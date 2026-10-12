@@ -1,0 +1,109 @@
+name: Build apps
+
+# Builds the Firestick and Windows apps from the project zip file in this repository.
+# Runs every time you upload something, or on demand from the Actions tab.
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  firestick:
+    name: Firestick app
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unpack the project
+        run: |
+          z=$(ls red-carpet-streams-project*.zip 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$z" ]; then ls -la; echo "::error::Upload the red-carpet-streams-project zip file to the main page of the repository."; exit 1; fi
+          echo "Using $z"
+          unzip -q "$z" -d src
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Put the TV app inside the Android app
+        run: |
+          mkdir -p src/firestick/app/src/main/assets/www
+          cp -r src/tv-app/. src/firestick/app/src/main/assets/www/
+
+      - name: Build
+        run: gradle -p src/firestick assembleRelease --no-daemon
+
+      - name: Name the file
+        run: cp src/firestick/app/build/outputs/apk/release/app-release.apk "RedCarpetStreams-Firestick-${{ github.run_number }}.apk"
+
+      - name: Publish for download
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}-firestick
+          name: Firestick app (build ${{ github.run_number }})
+          files: RedCarpetStreams-Firestick-${{ github.run_number }}.apk
+
+  windows:
+    name: Windows app
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unpack the project
+        shell: pwsh
+        run: |
+          $z = Get-ChildItem -File -Filter 'red-carpet-streams-project*.zip' | Sort-Object Name | Select-Object -Last 1
+          if (-not $z) { Get-ChildItem | Format-Table Name; throw "Upload the red-carpet-streams-project zip file to the main page of the repository." }
+          Write-Host "Using $($z.Name)"
+          Expand-Archive -Path $z.FullName -DestinationPath src -Force
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Put the TV app inside the Windows app
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force src/windows/app | Out-Null
+          Copy-Item -Recurse -Force src/tv-app/* src/windows/app/
+
+      - name: Download the mpv player
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $rel = Invoke-RestMethod -Uri 'https://api.github.com/repos/zhongfly/mpv-winbuild/releases/latest' -Headers @{ Authorization = "Bearer $env:GH_TOKEN" }
+          $asset = $rel.assets | Where-Object { $_.name -match '^mpv-x86_64-\d{8}-git-[0-9a-f]+\.7z$' } | Select-Object -First 1
+          if (-not $asset) { throw "Couldn't find the mpv download in the latest release" }
+          Write-Host "Using $($asset.name)"
+          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile mpv.7z
+          7z x mpv.7z -osrc/windows/mpv -y | Out-Null
+          if (-not (Test-Path src/windows/mpv/mpv.exe)) { Get-ChildItem -Recurse src/windows/mpv | Select-Object -First 30 | Format-Table FullName; throw "mpv.exe wasn't where expected after unpacking" }
+
+      - name: Build
+        shell: pwsh
+        run: |
+          Set-Location src/windows
+          npm install
+          if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
+          npx electron-builder --win nsis --x64 --publish never --config.extraMetadata.version=2.8.${{ github.run_number }}
+          if ($LASTEXITCODE -ne 0) { throw "electron-builder failed" }
+
+      - name: Name the file
+        shell: pwsh
+        run: Copy-Item (Get-ChildItem src/windows/dist/*.exe | Select-Object -First 1).FullName "RedCarpetStreams-Windows-Setup-${{ github.run_number }}.exe"
+
+      - name: Publish for download
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}-windows
+          name: Windows app (build ${{ github.run_number }})
+          files: RedCarpetStreams-Windows-Setup-${{ github.run_number }}.exe
