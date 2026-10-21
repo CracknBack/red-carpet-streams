@@ -1,0 +1,56 @@
+plugins {
+    id 'com.android.application'
+}
+
+def runNumber = (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
+/* the version shown is the TV app's own version (read from the files copied into the app at build time) */
+def infoFile = file('src/main/assets/www/appinfo.json')
+def appVer = infoFile.exists() ? new groovy.json.JsonSlurper().parseText(infoFile.text).version : '0.0'
+
+android {
+    namespace 'com.tyre.redcarpetstreams'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.tyre.redcarpetstreams'
+        minSdk 25
+        targetSdk 34
+        versionCode runNumber
+        versionName "${appVer}"
+    }
+
+    /* The same signing key every build, so updates install over the top without losing your sign-in or favourites. */
+    signingConfigs {
+        release {
+            storeFile file('rcs-release.p12')
+            storePassword 'REDACTED-OLD-KEYSTORE-PASSWORD'
+            keyAlias 'rcs'
+            keyPassword 'REDACTED-OLD-KEYSTORE-PASSWORD'
+            storeType 'pkcs12'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+}
+
+dependencies {
+    implementation 'androidx.media3:media3-exoplayer:1.4.1'
+    implementation 'androidx.media3:media3-exoplayer-hls:1.4.1'
+    implementation 'androidx.media3:media3-ui:1.4.1'
+    implementation 'androidx.annotation:annotation-experimental:1.4.1'
+}
