@@ -1,9 +1,7 @@
 name: Build Windows app
 
-# Runs every time you upload changes, or on demand from the Actions tab.
+# Manual only (Actions tab > Run workflow, or gh workflow run) -- not on every push, so pushing code changes does not burn a build until you ask for one.
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
 
 permissions:
