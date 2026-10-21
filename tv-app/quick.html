@@ -1310,11 +1310,15 @@ async function applyData(d, show) {
     for (const t of ['live', 'vod', 'series']) {
       const x = d[t];
       say(t === 'live' ? 'Preparing channels…' : t === 'vod' ? 'Preparing movies…' : 'Preparing series…');
-      /* vod/series: grouping every copy of every title into one entry is the single biggest memory
-         cost in the app (confirmed: it OOM-crashes a Fire TV Stick on a 200k+ item provider). Skip it
-         here and do it later, once, the first time the user actually opens Movies/Series/Search/Favourites
-         (ensureTitlesGrouped) — most sessions that only watch live TV never pay that cost at all. */
+      /* vod/series on an Xtream account: fetching and grouping every copy of every title into one
+         entry is the single biggest cost in the app (confirmed: it OOM-crashes a Fire TV Stick on a
+         200k+ item provider, and is slow even on hardware with enough RAM to survive it). Skip it here
+         and do it later, once, the first time the user actually opens Movies/Series/Search/Favourites
+         (ensureTitlesGrouped) — most sessions that only watch live TV never pay that cost at all.
+         M3U accounts get everything in one playlist file with no separate per-type fetch, so there is
+         nothing to defer for them. */
       if (t === 'live') { await runSliced(prepChannelsG()); x.grouped = true; }
+      else if (isM3u()) { await runSliced(prepTitlesG(t)); x.grouped = true; x.fetched = true; }
       else x.grouped = false;
       await runSliced(splitAdultG(t));
       x.byId = new Map(x.items.map(i => [i.id, i]));
@@ -1351,17 +1355,17 @@ async function refreshAll(fg) {
     }
     step('Downloading channels…');
     const [lc, ls] = await Promise.all([api('get_live_categories'), api('get_live_streams')]);
-    step('Downloading movies…');
-    const [vc, vs] = await Promise.all([api('get_vod_categories'), api('get_vod_streams')]).catch(() => [[], []]);
-    step('Downloading series…');
-    const [sc, ss] = await Promise.all([api('get_series_categories'), api('get_series')]).catch(() => [[], []]);
+    /* Movies/series categories only here — the (often huge) item lists are fetched lazily,
+       per type, by ensureTitlesGrouped the first time they're actually needed. */
+    step('Downloading movie and series categories…');
+    const [vc, sc] = await Promise.all([api('get_vod_categories'), api('get_series_categories')]).catch(() => [[], []]);
     step('Tidying up names…');
     await sleep(30);
     const d = {
       updated: Date.now(),
       live: {cats: procCats(lc), items: await runSliced(procItemsG(ls, 'live'))},
-      vod: {cats: procCats(vc), items: await runSliced(procItemsG(vs, 'vod'))},
-      series: {cats: procCats(sc), items: await runSliced(procItemsG(ss, 'series'))}
+      vod: {cats: procCats(vc), items: [], fetched: false},
+      series: {cats: procCats(sc), items: [], fetched: false}
     };
     await idb.set(cacheKey(), d);
     await applyData(d, fg);
@@ -1601,7 +1605,9 @@ const SORTS = {live: ['A to Z', 'Channel number'], vod: ['Provider order', 'Newe
 const TYPE_LABEL = {live: 'Live TV', vod: 'Movie', series: 'Series'};
 /* What a page is showing: the Favourites page shows channels, movies or series depending on the section picked. */
 function kindOf(t) { if (t !== 'favs') return t; const c = B.favs.cats[B.favs.cat]; return c ? c.ft : 'live'; }
-const anyFavs = () => !!DATA && ['live', 'vod', 'series'].some(t => specialList(t, '__fav').length);
+/* Checks the saved favourite ids directly, not whether they currently resolve in DATA — vod/series
+   are only fetched lazily now, so a movie/series-only favourite list must still be able to route here. */
+const anyFavs = () => ['live', 'vod', 'series'].some(t => (favs[t] || []).length);
 
 const catView = new VView($('cats'), {rowH: 6.8, render: catRow});
 const listView = new VView($('list'), {rowH: 6.8, render: liveRow});
@@ -3155,8 +3161,8 @@ function homeDetail(id) {
   if (id === 'live') return n(DATA.live.items.length) + ' channels';
   if (id === 'favs') { const c = ['live', 'vod', 'series'].reduce((a, t) => a + specialList(t, '__fav').length, 0); return c ? c + (c === 1 ? ' favourite' : ' favourites') : 'None yet'; }
   if (id === 'search') return 'Games, teams, channels';
-  if (id === 'vod') { const c = specialList('vod', '__cont').length; return c ? c + ' to continue' : n(DATA.vod.items.length) + ' movies'; }
-  if (id === 'series') { const c = specialList('series', '__cont').length; return c ? c + ' to continue' : n(DATA.series.items.length) + ' series'; }
+  if (id === 'vod') { const c = specialList('vod', '__cont').length; return c ? c + ' to continue' : DATA.vod.fetched ? n(DATA.vod.items.length) + ' movies' : 'Movies'; }
+  if (id === 'series') { const c = specialList('series', '__cont').length; return c ? c + ' to continue' : DATA.series.fetched ? n(DATA.series.items.length) + ' series' : 'Series'; }
   return 'Account and display';
 }
 /* the strip: live games from your sports (shortcuts and teams); otherwise things to continue watching */
@@ -3638,9 +3644,28 @@ async function ensureTitlesGrouped(t) {
   if (!x || x.grouped) return;
   loading(true, t === 'vod' ? 'Preparing movies…' : 'Preparing series…');
   try {
-    await runSliced(prepTitlesG(t));
-    x.byId = new Map(x.items.map(i => [i.id, i]));
-    x.grouped = true;
+    /* A previous visit (this session or an earlier one) may have already fetched and grouped this
+       type — check its own small cache entry before asking the provider for the whole list again.
+       It's only trusted while it matches the catalog's current refresh "epoch" (DATA.updated); a
+       background refreshAll() bumps that, so a stale cached type here just falls through to a
+       fresh fetch instead of silently showing an old list forever. */
+    const own = cacheKey() + ':' + t;
+    const cached = !isM3u() && await idb.get(own);
+    if (cached && cached._updated === DATA.updated) {
+      DATA[t] = cached;
+    } else {
+      if (!x.fetched) {
+        const raw = await api(t === 'vod' ? 'get_vod_streams' : 'get_series');
+        x.items = await runSliced(procItemsG(raw, t));
+        x.fetched = true;
+      }
+      await runSliced(prepTitlesG(t));
+      await runSliced(splitAdultG(t));
+      x.byId = new Map(x.items.map(i => [i.id, i]));
+      x.catName = new Map(x.cats.map(c => [c.id, c.name]));
+      x.grouped = true;
+      if (!isM3u()) await idb.set(own, Object.assign({}, x, {_updated: DATA.updated}));
+    }
     ALL = DATA.live.items.concat(DATA.vod.items, DATA.series.items);
   } finally { loading(false); }
 }
@@ -5083,6 +5108,10 @@ function renderSettings() {
   const u = userInfo || {};
   const exp = Number(u.exp_date) ? new Date(Number(u.exp_date) * 1000).toLocaleDateString() : 'No expiry date given';
   const upd = DATA && DATA.updated ? new Date(DATA.updated).toLocaleString([], {weekday: 'short', hour: 'numeric', minute: '2-digit'}) : 'Never';
+  /* Movies/series on an Xtream account aren't fetched until Movies/Series/Search/Favourites is first
+     opened (see ensureTitlesGrouped), so their counts aren't known yet until then. */
+  const vodCount = DATA && DATA.vod.fetched ? DATA.vod.items.length.toLocaleString() + ' movies' : 'movies not loaded yet';
+  const seriesCount = DATA && DATA.series.fetched ? DATA.series.items.length.toLocaleString() + ' series' : 'series not loaded yet';
   const rows = isM3u() ? [
     ['Signed in with', 'M3U playlist'],
     ['Playlist', cfg.url.length > 60 ? cfg.url.slice(0, 57) + '…' : cfg.url],
@@ -5095,7 +5124,7 @@ function renderSettings() {
     ['Status', u.status || 'Unknown'],
     ['Expires', exp],
     ['Connections in use', (u.active_cons ?? '?') + ' of ' + (u.max_connections || '?')],
-    ['Lists', DATA ? DATA.live.items.length.toLocaleString() + ' channels, ' + DATA.vod.items.length.toLocaleString() + ' movies, ' + DATA.series.items.length.toLocaleString() + ' series' : ''],
+    ['Lists', DATA ? DATA.live.items.length.toLocaleString() + ' channels, ' + vodCount + ', ' + seriesCount : ''],
     ['Last updated', upd],
     ['App version', APP_VERSION]
   ].concat(CLOCK.skew ? [['Device clock', 'Off by ' + Math.round(Math.abs(CLOCK.skew) / 60000) + ' minutes; the app corrects for it']] : []);
