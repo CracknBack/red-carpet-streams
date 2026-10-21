@@ -680,7 +680,6 @@ html:not(.phone) #g-chans .csec{grid-template-columns:repeat(var(--gc,4),1fr)}
 .pku{font-size:1.4rem;color:var(--muted);word-break:break-all;margin-top:2rem;opacity:.8}
 .svl{align-self:center;margin-right:1.2rem;color:var(--muted);font-size:1.8rem}
 .osdh{font-size:1.7rem;opacity:.75;margin-top:.6rem}
-
 /*LIGHT-START*/
 html.light .btn.focus{color:#3A1D18}
 html.light .err{color:#8A5A1C}
@@ -1311,7 +1310,12 @@ async function applyData(d, show) {
     for (const t of ['live', 'vod', 'series']) {
       const x = d[t];
       say(t === 'live' ? 'Preparing channels…' : t === 'vod' ? 'Preparing movies…' : 'Preparing series…');
-      if (t !== 'live') await runSliced(prepTitlesG(t)); else await runSliced(prepChannelsG());
+      /* vod/series: grouping every copy of every title into one entry is the single biggest memory
+         cost in the app (confirmed: it OOM-crashes a Fire TV Stick on a 200k+ item provider). Skip it
+         here and do it later, once, the first time the user actually opens Movies/Series/Search/Favourites
+         (ensureTitlesGrouped) — most sessions that only watch live TV never pay that cost at all. */
+      if (t === 'live') { await runSliced(prepChannelsG()); x.grouped = true; }
+      else x.grouped = false;
       await runSliced(splitAdultG(t));
       x.byId = new Map(x.items.map(i => [i.id, i]));
       x.catName = new Map(x.cats.map(c => [c.id, c.name]));
@@ -3627,6 +3631,24 @@ function* prepTitlesG(t) {
   x.items.forEach(g => g.vers.forEach(v => x.verToTitle.set(v.id, g)));
 }
 const prepTitles = t => runSync(prepTitlesG(t));
+/* The grouping applyData() skipped for vod/series (see there for why): done once, the first time
+   it's actually needed, with its own "Preparing…" message so it never surprises the user. */
+async function ensureTitlesGrouped(t) {
+  const x = DATA && DATA[t];
+  if (!x || x.grouped) return;
+  loading(true, t === 'vod' ? 'Preparing movies…' : 'Preparing series…');
+  try {
+    await runSliced(prepTitlesG(t));
+    x.byId = new Map(x.items.map(i => [i.id, i]));
+    x.grouped = true;
+    ALL = DATA.live.items.concat(DATA.vod.items, DATA.series.items);
+  } finally { loading(false); }
+}
+async function ensureVodSeriesReady() {
+  if (!DATA) return;
+  await ensureTitlesGrouped('vod');
+  await ensureTitlesGrouped('series');
+}
 /* newest progress among a title's copies */
 function titleProg(g) {
   let best = null;
@@ -4286,7 +4308,7 @@ function renderHints() {
   $('hints').innerHTML = hintsHtml(h);
 }
 
-function showPage(p) {
+async function showPage(p) {
   S.page = p;
   S.rail = PAGES.findIndex(x => x.id === p);
   $('main').classList.toggle('sport', p === 'search' || p === 'favs');
@@ -4299,6 +4321,10 @@ function showPage(p) {
   if (p === 'search') loadF1(false);
   if (p === 'search' && ui.tsdbKey) loadTsdb(false);
   if (p === 'search' && !GUIDE_BUSY && (!GUIDE || Date.now() - GUIDE.ts > 3 * 3600e3)) loadGuide(false);
+  /* movies/series are only fully prepared once something actually needs them: this page, a search,
+     or favourites (which can mix in a movie/series pick) — see ensureTitlesGrouped. */
+  if (p === 'vod' || p === 'series' || p === 'search' || p === 'favs') await ensureVodSeriesReady();
+  if (S.page !== p) return;   /* the user moved on again while that was loading */
   if (browse) { ensureCats(p); catView.reset(); listView.reset(); gridView.reset(); }
   if (p === 'search') resView.reset();
   renderMain();
@@ -5123,7 +5149,7 @@ function settingsAction(i) {
   else if (a === 'pcplayer') { ui.pcPlayer = ui.pcPlayer === 'mpv' ? 'auto' : 'mpv'; save('sp_ui', ui); renderMain(); }
   else if (a === 'lang') {
     ui.lang = LANG_ORDER[(LANG_ORDER.indexOf(ui.lang) + 1) % LANG_ORDER.length]; save('sp_ui', ui);
-    if (DATA) { ['vod', 'series'].forEach(t => { prepTitles(t); DATA[t].byId = new Map(DATA[t].items.map(x => [x.id, x])); B[t].cats = []; });
+    if (DATA) { ['vod', 'series'].forEach(t => { if (!DATA[t].grouped) return; prepTitles(t); DATA[t].byId = new Map(DATA[t].items.map(x => [x.id, x])); B[t].cats = []; });
       ALL = DATA.live.items.concat(DATA.vod.items, DATA.series.items); Q.last = null; }
     EVENTS = null; V++; renderMain();
   }
