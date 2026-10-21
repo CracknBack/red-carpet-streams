@@ -1,0 +1,38 @@
+{
+  "name": "red-carpet-streams",
+  "productName": "Red Carpet Streams",
+  "version": "3.2.0",
+  "description": "Red Carpet Streams for Windows",
+  "author": "Tyre",
+  "main": "main.js",
+  "private": true,
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.tyre.redcarpetstreams",
+    "productName": "Red Carpet Streams",
+    "files": [
+      "main.js",
+      "preload.js",
+      "icon.png",
+      "app/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "mpv",
+        "to": "mpv"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Red Carpet Streams"
+    }
+  }
+}
