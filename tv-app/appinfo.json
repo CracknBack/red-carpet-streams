@@ -1,0 +1,12 @@
+{
+  "id": "com.tyre.redcarpetstreams",
+  "version": "3.19.0",
+  "vendor": "Tyre",
+  "type": "web",
+  "main": "index.html",
+  "title": "Red Carpet Streams",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "bgColor": "#0C1920",
+  "disableBackHistoryAPI": true
+}

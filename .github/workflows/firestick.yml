@@ -1,0 +1,61 @@
+name: Build Firestick app
+
+# Runs every time you upload changes, or on demand from the Actions tab.
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find the project folders
+        run: |
+          # Works whether the project sits at the top of the repository or inside one extra folder.
+          f=$(find . -path '*/tv-app/index.html' -not -path '*/assets/*' | head -n 1)
+          if [ -z "$f" ]; then echo "Top level of the repository:"; ls -la; echo "::error::Couldn't find the tv-app folder. It may not have been uploaded."; exit 1; fi
+          root=$(cd "$(dirname "$f")/.." && pwd)
+          if [ ! -f "$root/firestick/app/build.gradle" ]; then echo "::error::Found tv-app in $root but not the firestick folder next to it. It may not have been uploaded."; exit 1; fi
+          echo "Project found in $root"
+          echo "ROOT=$root" >> "$GITHUB_ENV"
+
+      - name: Read the app version
+        run: echo "VER=$(jq -r .version "$ROOT/tv-app/appinfo.json")" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Put the TV app inside the Android app
+        run: |
+          mkdir -p "$ROOT/firestick/app/src/main/assets/www"
+          cp -r "$ROOT/tv-app/." "$ROOT/firestick/app/src/main/assets/www/"
+
+      - name: Build
+        run: gradle -p "$ROOT/firestick" assembleRelease --no-daemon
+
+      - name: Name the file
+        run: cp "$ROOT/firestick/app/build/outputs/apk/release/app-release.apk" "RedCarpetStreams-${{ env.VER }}-build${{ github.run_number }}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RedCarpetStreams-${{ env.VER }}-build${{ github.run_number }}
+          path: RedCarpetStreams-${{ env.VER }}-build${{ github.run_number }}.apk
+
+      - name: Publish as a release (easy to download on your phone)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: firestick-${{ github.run_number }}
+          name: Red Carpet Streams ${{ env.VER }} (build ${{ github.run_number }})
+          files: RedCarpetStreams-${{ env.VER }}-build${{ github.run_number }}.apk
