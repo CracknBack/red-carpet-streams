@@ -9,6 +9,7 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
+import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -45,6 +46,7 @@ import java.util.Locale;
  */
 @OptIn(markerClass = UnstableApi.class)
 public class MainActivity extends Activity {
+    private FrameLayout root;
     private WebView web;
     private PlayerView pv;
     private ExoPlayer player;
@@ -61,7 +63,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
-        FrameLayout root = new FrameLayout(this);
+        root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
 
         pv = new PlayerView(this);
@@ -70,20 +72,7 @@ public class MainActivity extends Activity {
         pv.setVisibility(View.GONE);
         root.addView(pv, new FrameLayout.LayoutParams(-1, -1));
 
-        web = new WebView(this);
-        web.setBackgroundColor(Color.TRANSPARENT);
-        WebSettings s = web.getSettings();
-        s.setJavaScriptEnabled(true);
-        s.setDomStorageEnabled(true);
-        s.setDatabaseEnabled(true);
-        s.setAllowFileAccess(true);
-        s.setAllowFileAccessFromFileURLs(true);
-        s.setAllowUniversalAccessFromFileURLs(true);
-        s.setMediaPlaybackRequiresUserGesture(false);
-        s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-        web.setWebViewClient(new WebViewClient());
-        web.setWebChromeClient(new WebChromeClient());
-        web.addJavascriptInterface(new Bridge(), "RCS");
+        web = makeWebView();
         root.addView(web, new FrameLayout.LayoutParams(-1, -1));
         setContentView(root);
         web.requestFocus();
@@ -111,6 +100,49 @@ public class MainActivity extends Activity {
         });
         ui.post(ticker);
 
+        web.loadUrl("file:///android_asset/www/index.html");
+    }
+
+    /*
+     * A WebView whose render process is killed (commonly out-of-memory while a big provider's
+     * channel/VOD lists load) takes the whole app down with it unless onRenderProcessGone is
+     * overridden: that is Android's documented default. Here we rebuild the WebView and reload
+     * the page instead of letting the app die silently back to the Fire TV home screen.
+     */
+    private WebView makeWebView() {
+        WebView w = new WebView(this);
+        w.setBackgroundColor(Color.TRANSPARENT);
+        WebSettings s = w.getSettings();
+        s.setJavaScriptEnabled(true);
+        s.setDomStorageEnabled(true);
+        s.setDatabaseEnabled(true);
+        s.setAllowFileAccess(true);
+        s.setAllowFileAccessFromFileURLs(true);
+        s.setAllowUniversalAccessFromFileURLs(true);
+        s.setMediaPlaybackRequiresUserGesture(false);
+        s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        w.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                if (view != web) return false;
+                ui.post(MainActivity.this::recreateWebView);
+                return true;
+            }
+        });
+        w.setWebChromeClient(new WebChromeClient());
+        w.addJavascriptInterface(new Bridge(), "RCS");
+        return w;
+    }
+
+    private void recreateWebView() {
+        if (player != null) { player.stop(); player.clearMediaItems(); }
+        if (pv != null) pv.setVisibility(View.GONE);
+        metaSent = false;
+        root.removeView(web);
+        web.destroy();
+        web = makeWebView();
+        root.addView(web, new FrameLayout.LayoutParams(-1, -1));
+        web.requestFocus();
         web.loadUrl("file:///android_asset/www/index.html");
     }
 
