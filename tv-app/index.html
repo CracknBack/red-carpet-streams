@@ -3665,6 +3665,11 @@ async function ensureTitlesGrouped(t) {
       x.grouped = true;
       if (!isM3u()) await idb.set(own, Object.assign({}, x, {_updated: DATA.updated}));
     }
+    /* Pre-warm the New releases/Top rated/Languages/All-A-Z menu now, sliced, under the same spinner —
+       otherwise it runs fully unsliced and blocking the first time the category menu is built, right
+       after this spinner would otherwise disappear. V resets every launch, so even a cache hit above
+       needs this redone each session; it's cheap compared to the fetch+grouping it piggybacks on. */
+    await runSliced(libIndexG(t));
     ALL = DATA.live.items.concat(DATA.vod.items, DATA.series.items);
   } finally { loading(false); }
 }
@@ -3893,21 +3898,41 @@ function buildCats0(t) {
 }
 /* ---------- movies and series: a short menu instead of the provider's hundreds of categories ---------- */
 const LANG_LABEL = c => c === '' ? 'Other / not labelled' : c === 'multi' ? 'Multi-language' : c === 'vost' ? 'Original with subtitles' : (LANGS[c] || c.toUpperCase());
-function libIndex(t) {
-  const d = DATA[t];
-  if (d.lib && d.lib.v === V + '|' + ui.lang) return d.lib;
+/* The Movies/Series category menu (New releases, Top rated, Languages, All A-Z) needs to look at
+   every item at least once — there is no way to show "top rated" without having seen every rating.
+   That look is the other big synchronous cost besides fetching+grouping (confirmed: fully unsliced,
+   it can block the thread for seconds on 100k+ items). So it is SLICED (libIndexG, yields regularly)
+   and run once up front by ensureTitlesGrouped, under the same "Preparing…" spinner as the fetch and
+   grouping, instead of appearing to freeze right after that spinner disappears. The one-off per-item
+   cost (_lr) replaces calling titleLangRank() again inside every one of the ~2,000,000 sort
+   comparisons a plain "sort 124,000 items" involves. */
+function* libIndexG(t) {
+  const d = DATA[t], key = V + '|' + ui.lang;
+  if (d.lib && d.lib.v === key) return;
   const yNow = new Date().getFullYear(), langMap = new Map();
-  d.items.forEach(x => {
+  let n = 0;
+  for (const x of d.items) {
+    x._lr = titleLangRank(x);
     const ls = new Set((x.vers || [x]).map(v => v.lang || ''));
     if (ls.size > 1) ls.delete('');
     ls.forEach(l => (langMap.get(l) || langMap.set(l, []).get(l)).push(x));
-  });
+    if ((++n & 511) === 0) yield;
+  }
   const yr = x => Number(x.year) || 0;
-  const newrel = d.items.filter(x => yr(x) >= yNow - 1).sort((a, b) => titleLangRank(a) - titleLangRank(b) || yr(b) - yr(a) || b.added - a.added).slice(0, 600);
-  const top = d.items.filter(x => x.rating >= 7.5 && x.rating <= 10).sort((a, b) => titleLangRank(a) - titleLangRank(b) || b.rating - a.rating).slice(0, 600);
+  const newrel = d.items.filter(x => yr(x) >= yNow - 1).sort((a, b) => a._lr - b._lr || yr(b) - yr(a) || b.added - a.added).slice(0, 600);
+  yield;
+  const top = d.items.filter(x => x.rating >= 7.5 && x.rating <= 10).sort((a, b) => a._lr - b._lr || b.rating - a.rating).slice(0, 600);
+  yield;
+  const az = d.items.slice().sort((a, b) => a._lr - b._lr || (a.q < b.q ? -1 : a.q > b.q ? 1 : 0));
+  yield;
   const langs = [...langMap.entries()].filter(([l, a]) => l === '' || a.length >= 5)
     .sort((a, b) => (a[0] === ui.lang ? -1 : b[0] === ui.lang ? 1 : 0) || (a[0] === '' ? 1 : b[0] === '' ? -1 : 0) || b[1].length - a[1].length);
-  d.lib = {v: V + '|' + ui.lang, newrel, top, langs, langMap};
+  d.lib = {v: key, newrel, top, langs, langMap, az};
+}
+function libIndex(t) {
+  const d = DATA[t];
+  if (d.lib && d.lib.v === V + '|' + ui.lang) return d.lib;
+  runSync(libIndexG(t));   /* fallback if not pre-warmed, e.g. the language preference changed mid-browse */
   return d.lib;
 }
 function buildLibCats(t) {
@@ -3993,7 +4018,7 @@ function sortItems(t, list) {
   const m = ui.sort[t];
   if ((t === 'vod' || t === 'series') && m !== 0) {
     const cmp = m === 1 ? (a, b) => b.added - a.added : m === 2 ? (a, b) => a.name.localeCompare(b.name) : (a, b) => b.rating - a.rating;
-    return list.slice().sort((a, b) => titleLangRank(a) - titleLangRank(b) || cmp(a, b));
+    return list.slice().sort((a, b) => (a._lr ?? titleLangRank(a)) - (b._lr ?? titleLangRank(b)) || cmp(a, b));
   }
   if (t === 'live') return m === 1 ? list.slice().sort((a, b) => (Number(a.num) || 1e9) - (Number(b.num) || 1e9)) : (list.az ? list : azSort(list));
   if (m === 1) return list.slice().sort((a, b) => b.added - a.added);
@@ -4015,7 +4040,7 @@ function itemsFor(t, c) {
     if (c.id.startsWith('g:')) { const [, cc, gn] = c.id.split(':'); const g = d.geoMap.get(cc); return sortItems(t, (g && g.genres.get(gn)) || []); }
   }
   if (String(c.id).startsWith('lang:')) return sortItems(t, libIndex(t).langMap.get(c.id.slice(5)) || []);
-  if (c.id === '__all' && (t === 'vod' || t === 'series')) return d.items.slice().sort((a, b) => titleLangRank(a) - titleLangRank(b) || a.name.localeCompare(b.name));
+  if (c.id === '__all' && (t === 'vod' || t === 'series')) return libIndex(t).az;   /* cached — see libIndexG */
   return sortItems(t, c.id === '__all' ? d.items : d.items.filter(it => it.cats ? it.cats.has(c.id) : it.cat === c.id));
 }
 function ensureCats(t) {
