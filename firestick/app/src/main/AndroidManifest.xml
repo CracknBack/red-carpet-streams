@@ -12,6 +12,7 @@
         android:banner="@drawable/banner"
         android:usesCleartextTraffic="true"
         android:hardwareAccelerated="true"
+        android:largeHeap="true"
         android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
 
         <activity
