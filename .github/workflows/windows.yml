@@ -1,0 +1,75 @@
+name: Build Windows app
+
+# Runs every time you upload changes, or on demand from the Actions tab.
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find the project folders
+        shell: pwsh
+        run: |
+          # Works whether the project sits at the top of the repository or inside one extra folder.
+          $f = Get-ChildItem -Recurse -File -Filter index.html | Where-Object { $_.Directory.Name -eq 'tv-app' } | Select-Object -First 1
+          if (-not $f) { Write-Host "Top level of the repository:"; Get-ChildItem | Format-Table Name; throw "Couldn't find the tv-app folder. It may not have been uploaded." }
+          $root = $f.Directory.Parent.FullName
+          if (-not (Test-Path "$root/windows/package.json")) { throw "Found tv-app in $root but not the windows folder next to it. It may not have been uploaded." }
+          Write-Host "Project found in $root"
+          "ROOT=$root" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Put the TV app inside the Windows app
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force "$env:ROOT/windows/app" | Out-Null
+          Copy-Item -Recurse -Force "$env:ROOT/tv-app/*" "$env:ROOT/windows/app/"
+
+      - name: Download the mpv player
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $rel = Invoke-RestMethod -Uri 'https://api.github.com/repos/zhongfly/mpv-winbuild/releases/latest' -Headers @{ Authorization = "Bearer $env:GH_TOKEN" }
+          $asset = $rel.assets | Where-Object { $_.name -match '^mpv-x86_64-\d{8}-git-[0-9a-f]+\.7z$' } | Select-Object -First 1
+          if (-not $asset) { throw "Couldn't find the mpv download in the latest release" }
+          Write-Host "Using $($asset.name)"
+          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile mpv.7z
+          7z x mpv.7z "-o$env:ROOT/windows/mpv" -y | Out-Null
+          if (-not (Test-Path "$env:ROOT/windows/mpv/mpv.exe")) { Get-ChildItem -Recurse "$env:ROOT/windows/mpv" | Select-Object -First 30 | Format-Table FullName; throw "mpv.exe wasn't where expected after unpacking" }
+
+      - name: Build
+        shell: pwsh
+        run: |
+          Set-Location "$env:ROOT/windows"
+          npm install
+          if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
+          npx electron-builder --win nsis --x64 --publish never --config.extraMetadata.version=2.8.${{ github.run_number }}
+          if ($LASTEXITCODE -ne 0) { throw "electron-builder failed" }
+
+      - name: Name the file
+        shell: pwsh
+        run: Copy-Item (Get-ChildItem "$env:ROOT/windows/dist/*.exe" | Select-Object -First 1).FullName "RedCarpetStreams-Windows-Setup-${{ github.run_number }}.exe"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RedCarpetStreams-windows-${{ github.run_number }}
+          path: RedCarpetStreams-Windows-Setup-${{ github.run_number }}.exe
+
+      - name: Publish as a release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: windows-${{ github.run_number }}
+          name: Windows build ${{ github.run_number }}
+          files: RedCarpetStreams-Windows-Setup-${{ github.run_number }}.exe
