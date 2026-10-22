@@ -3797,7 +3797,22 @@ async function ensureTitlesGrouped(t) {
         x.items = await runSliced(procItemsG(raw, t));
         x.fetched = true;
       }
+      memLog('ensureTitlesGrouped[' + t + '] before grouping, ' + x.items.length + ' raw items');
+      /* Safety ceiling, same reasoning as the guide items cap: the account's own live channel list
+         (56,333 raw items) processed fine at this device's memory ceiling, so that count is a real,
+         observed-safe reference point. vod/series title-grouping does meaningfully more work per item
+         (title-key normalisation, duplicate-copy merging, version sorting) than live channel grouping,
+         so this is capped slightly above that proven-safe figure rather than assuming linear safety all
+         the way up to an arbitrarily large catalog (182,569 raw vod items were seen on the device this
+         was diagnosed against). Unlike the guide cap, this does mean part of the owner's own library
+         wouldn't be shown if hit -- a real cost, not a free safety margin -- so it's flagged with a
+         visible toast rather than silently truncating. */
+      if (x.items.length > 60000) {
+        toast((t === 'vod' ? 'Movies' : 'Series') + ' list is very large (' + x.items.length.toLocaleString() + ' items) -- showing the first 60,000 to avoid a crash on this device.');
+        x.items = x.items.slice(0, 60000);
+      }
       await runSliced(prepTitlesG(t));
+      memLog('ensureTitlesGrouped[' + t + '] after grouping, ' + x.items.length + ' titles');
       await runSliced(splitAdultG(t));
       x.byId = new Map(x.items.map(i => [i.id, i]));
       x.catName = new Map(x.cats.map(c => [c.id, c.name]));
