@@ -431,9 +431,6 @@ mark{background:none;color:var(--amber);font-weight:600}
 .loading{position:fixed;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2.4rem;background:rgba(10,17,26,.92);z-index:10}
 .spinner{width:6rem;height:6rem;border:.5rem solid rgba(160,28,42,.45);border-top-color:var(--amber);border-radius:50%;animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-.pbar{width:34rem;max-width:70vw;height:.9rem;border-radius:.5rem;background:rgba(160,28,42,.3);overflow:hidden}
-.pbar-fill{height:100%;width:0%;background:var(--amber);border-radius:.5rem;transition:width .2s ease}
-html.light .pbar{background:rgba(120,70,20,.18)}
 .toast{position:fixed;top:3rem;left:50%;transform:translateX(-50%);background:var(--raise);padding:1.4rem 2.8rem;border-radius:.8rem;border:.1rem solid var(--line);z-index:11}
 #numjump{position:fixed;top:4rem;right:5rem;font-size:8rem;font-weight:700;color:var(--amber);background:rgba(10,17,26,.9);padding:1rem 3rem;border-radius:1rem;z-index:12;line-height:1}
 /* logo + splash */
@@ -918,7 +915,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 <div id="ask" class="overlay hidden"><div class="obox askbox"><div id="ask-title" class="slabel"></div><p id="ask-msg" class="note"></p><input id="ask-in" type="text" autocomplete="off" spellcheck="false"><p class="note">OK to save, Back to cancel</p></div></div>
 <div id="pk" class="overlay hidden"><div class="obox pkbox"><div class="pkcol"><div id="pk-title" class="slabel"></div><p class="pkm">Scan this with your phone’s camera, type, and press Send.</p><p id="pk-msg" class="pkst">Starting…</p><p id="pk-url" class="pku"></p><p class="note">Back to cancel</p></div><canvas id="pk-qr"></canvas></div></div>
 <div id="opts" class="overlay hidden"><div class="obox"><div class="slabel">Options</div><div id="opts-list"></div></div></div>
-<div id="loading" class="loading hidden"><div class="spinner"></div><p id="loading-msg">Loading…</p><div id="loading-bar" class="pbar hidden"><div id="loading-bar-fill" class="pbar-fill"></div></div></div>
+<div id="loading" class="loading hidden"><div class="spinner"></div><p id="loading-msg">Loading…</p></div>
 <div id="toast" class="toast hidden"></div>
 <div id="numjump" class="hidden"></div>
 
@@ -1139,12 +1136,11 @@ const norm = s => {
 let CUR = null;                                   /* the lists being prepared in the background, until they are ready to swap in */
 const D_ = () => CUR || DATA;
 function runSync(g) { let r; do { r = g.next(); } while (!r.done); return r.value; }
-async function runSliced(g, report) {
+async function runSliced(g) {
   let t = performance.now(), r;
   for (;;) {
     r = g.next();
     if (r.done) return r.value;
-    if (report && r.value != null) report(r.value);
     if (performance.now() - t > 12) { await new Promise(res => setTimeout(res, 0)); t = performance.now(); }
   }
 }
@@ -1284,7 +1280,7 @@ function* classifyLiveG() {
   L.cats.forEach(c => { const n = norm(c.raw); cc[c.id] = c.co || countryFromText(n); cg[c.id] = genreOf(' ' + n + ' '); });
   L.sorted = azSort(L.items);
   const geo = new Map();
-  let n = 0; const total = L.sorted.length || 1;
+  let n = 0;
   for (const it of L.sorted) {
     it.cc = it.co || cc[it.cat] || countryFromText(norm(it.raw)) || 'ZZ';
     if (!CNAME[it.cc]) CNAME[it.cc] = it.cc;
@@ -1295,7 +1291,7 @@ function* classifyLiveG() {
     let g = c.genres.get(it.g);
     if (!g) { g = []; g.az = true; c.genres.set(it.g, g); }
     g.push(it);
-    if ((++n & 127) === 0) yield n / total;
+    if ((++n & 127) === 0) yield;
   }
   const list = [...geo.values()];
   list.forEach(c => { c.glist = [...c.genres.entries()].sort((a, b) => a[0] === 'General' ? 1 : b[0] === 'General' ? -1 : a[0].localeCompare(b[0])); });
@@ -1305,81 +1301,36 @@ function* classifyLiveG() {
 const classifyLive = () => runSync(classifyLiveG());
 
 /* Prepares the lists in slices (with a short message if asked) and swaps them in only when everything is ready. */
-/* TEMPORARY diagnostic instrumentation: three rounds of fixes aimed at reducing memory pressure
-   (the logo database) did not move the needle on the owner's actual crash -- the V8 heap OOM recurred
-   at essentially the same ~223MB, ~138s mark on build 11 as it did before any of those fixes. Rather
-   than guess at the next hypothesis, this reports the real size of each major retained structure (and
-   performance.memory, where the WebView supports it -- this one does, Chromium 138) straight to logcat
-   at the moments that matter, plus every 20s so the growth curve up to a crash is visible, not just
-   snapshots. Remove once the real culprit is identified and fixed; this is not meant to ship long-term. */
-function memLog(label) {
-  try {
-    const m = performance.memory;
-    const parts = [
-      m ? 'heapUsedMB=' + (m.usedJSHeapSize / 1048576).toFixed(1) : 'heap=n/a',
-      m ? 'heapTotalMB=' + (m.totalJSHeapSize / 1048576).toFixed(1) : '',
-      'liveCh=' + (DATA && DATA.live ? DATA.live.items.length : '-'),
-      'liveRaw=' + (DATA && DATA.live && DATA.live.vers ? DATA.live.vers.length : '-'),
-      'vodItems=' + (DATA && DATA.vod ? DATA.vod.items.length : '-'),
-      'seriesItems=' + (DATA && DATA.series ? DATA.series.items.length : '-'),
-      'guideItems=' + (GUIDE ? GUIDE.items.length : '-'),
-      'guideChans=' + (GUIDE && GUIDE.chans ? Object.keys(GUIDE.chans).length : '-'),
-      'events=' + (EVENTS ? EVENTS.length : '-'),
-      'logoMap=' + (LOGOMAP ? 'u' + LOGOMAP.u.length + '/k' + Object.keys(LOGOMAP.k).length : '-')
-    ].filter(Boolean).join(' ');
-    console.error('MEMPROBE [' + label + '] ' + parts);
-  } catch (e) { console.error('MEMPROBE [' + label + '] error: ' + e.message); }
-}
-setInterval(() => memLog('periodic'), 20000);
-
 async function applyData(d, show) {
-  /* Live channel processing is the one phase with real, known-length work (the account's whole live
-     list, 49,121 channels in the case this was reported against) and now reports real progress through
-     it instead of leaving the owner looking at a frozen spinner with no idea whether it's still working.
-     vod/series are deferred (see below) so they have nothing meaningful to show here. Weights are a
-     rough split across the four live sub-phases (grouping is the dominant one), not a precise measure --
-     good enough for a progress bar, not claimed as exact. */
-  const say = (m, pct) => { if (show) loading(true, m, pct); };
+  const say = m => { if (show) loading(true, m); };
   CUR = d;
   try {
     let all = [];
     for (const t of ['live', 'vod', 'series']) {
       const x = d[t];
-      const msg = t === 'live' ? 'Preparing channels…' : t === 'vod' ? 'Preparing movies…' : 'Preparing series…';
-      say(msg, t === 'live' ? 0 : undefined);
-      if (t === 'live') {
-        await runSliced(prepChannelsG(), p => say(msg, p * 55)); x.grouped = true;
-        await runSliced(splitAdultG(t), p => say(msg, 55 + p * 15));
-        x.byId = new Map(x.items.map(i => [i.id, i]));
-        x.catName = new Map(x.cats.map(c => [c.id, c.name]));
-        all = all.concat(x.items);
-      } else {
-        /* vod/series: fetching and grouping every copy of every title into one entry is the single
-           biggest cost in the app (confirmed: it OOM-crashes a Fire TV Stick on a 200k+ item
-           provider, and is slow even on hardware with enough RAM to survive it). Skip it here and do
-           it later, once, the first time the user actually opens Movies/Series/Search/Favourites
-           (ensureTitlesGrouped) — most sessions that only watch live TV never pay that cost at all.
-           This used to apply only to Xtream accounts, on the assumption that M3U accounts -- whose
-           whole catalog arrives pre-parsed in one playlist file, with no separate per-category fetch
-           to defer -- had "nothing to defer". That assumption was wrong: the grouping step itself (and
-           the adult split / id lookup map / global Search concat riding on it) is exactly as deferrable
-           for M3U as for Xtream. Skipping that deferral for M3U was why a large M3U playlist (182,569
-           raw vod + 49,476 series items, seen on the device this was diagnosed against) was fully
-           grouped and held in memory on every single boot, before the owner had even opened Movies --
-           found only once diagnostics showed vod/series fully populated immediately after applyData(),
-           before Home had even rendered, with Movies never having been opened that session. */
-        x.fetched = isM3u(); x.grouped = false;
-      }
+      say(t === 'live' ? 'Preparing channels…' : t === 'vod' ? 'Preparing movies…' : 'Preparing series…');
+      /* vod/series on an Xtream account: fetching and grouping every copy of every title into one
+         entry is the single biggest cost in the app (confirmed: it OOM-crashes a Fire TV Stick on a
+         200k+ item provider, and is slow even on hardware with enough RAM to survive it). Skip it here
+         and do it later, once, the first time the user actually opens Movies/Series/Search/Favourites
+         (ensureTitlesGrouped) — most sessions that only watch live TV never pay that cost at all.
+         M3U accounts get everything in one playlist file with no separate per-type fetch, so there is
+         nothing to defer for them. */
+      if (t === 'live') { await runSliced(prepChannelsG()); x.grouped = true; }
+      else if (isM3u()) { await runSliced(prepTitlesG(t)); x.grouped = true; x.fetched = true; }
+      else x.grouped = false;
+      await runSliced(splitAdultG(t));
+      x.byId = new Map(x.items.map(i => [i.id, i]));
+      x.catName = new Map(x.cats.map(c => [c.id, c.name]));
+      all = all.concat(x.items);
     }
-    const liveMsg = 'Preparing channels…';
-    await runSliced(classifyLiveG(), p => say(liveMsg, 70 + p * 15));
-    await runSliced(applyLogosG(), p => say(liveMsg, 85 + p * 15));
+    await runSliced(classifyLiveG());
+    await runSliced(applyLogosG());
     DATA = d; ALL = all;
     for (const t of ['live', 'vod', 'series']) B[t].cats = [];
     EVENTS = null;
     V++;
     Q.last = null;
-    memLog('applyData done');
   } finally { CUR = null; }
 }
 
@@ -1591,12 +1542,7 @@ function show(id) {
 }
 window.addEventListener('resize', fitHome);
 addEventListener('resize', () => { if (S.screen === 'game' && GS.ev) renderGame(); });
-function loading(on, msg, pct) {
-  $('loading').classList.toggle('hidden', !on); if (msg) $('loading-msg').textContent = msg;
-  const bar = $('loading-bar'), has = typeof pct === 'number' && isFinite(pct);
-  bar.classList.toggle('hidden', !has);
-  if (has) $('loading-bar-fill').style.width = Math.max(0, Math.min(100, pct)) + '%';
-}
+function loading(on, msg) { $('loading').classList.toggle('hidden', !on); if (msg) $('loading-msg').textContent = msg; }
 let toastT;
 function toast(msg) {
   const t = $('toast'); t.textContent = msg; t.classList.remove('hidden');
@@ -1741,19 +1687,10 @@ async function loadFixtures(force) {
         home: (m.homeTeam && (m.homeTeam.shortName || m.homeTeam.name)) || 'TBC', away: (m.awayTeam && (m.awayTeam.shortName || m.awayTeam.name)) || 'TBC',
         homeFull: m.homeTeam && m.homeTeam.name || '', awayFull: m.awayTeam && m.awayTeam.name || ''}));
     }
-    /* buildEvents() is a large, fully synchronous pass over the whole guide (not sliced -- the
-       fixture-matching logic is the most correctness-sensitive code in the app, so it isn't touched
-       here); it used to re-run every time this poll landed even when the fetched fixtures were
-       identical to what EVENTS was already built from, which on a big guide is a real freeze, on a
-       poll as frequent as every 10 minutes whenever something is within 3 hours of now. Only drop
-       EVENTS when the fixtures actually changed (new match, a status change, a time change). */
-    const sig = JSON.stringify(all.map(m => [m.id, m.status, m.utcDate]));
-    const changed = sig !== FD.sig; FD.sig = sig;
     Object.assign(FD, {list: all, ts: Date.now(), err: ''});
     await idb.set(key, {list: all, ts: FD.ts});
-    if (changed) EVENTS = null;
   } catch (e) { FD.err = 'Fixtures couldn’t be updated: ' + e.message; }
-  FD.busy = false; if (S.screen === 'home') renderHome();
+  FD.busy = false; EVENTS = null; if (S.screen === 'home') renderHome();
   if (S.screen === 'main' && S.page === 'search') { Q.skey = ''; Q.gkey = ''; renderMain(); }
 }
 setInterval(() => { if (ui.fdKey && S.screen !== 'player') loadFixtures(false); }, 5 * 60000);
@@ -1777,13 +1714,10 @@ async function loadF1(force) {
       [['race', 'Race', at(rc), 2 * 3600e3], ['qual', 'Qualifying', at(rc.Qualifying), 4500e3], ['sprint', 'Sprint', at(rc.Sprint), 3600e3], ['sprintq', 'Sprint qualifying', at(rc.SprintQualifying || rc.SprintShootout), 3600e3]]
         .forEach(([k, label, start, dur]) => { if (start) list.push(Object.assign({id: rc.season + '-' + rc.round + '-' + k, k, label, start, dur}, base)); });
     });
-    const sig = JSON.stringify(list.map(x => [x.id, x.start]));
-    const changed = sig !== F1.sig; F1.sig = sig;
     Object.assign(F1, {list, ts: Date.now(), err: ''});
     await idb.set(key, {list, ts: F1.ts});
-    if (changed) EVENTS = null;
   } catch (e) { F1.err = 'The F1 schedule couldn’t be updated: ' + e.message; }
-  F1.busy = false; if (S.screen === 'home') renderHome();
+  F1.busy = false; EVENTS = null; if (S.screen === 'home') renderHome();
   if (S.screen === 'main' && S.page === 'search') { Q.skey = ''; Q.gkey = ''; renderMain(); }
 }
 /* which channels the guides show carrying a session: a Formula 1 listing for that race, starting within an hour of the session */
@@ -2482,18 +2416,8 @@ function guideUrl() {
   if (isM3u()) return cfg.epg || (DATA && DATA.epgUrl) || '';
   return cfg.server + '/xmltv.php?username=' + encodeURIComponent(cfg.user) + '&password=' + encodeURIComponent(cfg.pass);
 }
-/* Which guide channel ids belong to sports channels, and which channels they map to.
-   buildEvents() and its helpers (fixtureEvents, f1GuideChans -- the latter once per F1 session) can
-   call this many times in a single pass, and it was rebuilding a map over every one of the account's
-   live channels (49,121 in the case this was reported against) from scratch each time: real wasted CPU
-   and allocation on every call, not just the first. It only depends on DATA.live.items and GUIDE.xmap,
-   both of which are replaced wholesale (never mutated in place) whenever they actually change, so a
-   reference-equality cache is exact, not approximate -- one slot per 'all' value since both are used
-   together in checkGuideTimes(). */
-const EPGMAP_CACHE = [null, null];
+/* Which guide channel ids belong to sports channels, and which channels they map to. */
 function sportsEpgMap(all) {
-  const slot = all ? 1 : 0, c = EPGMAP_CACHE[slot];
-  if (c && c.items === DATA.live.items && c.xmap === (GUIDE && GUIDE.xmap)) return c.map;
   const m = new Map();
   for (const g of DATA.live.items) {
     if (!all && g.g !== 'Sports') continue;
@@ -2503,7 +2427,6 @@ function sportsEpgMap(all) {
     const set = new Set(GUIDE.xmap[k].map(id => DATA.live.byId.get(String(id))).filter(g => g && (all || g.g === 'Sports')));
     if (set.size) m.set(k, set);
   });
-  EPGMAP_CACHE[slot] = {items: DATA.live.items, xmap: GUIDE && GUIDE.xmap, map: m};
   return m;
 }
 /* ---------- free public guides (epgshare01), for channels the provider has no guide for ---------- */
@@ -2710,20 +2633,9 @@ async function loadGuide(force) {
   const want = sportsEpgMap(false), every = sportsEpgMap(true), chans = [], chIdx = new Map(), items = [];
   GUIDE_AC = new AbortController();
   const now = nowMs(), from = now - 24 * 3600e3, from8 = now - 8 * 86400e3, to = now + 7 * 86400e3;
-  /* Hard ceiling on how many guide entries get held in memory. On the owner's real provider (49,121
-     channels) this array was still growing fast -- 5,549 entries at 22.9MB read -- when the app crashed
-     (V8 heap OOM) a few seconds later; there was no limit at all before this, so an unusually large
-     guide could grow the array without bound regardless of device memory. This caps it at a size
-     comfortably past what was confirmed safe tonight (the capture never got further before the crash),
-     logged once if hit so it's visible rather than silently dropping coverage. It's a safety ceiling, not
-     a confirmed fix for the root cause -- if the crash still happens with this in place, the array's own
-     size isn't the (sole) driver and the next diagnostic pass needs to look elsewhere. */
-  const ITEMS_CAP = 6000;
-  let itemsCapHit = false;
-  let lastShow = 0, lastMem = 0;
+  let lastShow = 0;
   try {
     await streamXml(url, block => {
-      if (items.length >= ITEMS_CAP) { if (!itemsCapHit) { itemsCapHit = true; memLog('streamXml: hit ITEMS_CAP=' + ITEMS_CAP + ', dropping further entries'); } return; }
       const head = block.slice(0, block.indexOf('>') + 1);
       const ch = (head.match(/\bchannel="([^"]*)"/) || [])[1];
       if (!ch) return;
@@ -2743,17 +2655,13 @@ async function loadGuide(force) {
       items.push([ci, st, en, xmlDec(ti[1]), subWithDesc(block, xmlDec(ti[1]), su), 'p']);
     }, bytes => {
       if (Date.now() - lastShow > 700 && S.page === 'search') { lastShow = Date.now(); GUIDE_MSG = 'Downloading the TV guide… ' + (bytes / 1e6).toFixed(0) + ' MB read, ' + items.length.toLocaleString() + ' sports programmes found'; renderSearchHead(); }
-      if (Date.now() - lastMem > 5000) { lastMem = Date.now(); memLog('streamXml @' + (bytes / 1e6).toFixed(1) + 'MB read, ' + items.length + ' items, ' + chans.length + ' chans'); }
     });
-    memLog('streamXml done, ' + items.length + ' items, ' + chans.length + ' chans');
     const shift = await checkGuideTimes({items, chans}, every);
-    memLog('checkGuideTimes done');
     /* a correction you set yourself is applied now; otherwise the check against the broadcasters' schedules (below) decides */
     const man = manualFix();
     if (man) items.forEach(y => { y[1] += man; if (y[2]) y[2] += man; });
     let extra = {xmap: {}, notes: [], files: []};
     try { extra = await loadExtraGuides(chans, chIdx, items, from, to, every, force); } catch (e) { extra.notes.push('Free guides failed: ' + e.message); }
-    memLog('loadExtraGuides done, ' + items.length + ' items, ' + chans.length + ' chans');
     let cal = 0;
     if (man === null && extra.cal && extra.cal.d) {
       cal = -extra.cal.d;
@@ -2770,7 +2678,6 @@ async function loadGuide(force) {
     else { GUIDE_MSG = 'Couldn’t download the TV guide. ' + e.message; if (!GUIDE) GUIDE = {ts: 0, items: [], chans: [], failed: true}; }
   }
   GUIDE_AC = null; GUIDE_BUSY = false; EVENTS = null;
-  memLog('loadGuide done');
   if (S.screen === 'home') renderHome();
   if (S.page === 'search' && S.screen === 'main') { Q.skey = ''; Q.gkey = ''; resView.reset(); renderMain(); }
 }
@@ -2923,26 +2830,15 @@ function addNameEvents(out) {
       text: info.text + norm(g.name) + ' ', kick: kick || now, start: kick ? kick - 15 * 60e3 : now, stop: kick ? kick + 2.5 * 3600e3 : now + 24 * 3600e3, chans: [entry], reps: []});
   }
 }
-/* buildEvents() used to be one fully synchronous function. On a big enough guide (this was diagnosed
-   against a 49,121-channel provider) it's a genuine multi-second block, and on constrained hardware
-   (a Fire TV Stick) that block was severe enough to get the WebView render process OOM-killed. The
-   matching logic below is completely unchanged, line for line -- only yield points were added, at
-   boundaries between already-independent stages (and periodically within the one loop over the full
-   guide, which only writes to a local Map and so is safe to pause mid-loop). Two entry points:
-   buildEvents() (sync, via runSync -- every existing caller except Home's banner, unchanged behaviour)
-   and ensureEventsAsync() (sliced, via runSliced -- Home's banner only, see there for why). */
-function* buildEventsG() {
+function buildEvents() {
   const epgMap = sportsEpgMap(true), perCh = new Map(), now = nowMs();
   /* 1. read every guide entry once, channel by channel */
-  let n = 0;
   for (const [ci, st, en, title, sub] of ((GUIDE && GUIDE.items) || [])) {
     const groups = epgMap.get(GUIDE.chans[ci]);
     if (!groups) continue;
     const first = groups.values().next().value;
     (perCh.get(ci) || perCh.set(ci, []).get(ci)).push({ci, st, en: en || st + 2 * 3600e3, title, groups, info: parseEvent(title, sub, first ? first.name : '')});
-    if ((++n & 511) === 0) yield;
   }
-  yield;
   /* 2. a pre-match show that runs straight into a match on the same channel counts as that match's coverage */
   perCh.forEach(list => {
     list.sort((a, b) => a.st - b.st);
@@ -2954,7 +2850,6 @@ function* buildEventsG() {
       m.pre = pre; pre.used = true;
     }
   });
-  yield;
   /* 3. gather every airing of the same fixture. A club can't play two matches within 20 hours,
         so listings that share a known club in that time are the same match, whatever language they're in. */
   const all = [];
@@ -2977,9 +2872,7 @@ function* buildEventsG() {
     }
     if (!f) { f = {first: e.st, last: e.st, items: [], keys: new Set(), teamKeys: new Set()}; fixtures.push(f); }
     f.items.push(e); f.last = Math.max(f.last, e.st); f.keys.add(k); info.known.forEach(t => f.teamKeys.add(t));
-    if ((++n & 511) === 0) yield;
   }
-  yield;
   /* 4. split each club's airings into broadcasts (airings within 45 minutes of each other).
         The first broadcast is the live match. A later broadcast is a new match (say, a second leg)
         only if it's at least 2 days later and on several channels at once; anything else is a replay. */
@@ -2998,9 +2891,7 @@ function* buildEventsG() {
       /* airings before any live broadcast in the guide: the match itself was before the guide's history, so these are only replays */
       else { cur = {first: c.first, items: c.items.slice(), live: c.items.slice(), reps: [], isMatch: true, sure: false}; groups.push(cur); }
     }
-    if ((++n & 255) === 0) yield;
   }
-  yield;
   for (const grp of groups) {
     const items = grp.items, isMatch = grp.isMatch;
     const liveItems = grp.live.length ? grp.live : [items[0]], repItems = grp.reps;
@@ -3043,9 +2934,7 @@ function* buildEventsG() {
     /* a match is over 3 hours after kick-off at the latest, whatever a channel's listing says */
     ev.stop = Math.min(Math.max(...ev.chans.map(c => c.stop)), isMatch ? kick + 3 * 3600e3 : Infinity);
     out.push(ev);
-    if ((++n & 255) === 0) yield;
   }
-  yield;
   learnBroadcasters(out);
   addNameEvents(out);
   const f1 = f1Events();
@@ -3054,33 +2943,6 @@ function* buildEventsG() {
     const fx = fixtureEvents(), covered = ev => ev.teams && fx.some(f => Math.abs(f.kick - ev.kick) < 20 * 3600e3 && ev.teams.some(t => f.teams.map(norm).includes(norm(t))));
     EVENTS = fx.concat(f1, out.filter(ev => !FD_NAMES.has(ev.comp) && !(f1.length && ev.comp === 'Formula 1') && !covered(ev)));
   } else EVENTS = f1.concat(out.filter(ev => !(f1.length && ev.comp === 'Formula 1')));
-}
-const buildEvents = () => runSync(buildEventsG());
-let EVENTS_BUILDING = false;
-/* Home's banner (homeLives/homeUpcoming) is the one place that used to call buildEvents() synchronously
-   on the render path -- exactly where the owner saw the app black-screen and reload on a Fire TV Stick,
-   right as buildEvents() finished (a WebView render-process OOM kill: commit a23e735 already added
-   recovery for this class of crash, but recovering from it instead of avoiding it isn't good enough).
-   Every other caller of buildEvents() keeps the synchronous version above untouched. This one runs it
-   sliced instead, so the rest of the app (remote input, playback, other pages) stays responsive while
-   it works, and a lower peak memory footprint per slice (the GC gets to run between them) is the main
-   lever available here short of restructuring the matching logic itself, which is not something to
-   rush. GUIDE/DATA are snapshotted so a result computed against data that got replaced mid-build (an
-   account switch, a fresh refresh) is discarded instead of silently applied. */
-async function ensureEventsAsync() {
-  if (EVENTS || EVENTS_BUILDING) return;
-  EVENTS_BUILDING = true;
-  memLog('buildEvents start');
-  const myGuide = GUIDE, myData = DATA;
-  try {
-    await runSliced(buildEventsG());
-    if (GUIDE !== myGuide || DATA !== myData) EVENTS = null;
-  } catch (e) { EVENTS = null; }   /* e.g. GUIDE/DATA replaced mid-build; next render retries cleanly */
-  finally {
-    EVENTS_BUILDING = false;
-    memLog('buildEvents done');
-    if (EVENTS && S.screen === 'home') renderHome();
-  }
 }
 
 /* A guide can say a game is on a channel when it isn't (the wrong region's feed, a stale listing). The channel's OWN guide is the check:
@@ -3346,7 +3208,7 @@ const lgImg = (c, cls) => LG_OK.has(c) ? '<img class="' + (cls || 'lgi') + '" sr
 function homeLives() {
   try {
     if (!DATA || !(FD.list.length || F1.list.length)) return [];
-    if (!EVENTS) { ensureEventsAsync(); return []; }   /* builds in the background without blocking; renderHome() re-runs when ready */
+    if (!EVENTS) buildEvents();
     const now = nowMs(), order = chipsList(), rk = ev => { const k = order.indexOf(ev.comp); return k < 0 ? 99 : k; };
     return (EVENTS || []).filter(ev => ev.fixture && evState(ev, now) === 0).sort((a, b) => rk(a) - rk(b) || a.kick - b.kick);
   } catch (e) { return []; }
@@ -3365,7 +3227,7 @@ function homeReplays() {
 function homeUpcoming() {
   try {
     if (!DATA || !(FD.list.length || F1.list.length)) return [];
-    if (!EVENTS) { ensureEventsAsync(); return []; }   /* builds in the background without blocking; renderHome() re-runs when ready */
+    if (!EVENTS) buildEvents();
     const now = nowMs();
     return (EVENTS || []).filter(ev => ev.fixture && evState(ev, now) === 1 && ev.kick - now < 48 * 3600e3).sort((a, b) => a.kick - b.kick).slice(0, 6);
   } catch (e) { return []; }
@@ -3751,24 +3613,14 @@ function* groupTitlesG(t, list) {
   }
   /* copies with no year join the dated copies of the same title, if there's exactly one such title */
   const dated = new Map();
-  for (const g of byKey.values()) {
-    if (g.year) { let d = dated.get(g.k); if (!d) { d = []; dated.set(g.k, d); } d.push(g); }
-    if ((++n & 63) === 0) yield;
-  }
-  for (const [kk, g] of byKey) {
-    if (!g.year) { const d = dated.get(g.k); if (d && d.length === 1) { d[0].vers.push(...g.vers); byKey.delete(kk); } }
-    if ((++n & 63) === 0) yield;
-  }
+  byKey.forEach(g => { if (g.year) (dated.get(g.k) || dated.set(g.k, []).get(g.k)).push(g); });
+  byKey.forEach((g, kk) => { if (!g.year) { const d = dated.get(g.k); if (d && d.length === 1) { d[0].vers.push(...g.vers); byKey.delete(kk); } } });
   const out = [];
   for (const g of byKey.values()) {
     const vers = g.vers.sort(verCmp), best = vers[0];
-    /* a plain loop, not Math.max(...vers.map(...)): a popular title can have thousands of duplicate
-       listings on a big provider, and spreading that many args into Math.max throws "Maximum call
-       stack size exceeded" -- uncaught, this is what left Movies/Series stuck mid-load. */
-    let rating = 0, added = 0;
-    for (const v of vers) { if ((v.rating || 0) > rating) rating = v.rating; if ((v.added || 0) > added) added = v.added; }
     const it = {t, id: hashId(t + '|' + g.k + '|' + g.year), name: best.name, raw: best.raw, co: best.co, ql: best.qlab && !best.cam ? best.qlab : '',
-      year: g.year, icon: (vers.find(v => v.icon) || {}).icon || '', rating, added, cat: best.cat, cats: new Set(vers.map(v => v.cat)), vers};
+      year: g.year, icon: (vers.find(v => v.icon) || {}).icon || '', rating: Math.max(...vers.map(v => v.rating || 0)),
+      added: Math.max(...vers.map(v => v.added || 0)), cat: best.cat, cats: new Set(vers.map(v => v.cat)), vers};
     indexItem(it);
     out.push(it);
     if ((++n & 31) === 0) yield;
@@ -3789,7 +3641,12 @@ const prepTitles = t => runSync(prepTitlesG(t));
 async function ensureTitlesGrouped(t) {
   const x = DATA && DATA[t];
   if (!x || x.grouped) return;
-  loading(true, t === 'vod' ? 'Preparing movies…' : 'Preparing series…');
+  const label = t === 'vod' ? 'movies' : 'series';
+  loading(true, 'Preparing ' + label + '…');
+  /* A big provider can legitimately take a while to answer get_vod_streams/get_series (tens of MB of
+     JSON for 100k+ items) — say so instead of leaving a plain spinner up that looks identical to a
+     genuine hang. The request itself still has a hard 90s timeout (getJSON) either way. */
+  const reassure = setTimeout(() => loading(true, 'Still downloading ' + label + '… a large library can take a while'), 8000);
   try {
     /* A previous visit (this session or an earlier one) may have already fetched and grouped this
        type — check its own small cache entry before asking the provider for the whole list again.
@@ -3806,22 +3663,7 @@ async function ensureTitlesGrouped(t) {
         x.items = await runSliced(procItemsG(raw, t));
         x.fetched = true;
       }
-      memLog('ensureTitlesGrouped[' + t + '] before grouping, ' + x.items.length + ' raw items');
-      /* Safety ceiling, same reasoning as the guide items cap: the account's own live channel list
-         (56,333 raw items) processed fine at this device's memory ceiling, so that count is a real,
-         observed-safe reference point. vod/series title-grouping does meaningfully more work per item
-         (title-key normalisation, duplicate-copy merging, version sorting) than live channel grouping,
-         so this is capped slightly above that proven-safe figure rather than assuming linear safety all
-         the way up to an arbitrarily large catalog (182,569 raw vod items were seen on the device this
-         was diagnosed against). Unlike the guide cap, this does mean part of the owner's own library
-         wouldn't be shown if hit -- a real cost, not a free safety margin -- so it's flagged with a
-         visible toast rather than silently truncating. */
-      if (x.items.length > 60000) {
-        toast((t === 'vod' ? 'Movies' : 'Series') + ' list is very large (' + x.items.length.toLocaleString() + ' items) -- showing the first 60,000 to avoid a crash on this device.');
-        x.items = x.items.slice(0, 60000);
-      }
       await runSliced(prepTitlesG(t));
-      memLog('ensureTitlesGrouped[' + t + '] after grouping, ' + x.items.length + ' titles');
       await runSliced(splitAdultG(t));
       x.byId = new Map(x.items.map(i => [i.id, i]));
       x.catName = new Map(x.cats.map(c => [c.id, c.name]));
@@ -3834,7 +3676,12 @@ async function ensureTitlesGrouped(t) {
        needs this redone each session; it's cheap compared to the fetch+grouping it piggybacks on. */
     await runSliced(libIndexG(t));
     ALL = DATA.live.items.concat(DATA.vod.items, DATA.series.items);
-  } finally { loading(false); }
+  } catch (err) {
+    /* Never fail silently: without this, a network error or timeout here just left the "Preparing…"
+       spinner on screen forever with no sign anything had gone wrong. x.fetched/x.grouped stay false
+       so leaving and reopening the tab tries again, instead of getting stuck on a broken half-state. */
+    toast('Couldn’t load ' + label + ': ' + err.message);
+  } finally { clearTimeout(reassure); loading(false); }
 }
 async function ensureVodSeriesReady() {
   if (!DATA) return;
@@ -4154,15 +4001,7 @@ function buildProviderCats(t) {
   return v;
 }
 function specialList(t, id) {
-  /* d.byId/d.verToTitle don't exist yet for vod/series until ensureTitlesGrouped has actually run for
-     that type (grouping is deferred until Movies/Series is opened) -- treat that as "nothing resolves
-     yet" rather than crashing. This used to be safe to assume always-present, back when applyData()
-     built it eagerly for every type on every boot; it stopped being safe the moment that got deferred,
-     and this was the one caller of it that wasn't guarded, reached on every Home render (homeDetail)
-     whenever the Movies/Series tile is centred -- an uncaught TypeError here, with no try/catch above
-     it in renderHome(), is what was actually crashing/freezing Home on a device that was never short on
-     memory in the first place. */
-  const d = DATA[t], get = x => (d.byId ? d.byId.get(String(x)) : undefined) || (d.verToTitle && d.verToTitle.get(String(x)));
+  const d = DATA[t], get = x => d.byId.get(String(x)) || (d.verToTitle && d.verToTitle.get(String(x)));
   const uniq = l => l.filter((x, i) => x && l.indexOf(x) === i);
   if (id === '__adult') return adultOk() ? sortItems(t, d.adult || []) : [];
   if (id === '__fav') return uniq(favs[t].map(get));
@@ -4286,18 +4125,15 @@ function* groupChannelsG(list, cats) {
   const QR = {'8K': 5, '4K': 4, 'FHD': 3, 'HD': 2, 'SD': 1};
   const by = new Map();
   let n = 0;
-  const total1 = list.length || 1;
   for (const v of list) {
     const cc = v.co || catCo[v.cat] || countryFromText(norm(v.raw)) || 'ZZ';
     const key = cc + '|' + norm(v.name).replace(/ /g, '');
     let g = by.get(key);
     if (!g) { g = []; by.set(key, g); }
     g.push(v);
-    if ((++n & 63) === 0) yield n / total1 * 0.85;
+    if ((++n & 63) === 0) yield;
   }
   const out = [];
-  const total2 = by.size || 1;
-  let n2 = 0;
   for (const [key, vers] of by) {
     vers.sort((a, b) => (a.bk || 0) - (b.bk || 0) || (QR[b.ql] || 1.5) - (QR[a.ql] || 1.5) || (Number(a.num) || 1e9) - (Number(b.num) || 1e9));
     const best = vers[0];
@@ -4308,7 +4144,7 @@ function* groupChannelsG(list, cats) {
     if (best.url) it.url = best.url;
     indexItem(it);
     out.push(it);
-    if ((++n2 & 31) === 0) yield 0.85 + n2 / total2 * 0.15;
+    if ((++n & 31) === 0) yield;
   }
   return out;
 }
@@ -4324,59 +4160,49 @@ const prepChannels = () => runSync(prepChannelsG());
 function* applyLogosG() {
   if (!D_() || !LOGOMAP) return;
   const {k, u} = LOGOMAP;
-  let n = 0; const total = D_().live.items.length || 1;
+  let n = 0;
   for (const it of D_().live.items) {
     let m = null, g = null;
     const keys = logoKeys(it.name);
     for (const key of keys) { const a = k[key + '|' + it.cc]; if (a != null && a >= 0) { m = u[a]; break; } }
     if (!m) for (const key of keys) { const a = k[key]; if (a != null && a >= 0) { g = u[a]; break; } }
     it.lm = m; it.lg = g;
-    if ((++n & 127) === 0) yield n / total;
+    if ((++n & 127) === 0) yield;
   }
 }
-/* Builds the match tables from iptv-org's shared channel/logo database (currently ~32k channels,
-   ~35k logos) -- global, not the provider's own data, so this runs the same on every account. It used
-   to be two plain for loops with no yield point at all: the one genuinely unsliced heavy pass left in
-   the startup path, and it runs right as the owner reaches Home, which is exactly when an unresponsive
-   screen is most noticeable (worse the weaker the device). Sliced like everything else now. */
-function* buildLogoDbG(ch, lg) {
-  const best = {};
-  let n = 0;
-  for (const l of arr(lg)) {
-    if (!l || !l.channel || !l.url) continue;
-    const sc = (l.feed ? 0 : 2) + (l.in_use === false ? 0 : 1), b = best[l.channel];
-    if (!b || sc > b.sc) best[l.channel] = {url: l.url, sc};
-    if ((++n & 255) === 0) yield;
-  }
-  const u = [], k = {}, dup = new Set();
-  for (const c of arr(ch)) {
-    if (!c || c.is_nsfw) continue;
-    const url = (best[c.id] && best[c.id].url) || c.logo;
-    if (!url) continue;
-    const idx = u.push(url) - 1;
-    let cc = String(c.country || '').toUpperCase(); cc = CMAP[cc] || cc;
-    for (const nm of [c.name].concat(arr(c.alt_names))) {
-      for (const key of logoKeys(nm)) {
-        const kc = key + '|' + cc;
-        if (!(kc in k)) k[kc] = idx;
-        if (key in k) { if (k[key] !== idx) dup.add(key); } else k[key] = idx;
-      }
-    }
-    if ((++n & 255) === 0) yield;
-  }
-  dup.forEach(x => { k[x] = -1; });   /* a name shared by different channels is too risky to match without a country */
-  return {ts: Date.now(), k, u};
-}
+const applyLogos = () => runSync(applyLogosG());
 async function loadLogoDb() {
   let db = await idb.get('logos:v1');
   if (!db || Date.now() - db.ts > 7 * 86400e3) {
     try {
       const [ch, lg] = await Promise.all([getJSON(LOGO_BASE + 'channels.json'), getJSON(LOGO_BASE + 'logos.json').catch(() => [])]);
-      db = await runSliced(buildLogoDbG(ch, lg));
+      const best = {};
+      for (const l of arr(lg)) {
+        if (!l || !l.channel || !l.url) continue;
+        const sc = (l.feed ? 0 : 2) + (l.in_use === false ? 0 : 1), b = best[l.channel];
+        if (!b || sc > b.sc) best[l.channel] = {url: l.url, sc};
+      }
+      const u = [], k = {}, dup = new Set();
+      for (const c of arr(ch)) {
+        if (!c || c.is_nsfw) continue;
+        const url = (best[c.id] && best[c.id].url) || c.logo;
+        if (!url) continue;
+        const idx = u.push(url) - 1;
+        let cc = String(c.country || '').toUpperCase(); cc = CMAP[cc] || cc;
+        for (const nm of [c.name].concat(arr(c.alt_names))) {
+          for (const key of logoKeys(nm)) {
+            const kc = key + '|' + cc;
+            if (!(kc in k)) k[kc] = idx;
+            if (key in k) { if (k[key] !== idx) dup.add(key); } else k[key] = idx;
+          }
+        }
+      }
+      dup.forEach(x => { k[x] = -1; });   /* a name shared by different channels is too risky to match without a country */
+      db = {ts: Date.now(), k, u};
       await idb.set('logos:v1', db);
     } catch (e) { if (!db) return; }
   }
-  LOGOMAP = db; await runSliced(applyLogosG()); V++;
+  LOGOMAP = db; applyLogos(); V++;
   if (S.screen === 'main') { listView.reset(); resView.reset(); renderMain(); }
 }
 function logoCands(it) {
@@ -4555,10 +4381,8 @@ async function showPage(p) {
   if (p === 'search' && ui.tsdbKey) loadTsdb(false);
   if (p === 'search' && !GUIDE_BUSY && (!GUIDE || Date.now() - GUIDE.ts > 3 * 3600e3)) loadGuide(false);
   /* movies/series are only fully prepared once something actually needs them: this page, a search,
-     or favourites (which can mix in a movie/series pick) — see ensureTitlesGrouped. ensureTitlesGrouped
-     always hides the spinner itself (its own finally), but a failure here was otherwise uncaught and
-     left the page stuck mid-switch with nothing rendered; catch it so the page still opens. */
-  if (p === 'vod' || p === 'series' || p === 'search' || p === 'favs') { try { await ensureVodSeriesReady(); } catch (err) { toast(err && err.message ? err.message : 'Could not load movies/series.'); } }
+     or favourites (which can mix in a movie/series pick) — see ensureTitlesGrouped. */
+  if (p === 'vod' || p === 'series' || p === 'search' || p === 'favs') await ensureVodSeriesReady();
   if (S.page !== p) return;   /* the user moved on again while that was loading */
   if (browse) { ensureCats(p); catView.reset(); listView.reset(); gridView.reset(); }
   if (p === 'search') resView.reset();
@@ -5396,7 +5220,7 @@ function settingsAction(i) {
     ui.liveLayout = ui.liveLayout === 'provider' ? 'country' : 'provider'; save('sp_ui', ui);
     Object.assign(B.live, {cats: [], lv: 0, cc: null, catId: null}); V++; renderMain();
   }
-  else if (a === 'logos') { ui.logos = ui.logos === 'provider' ? 'best' : 'provider'; save('sp_ui', ui); startLogoDb(); V++; Q.ver++; listView.reset(); renderMain(); }
+  else if (a === 'logos') { ui.logos = ui.logos === 'provider' ? 'best' : 'provider'; save('sp_ui', ui); V++; Q.ver++; listView.reset(); renderMain(); }
   else if (a === 'names') { ui.orig = !ui.orig; save('sp_ui', ui); V++; Q.ver++; renderMain(); }
   else if (a === 'adult') adultPinMenu();
   else if (a === 'adultkw') askText('Extra adult keywords', 'If some adult channels or categories aren’t being caught, type words from their names, separated by commas. They move into the locked section when the app restarts.', ui.adultKw || '', v => { ui.adultKw = v.trim(); save('sp_ui', ui); toast('Restarting to apply…'); setTimeout(() => location.reload(), 300); });
@@ -5673,15 +5497,9 @@ function startStream() {
 /* ================= Windows: mpv for files the built-in player can't handle ================= */
 const MPV = {on: false, pos: 0, dur: 0, it: null};
 const MPV_EXT = ['mkv', 'avi', 'wmv', 'ts', 'mov', 'flv', 'mpg', 'mpeg', 'm2ts', 'vob'];
-/* Movies, episodes AND live channels go to VLC/mpv when their file type or format is one Chrome-based
-   players can't handle. This used to exclude live channels outright ("it.t === 'live'" short-circuited
-   to false), so an HEVC-encoded live channel -- common for premium/4K sports feeds, to save bandwidth,
-   and Edge/Chrome generally can't decode HEVC without hardware support it may not actually use -- just
-   silently failed to play natively, with no fallback, while the exact same codec on a movie/episode
-   already correctly handed off. techFromName() works off the channel's own name text (many providers
-   literally put "HEVC" in HEVC channel names), so no other data is needed for this to work for live. */
+/* Movies and episodes go to mpv when their file type or sound format is one Chrome-based players can't handle. */
 function needsBigPlayer(it) {
-  if (!it) return false;
+  if (!it || it.t === 'live') return false;
   if (MPV_EXT.includes(String(it.ext || '').toLowerCase())) return true;
   const t = it.t === 'vod' ? techFor(it) : (it.tech || techFromName(it.raw || it.name || ''));   /* includes the provider's own file details */
   return /Dolby|DTS|TrueHD/.test(t.ac || '') || t.vc === 'HEVC';
@@ -5697,7 +5515,7 @@ function openExternal(it, start) {
   location.href = 'rcsplay:play?u=' + encodeURIComponent(u.url) + '&t=' + encodeURIComponent(title) + '&s=' + Math.floor(start || 0);
 }
 function useMpv(it) {
-  if (!HAS_MPV || !it) return false;   /* used to also exclude live channels -- same HEVC gap as needsBigPlayer above */
+  if (!HAS_MPV || !it || it.t === 'live') return false;
   if (ui.pcPlayer === 'mpv') return true;
   if (MPV_EXT.includes(String(it.ext || '').toLowerCase())) return true;
   const t = it.tech || techFromName(it.raw || it.name || '');
@@ -6208,8 +6026,8 @@ function* splitAdultG(t) {
     return (t === 'live' ? ADULT_NAME_RE.test(nm) : /\b(xxx|porn\w*)\b/i.test(nm)) && !ADULT_OK_RE.test(nm);
   };
   const adult = [], keep = [];
-  let n = 0; const total = x.items.length || 1;
-  for (const g of x.items) { (isAd(g) ? adult : keep).push(g); if ((++n & 127) === 0) yield n / total; }
+  let n = 0;
+  for (const g of x.items) { (isAd(g) ? adult : keep).push(g); if ((++n & 127) === 0) yield; }
   x.adult = adult;
   if (!adult.length) return;
   x.items = keep;
@@ -6404,73 +6222,16 @@ function loginKey(k, e) {
   }
 }
 let logoDbStarted = false;
-/* iptv-org's shared logo database (~32k channels, ~35k logos -- see buildLogoDbG) is a purely cosmetic
-   add-on: nicer channel icons than the provider's own. "Channel logos: Provider's only" already existed
-   as a setting (logoCands() below never reads LOGOMAP in that mode), but this download-and-build step
-   ran unconditionally regardless of it, wasting real memory on a multi-tens-of-MB structure the app
-   would then never read. Diagnosed via adb logcat against a real device: the WebView's JS heap hit a
-   V8 "Ineffective mark-compacts near heap limit" OOM around 223MB after ~2 minutes; this is a genuine,
-   substantial, previously wasted chunk of that ceiling on every account, not just a large one. */
-/* Proactive version of the crash-loop guard below: rather than waiting for a first crash to happen at
-   all, skip the heavy optional logo-matching work up front on hardware that reports very little memory.
-   navigator.deviceMemory (supported by this WebView) is coarse -- a power of two, capped at 8GB -- and
-   not implemented on every platform, so this only ever acts when it IS reported and genuinely low; it
-   never guesses at hardware it can't measure, so it changes nothing for anyone whose browser doesn't
-   support it. The device this was diagnosed against (Fire TV Stick HD, confirmed ~900MB total RAM via
-   adb, which reports as 1 on this scale) is exactly the case this is for. */
-function lowMemDevice() { return typeof navigator.deviceMemory === 'number' && navigator.deviceMemory <= 1; }
-function startLogoDb() { if (!logoDbStarted && ui.logos !== 'provider' && !CRASHGUARD_FORCE && !lowMemDevice()) { logoDbStarted = true; loadLogoDb().catch(() => {}); } }
-/* Self-healing crash-loop guard. The scenario this exists for: a device too constrained to survive
-   the optional logo-matching work (see startLogoDb above) crashes before the owner can ever reach
-   Settings to turn "Channel logos" to Provider's only themselves -- there has to be a way out that
-   doesn't depend on reaching a UI the crash itself blocks. Every boot records a timestamp and a
-   "stable" flag (set true once this boot has stayed up long enough to be past where the crash this
-   was built for was observed, ~136s). If a NEW boot starts and the previous one never reached stable,
-   that's real evidence of a crash loop, and the heavy optional work is skipped automatically for this
-   run -- the saved setting itself is untouched, so normal behaviour resumes on its own once boots
-   stop crash-looping. Runs once, before anything else, so it covers every path into enterMain(). */
-const CRASHGUARD_KEY = 'sp_crashguard';
-let CRASHGUARD_FORCE = false;
-/* A single quick relaunch -- closed and reopened within 5 minutes, before the 150s "stable" mark --
-   is completely normal: it's what happens every time someone force-closes the app to test something,
-   or Fire TV backgrounds it and they tap straight back in. Treating that alone as "a crash" was wrong;
-   it fired this warning on a healthy device that never crashed, just because it had been closed and
-   reopened quickly. A real crash loop looks like it happening repeatedly in a row, so this now needs a
-   streak of 2+ before it acts, not a single quick relaunch. */
-function crashGuardOnBoot() {
-  let g; try { g = JSON.parse(localStorage.getItem(CRASHGUARD_KEY) || 'null') || {}; } catch (e) { g = {}; }
-  const wasQuick = !!(g.lastStart && !g.stable && Date.now() - g.lastStart < 5 * 60e3);
-  const streak = wasQuick ? (g.streak || 0) + 1 : 0;
-  CRASHGUARD_FORCE = streak >= 2;
-  try { localStorage.setItem(CRASHGUARD_KEY, JSON.stringify({lastStart: Date.now(), stable: false, streak})); } catch (e) {}
-}
-function crashGuardMarkStable() {
-  try { const g = JSON.parse(localStorage.getItem(CRASHGUARD_KEY) || 'null') || {}; g.stable = true; g.streak = 0; localStorage.setItem(CRASHGUARD_KEY, JSON.stringify(g)); } catch (e) {}
-}
-function enterMain() {
-  show('main'); S.zone = 'cats'; showPage(anyFavs() ? 'favs' : 'live'); openHome(); startLogoDb();
-  if (isM3u() && !EPGX) loadXmltv().catch(() => {});
-  if (CRASHGUARD_FORCE) toast('Running in a lighter mode after a crash, to save memory. Channel logos look plainer this session; Settings is unaffected.');
-  setTimeout(crashGuardMarkStable, 150000);
-}
+function enterMain() { show('main'); S.zone = 'cats'; showPage(anyFavs() ? 'favs' : 'live'); openHome(); if (!logoDbStarted) { logoDbStarted = true; loadLogoDb().catch(() => {}); } if (isM3u() && !EPGX) loadXmltv().catch(() => {}); }
 
 async function boot() {
-  crashGuardOnBoot();
-  memLog('boot start');
   await idb.open();
   if (!cfg) { showLogin(''); return; }
   const cached = await idb.get(cacheKey());
   if (cached) {
-    try {
-      loading(true, 'Preparing your channels…'); await applyData(cached, true); loading(false); enterMain();
-      authenticate().catch(err => toast(err.message));
-      if (Date.now() - cached.updated > 12 * 3600e3) refreshAll(false).catch(() => {});
-    } catch (err) {
-      /* Every other applyData()/ensureTitlesGrouped() call site is wrapped like this; this one was
-         not, so a failure here (e.g. the Math.max crash above) left the loading overlay on screen
-         forever with no way out. */
-      loading(false); showLogin(err && err.message ? err.message : 'Something went wrong preparing your channels. Try signing in again.');
-    }
+    loading(true, 'Preparing your channels…'); await applyData(cached, true); loading(false); enterMain();
+    authenticate().catch(err => toast(err.message));
+    if (Date.now() - cached.updated > 12 * 3600e3) refreshAll(false).catch(() => {});
   } else {
     try { loading(true, 'Signing in…'); await authenticate(); await refreshAll(true); enterMain(); }
     catch (err) { loading(false); showLogin(err.message); }
