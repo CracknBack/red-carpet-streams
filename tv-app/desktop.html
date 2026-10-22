@@ -1302,6 +1302,33 @@ function* classifyLiveG() {
 const classifyLive = () => runSync(classifyLiveG());
 
 /* Prepares the lists in slices (with a short message if asked) and swaps them in only when everything is ready. */
+/* TEMPORARY diagnostic instrumentation: three rounds of fixes aimed at reducing memory pressure
+   (the logo database) did not move the needle on the owner's actual crash -- the V8 heap OOM recurred
+   at essentially the same ~223MB, ~138s mark on build 11 as it did before any of those fixes. Rather
+   than guess at the next hypothesis, this reports the real size of each major retained structure (and
+   performance.memory, where the WebView supports it -- this one does, Chromium 138) straight to logcat
+   at the moments that matter, plus every 20s so the growth curve up to a crash is visible, not just
+   snapshots. Remove once the real culprit is identified and fixed; this is not meant to ship long-term. */
+function memLog(label) {
+  try {
+    const m = performance.memory;
+    const parts = [
+      m ? 'heapUsedMB=' + (m.usedJSHeapSize / 1048576).toFixed(1) : 'heap=n/a',
+      m ? 'heapTotalMB=' + (m.totalJSHeapSize / 1048576).toFixed(1) : '',
+      'liveCh=' + (DATA && DATA.live ? DATA.live.items.length : '-'),
+      'liveRaw=' + (DATA && DATA.live && DATA.live.vers ? DATA.live.vers.length : '-'),
+      'vodItems=' + (DATA && DATA.vod ? DATA.vod.items.length : '-'),
+      'seriesItems=' + (DATA && DATA.series ? DATA.series.items.length : '-'),
+      'guideItems=' + (GUIDE ? GUIDE.items.length : '-'),
+      'guideChans=' + (GUIDE && GUIDE.chans ? Object.keys(GUIDE.chans).length : '-'),
+      'events=' + (EVENTS ? EVENTS.length : '-'),
+      'logoMap=' + (LOGOMAP ? 'u' + LOGOMAP.u.length + '/k' + Object.keys(LOGOMAP.k).length : '-')
+    ].filter(Boolean).join(' ');
+    console.log('MEMPROBE [' + label + '] ' + parts);
+  } catch (e) { console.log('MEMPROBE [' + label + '] error: ' + e.message); }
+}
+setInterval(() => memLog('periodic'), 20000);
+
 async function applyData(d, show) {
   const say = m => { if (show) loading(true, m); };
   CUR = d;
@@ -1332,6 +1359,7 @@ async function applyData(d, show) {
     EVENTS = null;
     V++;
     Q.last = null;
+    memLog('applyData done');
   } finally { CUR = null; }
 }
 
@@ -2702,6 +2730,7 @@ async function loadGuide(force) {
     else { GUIDE_MSG = 'Couldn’t download the TV guide. ' + e.message; if (!GUIDE) GUIDE = {ts: 0, items: [], chans: [], failed: true}; }
   }
   GUIDE_AC = null; GUIDE_BUSY = false; EVENTS = null;
+  memLog('loadGuide done');
   if (S.screen === 'home') renderHome();
   if (S.page === 'search' && S.screen === 'main') { Q.skey = ''; Q.gkey = ''; resView.reset(); renderMain(); }
 }
@@ -3001,6 +3030,7 @@ let EVENTS_BUILDING = false;
 async function ensureEventsAsync() {
   if (EVENTS || EVENTS_BUILDING) return;
   EVENTS_BUILDING = true;
+  memLog('buildEvents start');
   const myGuide = GUIDE, myData = DATA;
   try {
     await runSliced(buildEventsG());
@@ -3008,6 +3038,7 @@ async function ensureEventsAsync() {
   } catch (e) { EVENTS = null; }   /* e.g. GUIDE/DATA replaced mid-build; next render retries cleanly */
   finally {
     EVENTS_BUILDING = false;
+    memLog('buildEvents done');
     if (EVENTS && S.screen === 'home') renderHome();
   }
 }
@@ -6345,6 +6376,7 @@ function enterMain() {
 
 async function boot() {
   crashGuardOnBoot();
+  memLog('boot start');
   await idb.open();
   if (!cfg) { showLogin(''); return; }
   const cached = await idb.get(cacheKey());
