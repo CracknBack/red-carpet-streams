@@ -4170,39 +4170,49 @@ function* applyLogosG() {
     if ((++n & 127) === 0) yield;
   }
 }
-const applyLogos = () => runSync(applyLogosG());
+/* Builds the match tables from iptv-org's shared channel/logo database (currently ~32k channels,
+   ~35k logos) -- global, not the provider's own data, so this runs the same on every account. It used
+   to be two plain for loops with no yield point at all: the one genuinely unsliced heavy pass left in
+   the startup path, and it runs right as the owner reaches Home, which is exactly when an unresponsive
+   screen is most noticeable (worse the weaker the device). Sliced like everything else now. */
+function* buildLogoDbG(ch, lg) {
+  const best = {};
+  let n = 0;
+  for (const l of arr(lg)) {
+    if (!l || !l.channel || !l.url) continue;
+    const sc = (l.feed ? 0 : 2) + (l.in_use === false ? 0 : 1), b = best[l.channel];
+    if (!b || sc > b.sc) best[l.channel] = {url: l.url, sc};
+    if ((++n & 255) === 0) yield;
+  }
+  const u = [], k = {}, dup = new Set();
+  for (const c of arr(ch)) {
+    if (!c || c.is_nsfw) continue;
+    const url = (best[c.id] && best[c.id].url) || c.logo;
+    if (!url) continue;
+    const idx = u.push(url) - 1;
+    let cc = String(c.country || '').toUpperCase(); cc = CMAP[cc] || cc;
+    for (const nm of [c.name].concat(arr(c.alt_names))) {
+      for (const key of logoKeys(nm)) {
+        const kc = key + '|' + cc;
+        if (!(kc in k)) k[kc] = idx;
+        if (key in k) { if (k[key] !== idx) dup.add(key); } else k[key] = idx;
+      }
+    }
+    if ((++n & 255) === 0) yield;
+  }
+  dup.forEach(x => { k[x] = -1; });   /* a name shared by different channels is too risky to match without a country */
+  return {ts: Date.now(), k, u};
+}
 async function loadLogoDb() {
   let db = await idb.get('logos:v1');
   if (!db || Date.now() - db.ts > 7 * 86400e3) {
     try {
       const [ch, lg] = await Promise.all([getJSON(LOGO_BASE + 'channels.json'), getJSON(LOGO_BASE + 'logos.json').catch(() => [])]);
-      const best = {};
-      for (const l of arr(lg)) {
-        if (!l || !l.channel || !l.url) continue;
-        const sc = (l.feed ? 0 : 2) + (l.in_use === false ? 0 : 1), b = best[l.channel];
-        if (!b || sc > b.sc) best[l.channel] = {url: l.url, sc};
-      }
-      const u = [], k = {}, dup = new Set();
-      for (const c of arr(ch)) {
-        if (!c || c.is_nsfw) continue;
-        const url = (best[c.id] && best[c.id].url) || c.logo;
-        if (!url) continue;
-        const idx = u.push(url) - 1;
-        let cc = String(c.country || '').toUpperCase(); cc = CMAP[cc] || cc;
-        for (const nm of [c.name].concat(arr(c.alt_names))) {
-          for (const key of logoKeys(nm)) {
-            const kc = key + '|' + cc;
-            if (!(kc in k)) k[kc] = idx;
-            if (key in k) { if (k[key] !== idx) dup.add(key); } else k[key] = idx;
-          }
-        }
-      }
-      dup.forEach(x => { k[x] = -1; });   /* a name shared by different channels is too risky to match without a country */
-      db = {ts: Date.now(), k, u};
+      db = await runSliced(buildLogoDbG(ch, lg));
       await idb.set('logos:v1', db);
     } catch (e) { if (!db) return; }
   }
-  LOGOMAP = db; applyLogos(); V++;
+  LOGOMAP = db; await runSliced(applyLogosG()); V++;
   if (S.screen === 'main') { listView.reset(); resView.reset(); renderMain(); }
 }
 function logoCands(it) {
