@@ -3614,14 +3614,24 @@ function* groupTitlesG(t, list) {
   }
   /* copies with no year join the dated copies of the same title, if there's exactly one such title */
   const dated = new Map();
-  byKey.forEach(g => { if (g.year) (dated.get(g.k) || dated.set(g.k, []).get(g.k)).push(g); });
-  byKey.forEach((g, kk) => { if (!g.year) { const d = dated.get(g.k); if (d && d.length === 1) { d[0].vers.push(...g.vers); byKey.delete(kk); } } });
+  for (const g of byKey.values()) {
+    if (g.year) { let d = dated.get(g.k); if (!d) { d = []; dated.set(g.k, d); } d.push(g); }
+    if ((++n & 63) === 0) yield;
+  }
+  for (const [kk, g] of byKey) {
+    if (!g.year) { const d = dated.get(g.k); if (d && d.length === 1) { d[0].vers.push(...g.vers); byKey.delete(kk); } }
+    if ((++n & 63) === 0) yield;
+  }
   const out = [];
   for (const g of byKey.values()) {
     const vers = g.vers.sort(verCmp), best = vers[0];
+    /* a plain loop, not Math.max(...vers.map(...)): a popular title can have thousands of duplicate
+       listings on a big provider, and spreading that many args into Math.max throws "Maximum call
+       stack size exceeded" -- uncaught, this is what left Movies/Series stuck mid-load. */
+    let rating = 0, added = 0;
+    for (const v of vers) { if ((v.rating || 0) > rating) rating = v.rating; if ((v.added || 0) > added) added = v.added; }
     const it = {t, id: hashId(t + '|' + g.k + '|' + g.year), name: best.name, raw: best.raw, co: best.co, ql: best.qlab && !best.cam ? best.qlab : '',
-      year: g.year, icon: (vers.find(v => v.icon) || {}).icon || '', rating: Math.max(...vers.map(v => v.rating || 0)),
-      added: Math.max(...vers.map(v => v.added || 0)), cat: best.cat, cats: new Set(vers.map(v => v.cat)), vers};
+      year: g.year, icon: (vers.find(v => v.icon) || {}).icon || '', rating, added, cat: best.cat, cats: new Set(vers.map(v => v.cat)), vers};
     indexItem(it);
     out.push(it);
     if ((++n & 31) === 0) yield;
@@ -4372,8 +4382,10 @@ async function showPage(p) {
   if (p === 'search' && ui.tsdbKey) loadTsdb(false);
   if (p === 'search' && !GUIDE_BUSY && (!GUIDE || Date.now() - GUIDE.ts > 3 * 3600e3)) loadGuide(false);
   /* movies/series are only fully prepared once something actually needs them: this page, a search,
-     or favourites (which can mix in a movie/series pick) — see ensureTitlesGrouped. */
-  if (p === 'vod' || p === 'series' || p === 'search' || p === 'favs') await ensureVodSeriesReady();
+     or favourites (which can mix in a movie/series pick) — see ensureTitlesGrouped. ensureTitlesGrouped
+     always hides the spinner itself (its own finally), but a failure here was otherwise uncaught and
+     left the page stuck mid-switch with nothing rendered; catch it so the page still opens. */
+  if (p === 'vod' || p === 'series' || p === 'search' || p === 'favs') { try { await ensureVodSeriesReady(); } catch (err) { toast(err && err.message ? err.message : 'Could not load movies/series.'); } }
   if (S.page !== p) return;   /* the user moved on again while that was loading */
   if (browse) { ensureCats(p); catView.reset(); listView.reset(); gridView.reset(); }
   if (p === 'search') resView.reset();
@@ -6220,9 +6232,16 @@ async function boot() {
   if (!cfg) { showLogin(''); return; }
   const cached = await idb.get(cacheKey());
   if (cached) {
-    loading(true, 'Preparing your channels…'); await applyData(cached, true); loading(false); enterMain();
-    authenticate().catch(err => toast(err.message));
-    if (Date.now() - cached.updated > 12 * 3600e3) refreshAll(false).catch(() => {});
+    try {
+      loading(true, 'Preparing your channels…'); await applyData(cached, true); loading(false); enterMain();
+      authenticate().catch(err => toast(err.message));
+      if (Date.now() - cached.updated > 12 * 3600e3) refreshAll(false).catch(() => {});
+    } catch (err) {
+      /* Every other applyData()/ensureTitlesGrouped() call site is wrapped like this; this one was
+         not, so a failure here (e.g. the Math.max crash above) left the loading overlay on screen
+         forever with no way out. */
+      loading(false); showLogin(err && err.message ? err.message : 'Something went wrong preparing your channels. Try signing in again.');
+    }
   } else {
     try { loading(true, 'Signing in…'); await authenticate(); await refreshAll(true); enterMain(); }
     catch (err) { loading(false); showLogin(err.message); }
