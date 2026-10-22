@@ -2701,7 +2701,7 @@ async function loadGuide(force) {
   const want = sportsEpgMap(false), every = sportsEpgMap(true), chans = [], chIdx = new Map(), items = [];
   GUIDE_AC = new AbortController();
   const now = nowMs(), from = now - 24 * 3600e3, from8 = now - 8 * 86400e3, to = now + 7 * 86400e3;
-  let lastShow = 0;
+  let lastShow = 0, lastMem = 0;
   try {
     await streamXml(url, block => {
       const head = block.slice(0, block.indexOf('>') + 1);
@@ -2723,13 +2723,17 @@ async function loadGuide(force) {
       items.push([ci, st, en, xmlDec(ti[1]), subWithDesc(block, xmlDec(ti[1]), su), 'p']);
     }, bytes => {
       if (Date.now() - lastShow > 700 && S.page === 'search') { lastShow = Date.now(); GUIDE_MSG = 'Downloading the TV guide… ' + (bytes / 1e6).toFixed(0) + ' MB read, ' + items.length.toLocaleString() + ' sports programmes found'; renderSearchHead(); }
+      if (Date.now() - lastMem > 5000) { lastMem = Date.now(); memLog('streamXml @' + (bytes / 1e6).toFixed(1) + 'MB read, ' + items.length + ' items, ' + chans.length + ' chans'); }
     });
+    memLog('streamXml done, ' + items.length + ' items, ' + chans.length + ' chans');
     const shift = await checkGuideTimes({items, chans}, every);
+    memLog('checkGuideTimes done');
     /* a correction you set yourself is applied now; otherwise the check against the broadcasters' schedules (below) decides */
     const man = manualFix();
     if (man) items.forEach(y => { y[1] += man; if (y[2]) y[2] += man; });
     let extra = {xmap: {}, notes: [], files: []};
     try { extra = await loadExtraGuides(chans, chIdx, items, from, to, every, force); } catch (e) { extra.notes.push('Free guides failed: ' + e.message); }
+    memLog('loadExtraGuides done, ' + items.length + ' items, ' + chans.length + ' chans');
     let cal = 0;
     if (man === null && extra.cal && extra.cal.d) {
       cal = -extra.cal.d;
