@@ -4154,7 +4154,15 @@ function buildProviderCats(t) {
   return v;
 }
 function specialList(t, id) {
-  const d = DATA[t], get = x => d.byId.get(String(x)) || (d.verToTitle && d.verToTitle.get(String(x)));
+  /* d.byId/d.verToTitle don't exist yet for vod/series until ensureTitlesGrouped has actually run for
+     that type (grouping is deferred until Movies/Series is opened) -- treat that as "nothing resolves
+     yet" rather than crashing. This used to be safe to assume always-present, back when applyData()
+     built it eagerly for every type on every boot; it stopped being safe the moment that got deferred,
+     and this was the one caller of it that wasn't guarded, reached on every Home render (homeDetail)
+     whenever the Movies/Series tile is centred -- an uncaught TypeError here, with no try/catch above
+     it in renderHome(), is what was actually crashing/freezing Home on a device that was never short on
+     memory in the first place. */
+  const d = DATA[t], get = x => (d.byId ? d.byId.get(String(x)) : undefined) || (d.verToTitle && d.verToTitle.get(String(x)));
   const uniq = l => l.filter((x, i) => x && l.indexOf(x) === i);
   if (id === '__adult') return adultOk() ? sortItems(t, d.adult || []) : [];
   if (id === '__fav') return uniq(favs[t].map(get));
