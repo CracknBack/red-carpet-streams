@@ -5299,7 +5299,7 @@ function settingsAction(i) {
     ui.liveLayout = ui.liveLayout === 'provider' ? 'country' : 'provider'; save('sp_ui', ui);
     Object.assign(B.live, {cats: [], lv: 0, cc: null, catId: null}); V++; renderMain();
   }
-  else if (a === 'logos') { ui.logos = ui.logos === 'provider' ? 'best' : 'provider'; save('sp_ui', ui); V++; Q.ver++; listView.reset(); renderMain(); }
+  else if (a === 'logos') { ui.logos = ui.logos === 'provider' ? 'best' : 'provider'; save('sp_ui', ui); startLogoDb(); V++; Q.ver++; listView.reset(); renderMain(); }
   else if (a === 'names') { ui.orig = !ui.orig; save('sp_ui', ui); V++; Q.ver++; renderMain(); }
   else if (a === 'adult') adultPinMenu();
   else if (a === 'adultkw') askText('Extra adult keywords', 'If some adult channels or categories aren’t being caught, type words from their names, separated by commas. They move into the locked section when the app restarts.', ui.adultKw || '', v => { ui.adultKw = v.trim(); save('sp_ui', ui); toast('Restarting to apply…'); setTimeout(() => location.reload(), 300); });
@@ -6301,9 +6301,50 @@ function loginKey(k, e) {
   }
 }
 let logoDbStarted = false;
-function enterMain() { show('main'); S.zone = 'cats'; showPage(anyFavs() ? 'favs' : 'live'); openHome(); if (!logoDbStarted) { logoDbStarted = true; loadLogoDb().catch(() => {}); } if (isM3u() && !EPGX) loadXmltv().catch(() => {}); }
+/* iptv-org's shared logo database (~32k channels, ~35k logos -- see buildLogoDbG) is a purely cosmetic
+   add-on: nicer channel icons than the provider's own. "Channel logos: Provider's only" already existed
+   as a setting (logoCands() below never reads LOGOMAP in that mode), but this download-and-build step
+   ran unconditionally regardless of it, wasting real memory on a multi-tens-of-MB structure the app
+   would then never read. Diagnosed via adb logcat against a real device: the WebView's JS heap hit a
+   V8 "Ineffective mark-compacts near heap limit" OOM around 223MB after ~2 minutes; this is a genuine,
+   substantial, previously wasted chunk of that ceiling on every account, not just a large one. */
+/* Proactive version of the crash-loop guard below: rather than waiting for a first crash to happen at
+   all, skip the heavy optional logo-matching work up front on hardware that reports very little memory.
+   navigator.deviceMemory (supported by this WebView) is coarse -- a power of two, capped at 8GB -- and
+   not implemented on every platform, so this only ever acts when it IS reported and genuinely low; it
+   never guesses at hardware it can't measure, so it changes nothing for anyone whose browser doesn't
+   support it. The device this was diagnosed against (Fire TV Stick HD, confirmed ~900MB total RAM via
+   adb, which reports as 1 on this scale) is exactly the case this is for. */
+function lowMemDevice() { return typeof navigator.deviceMemory === 'number' && navigator.deviceMemory <= 1; }
+function startLogoDb() { if (!logoDbStarted && ui.logos !== 'provider' && !CRASHGUARD_FORCE && !lowMemDevice()) { logoDbStarted = true; loadLogoDb().catch(() => {}); } }
+/* Self-healing crash-loop guard. The scenario this exists for: a device too constrained to survive
+   the optional logo-matching work (see startLogoDb above) crashes before the owner can ever reach
+   Settings to turn "Channel logos" to Provider's only themselves -- there has to be a way out that
+   doesn't depend on reaching a UI the crash itself blocks. Every boot records a timestamp and a
+   "stable" flag (set true once this boot has stayed up long enough to be past where the crash this
+   was built for was observed, ~136s). If a NEW boot starts and the previous one never reached stable,
+   that's real evidence of a crash loop, and the heavy optional work is skipped automatically for this
+   run -- the saved setting itself is untouched, so normal behaviour resumes on its own once boots
+   stop crash-looping. Runs once, before anything else, so it covers every path into enterMain(). */
+const CRASHGUARD_KEY = 'sp_crashguard';
+let CRASHGUARD_FORCE = false;
+function crashGuardOnBoot() {
+  let g; try { g = JSON.parse(localStorage.getItem(CRASHGUARD_KEY) || 'null') || {}; } catch (e) { g = {}; }
+  CRASHGUARD_FORCE = !!(g.lastStart && !g.stable && Date.now() - g.lastStart < 5 * 60e3);
+  try { localStorage.setItem(CRASHGUARD_KEY, JSON.stringify({lastStart: Date.now(), stable: false})); } catch (e) {}
+}
+function crashGuardMarkStable() {
+  try { const g = JSON.parse(localStorage.getItem(CRASHGUARD_KEY) || 'null') || {}; g.stable = true; localStorage.setItem(CRASHGUARD_KEY, JSON.stringify(g)); } catch (e) {}
+}
+function enterMain() {
+  show('main'); S.zone = 'cats'; showPage(anyFavs() ? 'favs' : 'live'); openHome(); startLogoDb();
+  if (isM3u() && !EPGX) loadXmltv().catch(() => {});
+  if (CRASHGUARD_FORCE) toast('Running in a lighter mode after a crash, to save memory. Channel logos look plainer this session; Settings is unaffected.');
+  setTimeout(crashGuardMarkStable, 150000);
+}
 
 async function boot() {
+  crashGuardOnBoot();
   await idb.open();
   if (!cfg) { showLogin(''); return; }
   const cached = await idb.get(cacheKey());
