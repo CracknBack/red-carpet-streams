@@ -6423,13 +6423,21 @@ function startLogoDb() { if (!logoDbStarted && ui.logos !== 'provider' && !CRASH
    stop crash-looping. Runs once, before anything else, so it covers every path into enterMain(). */
 const CRASHGUARD_KEY = 'sp_crashguard';
 let CRASHGUARD_FORCE = false;
+/* A single quick relaunch -- closed and reopened within 5 minutes, before the 150s "stable" mark --
+   is completely normal: it's what happens every time someone force-closes the app to test something,
+   or Fire TV backgrounds it and they tap straight back in. Treating that alone as "a crash" was wrong;
+   it fired this warning on a healthy device that never crashed, just because it had been closed and
+   reopened quickly. A real crash loop looks like it happening repeatedly in a row, so this now needs a
+   streak of 2+ before it acts, not a single quick relaunch. */
 function crashGuardOnBoot() {
   let g; try { g = JSON.parse(localStorage.getItem(CRASHGUARD_KEY) || 'null') || {}; } catch (e) { g = {}; }
-  CRASHGUARD_FORCE = !!(g.lastStart && !g.stable && Date.now() - g.lastStart < 5 * 60e3);
-  try { localStorage.setItem(CRASHGUARD_KEY, JSON.stringify({lastStart: Date.now(), stable: false})); } catch (e) {}
+  const wasQuick = !!(g.lastStart && !g.stable && Date.now() - g.lastStart < 5 * 60e3);
+  const streak = wasQuick ? (g.streak || 0) + 1 : 0;
+  CRASHGUARD_FORCE = streak >= 2;
+  try { localStorage.setItem(CRASHGUARD_KEY, JSON.stringify({lastStart: Date.now(), stable: false, streak})); } catch (e) {}
 }
 function crashGuardMarkStable() {
-  try { const g = JSON.parse(localStorage.getItem(CRASHGUARD_KEY) || 'null') || {}; g.stable = true; localStorage.setItem(CRASHGUARD_KEY, JSON.stringify(g)); } catch (e) {}
+  try { const g = JSON.parse(localStorage.getItem(CRASHGUARD_KEY) || 'null') || {}; g.stable = true; g.streak = 0; localStorage.setItem(CRASHGUARD_KEY, JSON.stringify(g)); } catch (e) {}
 }
 function enterMain() {
   show('main'); S.zone = 'cats'; showPage(anyFavs() ? 'favs' : 'live'); openHome(); startLogoDb();
