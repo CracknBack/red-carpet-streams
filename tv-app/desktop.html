@@ -1324,8 +1324,8 @@ function memLog(label) {
       'events=' + (EVENTS ? EVENTS.length : '-'),
       'logoMap=' + (LOGOMAP ? 'u' + LOGOMAP.u.length + '/k' + Object.keys(LOGOMAP.k).length : '-')
     ].filter(Boolean).join(' ');
-    console.log('MEMPROBE [' + label + '] ' + parts);
-  } catch (e) { console.log('MEMPROBE [' + label + '] error: ' + e.message); }
+    console.error('MEMPROBE [' + label + '] ' + parts);
+  } catch (e) { console.error('MEMPROBE [' + label + '] error: ' + e.message); }
 }
 setInterval(() => memLog('periodic'), 20000);
 
