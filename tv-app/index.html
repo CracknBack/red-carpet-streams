@@ -1324,8 +1324,8 @@ function memLog(label) {
       'events=' + (EVENTS ? EVENTS.length : '-'),
       'logoMap=' + (LOGOMAP ? 'u' + LOGOMAP.u.length + '/k' + Object.keys(LOGOMAP.k).length : '-')
     ].filter(Boolean).join(' ');
-    console.log('MEMPROBE [' + label + '] ' + parts);
-  } catch (e) { console.log('MEMPROBE [' + label + '] error: ' + e.message); }
+    console.error('MEMPROBE [' + label + '] ' + parts);
+  } catch (e) { console.error('MEMPROBE [' + label + '] error: ' + e.message); }
 }
 setInterval(() => memLog('periodic'), 20000);
 
@@ -5607,9 +5607,15 @@ function startStream() {
 /* ================= Windows: mpv for files the built-in player can't handle ================= */
 const MPV = {on: false, pos: 0, dur: 0, it: null};
 const MPV_EXT = ['mkv', 'avi', 'wmv', 'ts', 'mov', 'flv', 'mpg', 'mpeg', 'm2ts', 'vob'];
-/* Movies and episodes go to mpv when their file type or sound format is one Chrome-based players can't handle. */
+/* Movies, episodes AND live channels go to VLC/mpv when their file type or format is one Chrome-based
+   players can't handle. This used to exclude live channels outright ("it.t === 'live'" short-circuited
+   to false), so an HEVC-encoded live channel -- common for premium/4K sports feeds, to save bandwidth,
+   and Edge/Chrome generally can't decode HEVC without hardware support it may not actually use -- just
+   silently failed to play natively, with no fallback, while the exact same codec on a movie/episode
+   already correctly handed off. techFromName() works off the channel's own name text (many providers
+   literally put "HEVC" in HEVC channel names), so no other data is needed for this to work for live. */
 function needsBigPlayer(it) {
-  if (!it || it.t === 'live') return false;
+  if (!it) return false;
   if (MPV_EXT.includes(String(it.ext || '').toLowerCase())) return true;
   const t = it.t === 'vod' ? techFor(it) : (it.tech || techFromName(it.raw || it.name || ''));   /* includes the provider's own file details */
   return /Dolby|DTS|TrueHD/.test(t.ac || '') || t.vc === 'HEVC';
@@ -5625,7 +5631,7 @@ function openExternal(it, start) {
   location.href = 'rcsplay:play?u=' + encodeURIComponent(u.url) + '&t=' + encodeURIComponent(title) + '&s=' + Math.floor(start || 0);
 }
 function useMpv(it) {
-  if (!HAS_MPV || !it || it.t === 'live') return false;
+  if (!HAS_MPV || !it) return false;   /* used to also exclude live channels -- same HEVC gap as needsBigPlayer above */
   if (ui.pcPlayer === 'mpv') return true;
   if (MPV_EXT.includes(String(it.ext || '').toLowerCase())) return true;
   const t = it.tech || techFromName(it.raw || it.name || '');
