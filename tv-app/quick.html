@@ -432,6 +432,9 @@ mark{background:none;color:var(--amber);font-weight:600}
 .loading{position:fixed;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2.4rem;background:rgba(10,17,26,.92);z-index:10}
 .spinner{width:6rem;height:6rem;border:.5rem solid rgba(160,28,42,.45);border-top-color:var(--amber);border-radius:50%;animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+.pbar{width:34rem;max-width:70vw;height:.9rem;border-radius:.5rem;background:rgba(160,28,42,.3);overflow:hidden}
+.pbar-fill{height:100%;width:0%;background:var(--amber);border-radius:.5rem;transition:width .2s ease}
+html.light .pbar{background:rgba(120,70,20,.18)}
 .toast{position:fixed;top:3rem;left:50%;transform:translateX(-50%);background:var(--raise);padding:1.4rem 2.8rem;border-radius:.8rem;border:.1rem solid var(--line);z-index:11}
 #numjump{position:fixed;top:4rem;right:5rem;font-size:8rem;font-weight:700;color:var(--amber);background:rgba(10,17,26,.9);padding:1rem 3rem;border-radius:1rem;z-index:12;line-height:1}
 /* logo + splash */
@@ -916,7 +919,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 <div id="ask" class="overlay hidden"><div class="obox askbox"><div id="ask-title" class="slabel"></div><p id="ask-msg" class="note"></p><input id="ask-in" type="text" autocomplete="off" spellcheck="false"><p class="note">OK to save, Back to cancel</p></div></div>
 <div id="pk" class="overlay hidden"><div class="obox pkbox"><div class="pkcol"><div id="pk-title" class="slabel"></div><p class="pkm">Scan this with your phone’s camera, type, and press Send.</p><p id="pk-msg" class="pkst">Starting…</p><p id="pk-url" class="pku"></p><p class="note">Back to cancel</p></div><canvas id="pk-qr"></canvas></div></div>
 <div id="opts" class="overlay hidden"><div class="obox"><div class="slabel">Options</div><div id="opts-list"></div></div></div>
-<div id="loading" class="loading hidden"><div class="spinner"></div><p id="loading-msg">Loading…</p></div>
+<div id="loading" class="loading hidden"><div class="spinner"></div><p id="loading-msg">Loading…</p><div id="loading-bar" class="pbar hidden"><div id="loading-bar-fill" class="pbar-fill"></div></div></div>
 <div id="toast" class="toast hidden"></div>
 <div id="numjump" class="hidden"></div>
 
@@ -1281,7 +1284,7 @@ function* classifyLiveG() {
   L.cats.forEach(c => { const n = norm(c.raw); cc[c.id] = c.co || countryFromText(n); cg[c.id] = genreOf(' ' + n + ' '); });
   L.sorted = azSort(L.items);
   const geo = new Map();
-  let n = 0;
+  let n = 0; const total = L.sorted.length || 1;
   for (const it of L.sorted) {
     it.cc = it.co || cc[it.cat] || countryFromText(norm(it.raw)) || 'ZZ';
     if (!CNAME[it.cc]) CNAME[it.cc] = it.cc;
@@ -1292,7 +1295,7 @@ function* classifyLiveG() {
     let g = c.genres.get(it.g);
     if (!g) { g = []; g.az = true; c.genres.set(it.g, g); }
     g.push(it);
-    if ((++n & 127) === 0) yield;
+    if ((++n & 127) === 0) yield n / total;
   }
   const list = [...geo.values()];
   list.forEach(c => { c.glist = [...c.genres.entries()].sort((a, b) => a[0] === 'General' ? 1 : b[0] === 'General' ? -1 : a[0].localeCompare(b[0])); });
@@ -1330,13 +1333,20 @@ function memLog(label) {
 setInterval(() => memLog('periodic'), 20000);
 
 async function applyData(d, show) {
-  const say = m => { if (show) loading(true, m); };
+  /* Live channel processing is the one phase with real, known-length work (the account's whole live
+     list, 49,121 channels in the case this was reported against) and now reports real progress through
+     it instead of leaving the owner looking at a frozen spinner with no idea whether it's still working.
+     vod/series are deferred (see below) so they have nothing meaningful to show here. Weights are a
+     rough split across the four live sub-phases (grouping is the dominant one), not a precise measure --
+     good enough for a progress bar, not claimed as exact. */
+  const say = (m, pct) => { if (show) loading(true, m, pct); };
   CUR = d;
   try {
     let all = [];
     for (const t of ['live', 'vod', 'series']) {
       const x = d[t];
-      say(t === 'live' ? 'Preparing channels…' : t === 'vod' ? 'Preparing movies…' : 'Preparing series…');
+      const msg = t === 'live' ? 'Preparing channels…' : t === 'vod' ? 'Preparing movies…' : 'Preparing series…';
+      say(msg, t === 'live' ? 0 : undefined);
       /* vod/series on an Xtream account: fetching and grouping every copy of every title into one
          entry is the single biggest cost in the app (confirmed: it OOM-crashes a Fire TV Stick on a
          200k+ item provider, and is slow even on hardware with enough RAM to survive it). Skip it here
@@ -1344,16 +1354,17 @@ async function applyData(d, show) {
          (ensureTitlesGrouped) — most sessions that only watch live TV never pay that cost at all.
          M3U accounts get everything in one playlist file with no separate per-type fetch, so there is
          nothing to defer for them. */
-      if (t === 'live') { await runSliced(prepChannelsG()); x.grouped = true; }
+      if (t === 'live') { await runSliced(prepChannelsG(), p => say(msg, p * 55)); x.grouped = true; }
       else if (isM3u()) { await runSliced(prepTitlesG(t)); x.grouped = true; x.fetched = true; }
       else x.grouped = false;
-      await runSliced(splitAdultG(t));
+      await runSliced(splitAdultG(t), t === 'live' ? p => say(msg, 55 + p * 15) : undefined);
       x.byId = new Map(x.items.map(i => [i.id, i]));
       x.catName = new Map(x.cats.map(c => [c.id, c.name]));
       all = all.concat(x.items);
     }
-    await runSliced(classifyLiveG());
-    await runSliced(applyLogosG());
+    const liveMsg = 'Preparing channels…';
+    await runSliced(classifyLiveG(), p => say(liveMsg, 70 + p * 15));
+    await runSliced(applyLogosG(), p => say(liveMsg, 85 + p * 15));
     DATA = d; ALL = all;
     for (const t of ['live', 'vod', 'series']) B[t].cats = [];
     EVENTS = null;
@@ -1571,7 +1582,12 @@ function show(id) {
 }
 window.addEventListener('resize', fitHome);
 addEventListener('resize', () => { if (S.screen === 'game' && GS.ev) renderGame(); });
-function loading(on, msg) { $('loading').classList.toggle('hidden', !on); if (msg) $('loading-msg').textContent = msg; }
+function loading(on, msg, pct) {
+  $('loading').classList.toggle('hidden', !on); if (msg) $('loading-msg').textContent = msg;
+  const bar = $('loading-bar'), has = typeof pct === 'number' && isFinite(pct);
+  bar.classList.toggle('hidden', !has);
+  if (has) $('loading-bar-fill').style.width = Math.max(0, Math.min(100, pct)) + '%';
+}
 let toastT;
 function toast(msg) {
   const t = $('toast'); t.textContent = msg; t.classList.remove('hidden');
@@ -4223,15 +4239,18 @@ function* groupChannelsG(list, cats) {
   const QR = {'8K': 5, '4K': 4, 'FHD': 3, 'HD': 2, 'SD': 1};
   const by = new Map();
   let n = 0;
+  const total1 = list.length || 1;
   for (const v of list) {
     const cc = v.co || catCo[v.cat] || countryFromText(norm(v.raw)) || 'ZZ';
     const key = cc + '|' + norm(v.name).replace(/ /g, '');
     let g = by.get(key);
     if (!g) { g = []; by.set(key, g); }
     g.push(v);
-    if ((++n & 63) === 0) yield;
+    if ((++n & 63) === 0) yield n / total1 * 0.85;
   }
   const out = [];
+  const total2 = by.size || 1;
+  let n2 = 0;
   for (const [key, vers] of by) {
     vers.sort((a, b) => (a.bk || 0) - (b.bk || 0) || (QR[b.ql] || 1.5) - (QR[a.ql] || 1.5) || (Number(a.num) || 1e9) - (Number(b.num) || 1e9));
     const best = vers[0];
@@ -4242,7 +4261,7 @@ function* groupChannelsG(list, cats) {
     if (best.url) it.url = best.url;
     indexItem(it);
     out.push(it);
-    if ((++n & 31) === 0) yield;
+    if ((++n2 & 31) === 0) yield 0.85 + n2 / total2 * 0.15;
   }
   return out;
 }
@@ -4258,14 +4277,14 @@ const prepChannels = () => runSync(prepChannelsG());
 function* applyLogosG() {
   if (!D_() || !LOGOMAP) return;
   const {k, u} = LOGOMAP;
-  let n = 0;
+  let n = 0; const total = D_().live.items.length || 1;
   for (const it of D_().live.items) {
     let m = null, g = null;
     const keys = logoKeys(it.name);
     for (const key of keys) { const a = k[key + '|' + it.cc]; if (a != null && a >= 0) { m = u[a]; break; } }
     if (!m) for (const key of keys) { const a = k[key]; if (a != null && a >= 0) { g = u[a]; break; } }
     it.lm = m; it.lg = g;
-    if ((++n & 127) === 0) yield;
+    if ((++n & 127) === 0) yield n / total;
   }
 }
 /* Builds the match tables from iptv-org's shared channel/logo database (currently ~32k channels,
@@ -6142,8 +6161,8 @@ function* splitAdultG(t) {
     return (t === 'live' ? ADULT_NAME_RE.test(nm) : /\b(xxx|porn\w*)\b/i.test(nm)) && !ADULT_OK_RE.test(nm);
   };
   const adult = [], keep = [];
-  let n = 0;
-  for (const g of x.items) { (isAd(g) ? adult : keep).push(g); if ((++n & 127) === 0) yield; }
+  let n = 0; const total = x.items.length || 1;
+  for (const g of x.items) { (isAd(g) ? adult : keep).push(g); if ((++n & 127) === 0) yield n / total; }
   x.adult = adult;
   if (!adult.length) return;
   x.items = keep;
