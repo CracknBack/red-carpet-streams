@@ -1688,10 +1688,19 @@ async function loadFixtures(force) {
         home: (m.homeTeam && (m.homeTeam.shortName || m.homeTeam.name)) || 'TBC', away: (m.awayTeam && (m.awayTeam.shortName || m.awayTeam.name)) || 'TBC',
         homeFull: m.homeTeam && m.homeTeam.name || '', awayFull: m.awayTeam && m.awayTeam.name || ''}));
     }
+    /* buildEvents() is a large, fully synchronous pass over the whole guide (not sliced -- the
+       fixture-matching logic is the most correctness-sensitive code in the app, so it isn't touched
+       here); it used to re-run every time this poll landed even when the fetched fixtures were
+       identical to what EVENTS was already built from, which on a big guide is a real freeze, on a
+       poll as frequent as every 10 minutes whenever something is within 3 hours of now. Only drop
+       EVENTS when the fixtures actually changed (new match, a status change, a time change). */
+    const sig = JSON.stringify(all.map(m => [m.id, m.status, m.utcDate]));
+    const changed = sig !== FD.sig; FD.sig = sig;
     Object.assign(FD, {list: all, ts: Date.now(), err: ''});
     await idb.set(key, {list: all, ts: FD.ts});
+    if (changed) EVENTS = null;
   } catch (e) { FD.err = 'Fixtures couldn’t be updated: ' + e.message; }
-  FD.busy = false; EVENTS = null; if (S.screen === 'home') renderHome();
+  FD.busy = false; if (S.screen === 'home') renderHome();
   if (S.screen === 'main' && S.page === 'search') { Q.skey = ''; Q.gkey = ''; renderMain(); }
 }
 setInterval(() => { if (ui.fdKey && S.screen !== 'player') loadFixtures(false); }, 5 * 60000);
@@ -1715,10 +1724,13 @@ async function loadF1(force) {
       [['race', 'Race', at(rc), 2 * 3600e3], ['qual', 'Qualifying', at(rc.Qualifying), 4500e3], ['sprint', 'Sprint', at(rc.Sprint), 3600e3], ['sprintq', 'Sprint qualifying', at(rc.SprintQualifying || rc.SprintShootout), 3600e3]]
         .forEach(([k, label, start, dur]) => { if (start) list.push(Object.assign({id: rc.season + '-' + rc.round + '-' + k, k, label, start, dur}, base)); });
     });
+    const sig = JSON.stringify(list.map(x => [x.id, x.start]));
+    const changed = sig !== F1.sig; F1.sig = sig;
     Object.assign(F1, {list, ts: Date.now(), err: ''});
     await idb.set(key, {list, ts: F1.ts});
+    if (changed) EVENTS = null;
   } catch (e) { F1.err = 'The F1 schedule couldn’t be updated: ' + e.message; }
-  F1.busy = false; EVENTS = null; if (S.screen === 'home') renderHome();
+  F1.busy = false; if (S.screen === 'home') renderHome();
   if (S.screen === 'main' && S.page === 'search') { Q.skey = ''; Q.gkey = ''; renderMain(); }
 }
 /* which channels the guides show carrying a session: a Formula 1 listing for that race, starting within an hour of the session */
@@ -2417,8 +2429,18 @@ function guideUrl() {
   if (isM3u()) return cfg.epg || (DATA && DATA.epgUrl) || '';
   return cfg.server + '/xmltv.php?username=' + encodeURIComponent(cfg.user) + '&password=' + encodeURIComponent(cfg.pass);
 }
-/* Which guide channel ids belong to sports channels, and which channels they map to. */
+/* Which guide channel ids belong to sports channels, and which channels they map to.
+   buildEvents() and its helpers (fixtureEvents, f1GuideChans -- the latter once per F1 session) can
+   call this many times in a single pass, and it was rebuilding a map over every one of the account's
+   live channels (49,121 in the case this was reported against) from scratch each time: real wasted CPU
+   and allocation on every call, not just the first. It only depends on DATA.live.items and GUIDE.xmap,
+   both of which are replaced wholesale (never mutated in place) whenever they actually change, so a
+   reference-equality cache is exact, not approximate -- one slot per 'all' value since both are used
+   together in checkGuideTimes(). */
+const EPGMAP_CACHE = [null, null];
 function sportsEpgMap(all) {
+  const slot = all ? 1 : 0, c = EPGMAP_CACHE[slot];
+  if (c && c.items === DATA.live.items && c.xmap === (GUIDE && GUIDE.xmap)) return c.map;
   const m = new Map();
   for (const g of DATA.live.items) {
     if (!all && g.g !== 'Sports') continue;
@@ -2428,6 +2450,7 @@ function sportsEpgMap(all) {
     const set = new Set(GUIDE.xmap[k].map(id => DATA.live.byId.get(String(id))).filter(g => g && (all || g.g === 'Sports')));
     if (set.size) m.set(k, set);
   });
+  EPGMAP_CACHE[slot] = {items: DATA.live.items, xmap: GUIDE && GUIDE.xmap, map: m};
   return m;
 }
 /* ---------- free public guides (epgshare01), for channels the provider has no guide for ---------- */
