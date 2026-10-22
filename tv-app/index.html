@@ -6308,7 +6308,15 @@ let logoDbStarted = false;
    would then never read. Diagnosed via adb logcat against a real device: the WebView's JS heap hit a
    V8 "Ineffective mark-compacts near heap limit" OOM around 223MB after ~2 minutes; this is a genuine,
    substantial, previously wasted chunk of that ceiling on every account, not just a large one. */
-function startLogoDb() { if (!logoDbStarted && ui.logos !== 'provider' && !CRASHGUARD_FORCE) { logoDbStarted = true; loadLogoDb().catch(() => {}); } }
+/* Proactive version of the crash-loop guard below: rather than waiting for a first crash to happen at
+   all, skip the heavy optional logo-matching work up front on hardware that reports very little memory.
+   navigator.deviceMemory (supported by this WebView) is coarse -- a power of two, capped at 8GB -- and
+   not implemented on every platform, so this only ever acts when it IS reported and genuinely low; it
+   never guesses at hardware it can't measure, so it changes nothing for anyone whose browser doesn't
+   support it. The device this was diagnosed against (Fire TV Stick HD, confirmed ~900MB total RAM via
+   adb, which reports as 1 on this scale) is exactly the case this is for. */
+function lowMemDevice() { return typeof navigator.deviceMemory === 'number' && navigator.deviceMemory <= 1; }
+function startLogoDb() { if (!logoDbStarted && ui.logos !== 'provider' && !CRASHGUARD_FORCE && !lowMemDevice()) { logoDbStarted = true; loadLogoDb().catch(() => {}); } }
 /* Self-healing crash-loop guard. The scenario this exists for: a device too constrained to survive
    the optional logo-matching work (see startLogoDb above) crashes before the owner can ever reach
    Settings to turn "Channel logos" to Provider's only themselves -- there has to be a way out that
