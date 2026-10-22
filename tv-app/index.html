@@ -1136,11 +1136,12 @@ const norm = s => {
 let CUR = null;                                   /* the lists being prepared in the background, until they are ready to swap in */
 const D_ = () => CUR || DATA;
 function runSync(g) { let r; do { r = g.next(); } while (!r.done); return r.value; }
-async function runSliced(g) {
+async function runSliced(g, report) {
   let t = performance.now(), r;
   for (;;) {
     r = g.next();
     if (r.done) return r.value;
+    if (report && r.value != null) report(r.value);
     if (performance.now() - t > 12) { await new Promise(res => setTimeout(res, 0)); t = performance.now(); }
   }
 }
@@ -2853,15 +2854,26 @@ function addNameEvents(out) {
       text: info.text + norm(g.name) + ' ', kick: kick || now, start: kick ? kick - 15 * 60e3 : now, stop: kick ? kick + 2.5 * 3600e3 : now + 24 * 3600e3, chans: [entry], reps: []});
   }
 }
-function buildEvents() {
+/* buildEvents() used to be one fully synchronous function. On a big enough guide (this was diagnosed
+   against a 49,121-channel provider) it's a genuine multi-second block, and on constrained hardware
+   (a Fire TV Stick) that block was severe enough to get the WebView render process OOM-killed. The
+   matching logic below is completely unchanged, line for line -- only yield points were added, at
+   boundaries between already-independent stages (and periodically within the one loop over the full
+   guide, which only writes to a local Map and so is safe to pause mid-loop). Two entry points:
+   buildEvents() (sync, via runSync -- every existing caller except Home's banner, unchanged behaviour)
+   and ensureEventsAsync() (sliced, via runSliced -- Home's banner only, see there for why). */
+function* buildEventsG() {
   const epgMap = sportsEpgMap(true), perCh = new Map(), now = nowMs();
   /* 1. read every guide entry once, channel by channel */
+  let n = 0;
   for (const [ci, st, en, title, sub] of ((GUIDE && GUIDE.items) || [])) {
     const groups = epgMap.get(GUIDE.chans[ci]);
     if (!groups) continue;
     const first = groups.values().next().value;
     (perCh.get(ci) || perCh.set(ci, []).get(ci)).push({ci, st, en: en || st + 2 * 3600e3, title, groups, info: parseEvent(title, sub, first ? first.name : '')});
+    if ((++n & 511) === 0) yield;
   }
+  yield;
   /* 2. a pre-match show that runs straight into a match on the same channel counts as that match's coverage */
   perCh.forEach(list => {
     list.sort((a, b) => a.st - b.st);
@@ -2873,6 +2885,7 @@ function buildEvents() {
       m.pre = pre; pre.used = true;
     }
   });
+  yield;
   /* 3. gather every airing of the same fixture. A club can't play two matches within 20 hours,
         so listings that share a known club in that time are the same match, whatever language they're in. */
   const all = [];
@@ -2895,7 +2908,9 @@ function buildEvents() {
     }
     if (!f) { f = {first: e.st, last: e.st, items: [], keys: new Set(), teamKeys: new Set()}; fixtures.push(f); }
     f.items.push(e); f.last = Math.max(f.last, e.st); f.keys.add(k); info.known.forEach(t => f.teamKeys.add(t));
+    if ((++n & 511) === 0) yield;
   }
+  yield;
   /* 4. split each club's airings into broadcasts (airings within 45 minutes of each other).
         The first broadcast is the live match. A later broadcast is a new match (say, a second leg)
         only if it's at least 2 days later and on several channels at once; anything else is a replay. */
@@ -2914,7 +2929,9 @@ function buildEvents() {
       /* airings before any live broadcast in the guide: the match itself was before the guide's history, so these are only replays */
       else { cur = {first: c.first, items: c.items.slice(), live: c.items.slice(), reps: [], isMatch: true, sure: false}; groups.push(cur); }
     }
+    if ((++n & 255) === 0) yield;
   }
+  yield;
   for (const grp of groups) {
     const items = grp.items, isMatch = grp.isMatch;
     const liveItems = grp.live.length ? grp.live : [items[0]], repItems = grp.reps;
@@ -2957,7 +2974,9 @@ function buildEvents() {
     /* a match is over 3 hours after kick-off at the latest, whatever a channel's listing says */
     ev.stop = Math.min(Math.max(...ev.chans.map(c => c.stop)), isMatch ? kick + 3 * 3600e3 : Infinity);
     out.push(ev);
+    if ((++n & 255) === 0) yield;
   }
+  yield;
   learnBroadcasters(out);
   addNameEvents(out);
   const f1 = f1Events();
@@ -2966,6 +2985,31 @@ function buildEvents() {
     const fx = fixtureEvents(), covered = ev => ev.teams && fx.some(f => Math.abs(f.kick - ev.kick) < 20 * 3600e3 && ev.teams.some(t => f.teams.map(norm).includes(norm(t))));
     EVENTS = fx.concat(f1, out.filter(ev => !FD_NAMES.has(ev.comp) && !(f1.length && ev.comp === 'Formula 1') && !covered(ev)));
   } else EVENTS = f1.concat(out.filter(ev => !(f1.length && ev.comp === 'Formula 1')));
+}
+const buildEvents = () => runSync(buildEventsG());
+let EVENTS_BUILDING = false;
+/* Home's banner (homeLives/homeUpcoming) is the one place that used to call buildEvents() synchronously
+   on the render path -- exactly where the owner saw the app black-screen and reload on a Fire TV Stick,
+   right as buildEvents() finished (a WebView render-process OOM kill: commit a23e735 already added
+   recovery for this class of crash, but recovering from it instead of avoiding it isn't good enough).
+   Every other caller of buildEvents() keeps the synchronous version above untouched. This one runs it
+   sliced instead, so the rest of the app (remote input, playback, other pages) stays responsive while
+   it works, and a lower peak memory footprint per slice (the GC gets to run between them) is the main
+   lever available here short of restructuring the matching logic itself, which is not something to
+   rush. GUIDE/DATA are snapshotted so a result computed against data that got replaced mid-build (an
+   account switch, a fresh refresh) is discarded instead of silently applied. */
+async function ensureEventsAsync() {
+  if (EVENTS || EVENTS_BUILDING) return;
+  EVENTS_BUILDING = true;
+  const myGuide = GUIDE, myData = DATA;
+  try {
+    await runSliced(buildEventsG());
+    if (GUIDE !== myGuide || DATA !== myData) EVENTS = null;
+  } catch (e) { EVENTS = null; }   /* e.g. GUIDE/DATA replaced mid-build; next render retries cleanly */
+  finally {
+    EVENTS_BUILDING = false;
+    if (EVENTS && S.screen === 'home') renderHome();
+  }
 }
 
 /* A guide can say a game is on a channel when it isn't (the wrong region's feed, a stale listing). The channel's OWN guide is the check:
@@ -3231,7 +3275,7 @@ const lgImg = (c, cls) => LG_OK.has(c) ? '<img class="' + (cls || 'lgi') + '" sr
 function homeLives() {
   try {
     if (!DATA || !(FD.list.length || F1.list.length)) return [];
-    if (!EVENTS) buildEvents();
+    if (!EVENTS) { ensureEventsAsync(); return []; }   /* builds in the background without blocking; renderHome() re-runs when ready */
     const now = nowMs(), order = chipsList(), rk = ev => { const k = order.indexOf(ev.comp); return k < 0 ? 99 : k; };
     return (EVENTS || []).filter(ev => ev.fixture && evState(ev, now) === 0).sort((a, b) => rk(a) - rk(b) || a.kick - b.kick);
   } catch (e) { return []; }
@@ -3250,7 +3294,7 @@ function homeReplays() {
 function homeUpcoming() {
   try {
     if (!DATA || !(FD.list.length || F1.list.length)) return [];
-    if (!EVENTS) buildEvents();
+    if (!EVENTS) { ensureEventsAsync(); return []; }   /* builds in the background without blocking; renderHome() re-runs when ready */
     const now = nowMs();
     return (EVENTS || []).filter(ev => ev.fixture && evState(ev, now) === 1 && ev.kick - now < 48 * 3600e3).sort((a, b) => a.kick - b.kick).slice(0, 6);
   } catch (e) { return []; }
