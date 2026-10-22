@@ -1347,20 +1347,29 @@ async function applyData(d, show) {
       const x = d[t];
       const msg = t === 'live' ? 'Preparing channels…' : t === 'vod' ? 'Preparing movies…' : 'Preparing series…';
       say(msg, t === 'live' ? 0 : undefined);
-      /* vod/series on an Xtream account: fetching and grouping every copy of every title into one
-         entry is the single biggest cost in the app (confirmed: it OOM-crashes a Fire TV Stick on a
-         200k+ item provider, and is slow even on hardware with enough RAM to survive it). Skip it here
-         and do it later, once, the first time the user actually opens Movies/Series/Search/Favourites
-         (ensureTitlesGrouped) — most sessions that only watch live TV never pay that cost at all.
-         M3U accounts get everything in one playlist file with no separate per-type fetch, so there is
-         nothing to defer for them. */
-      if (t === 'live') { await runSliced(prepChannelsG(), p => say(msg, p * 55)); x.grouped = true; }
-      else if (isM3u()) { await runSliced(prepTitlesG(t)); x.grouped = true; x.fetched = true; }
-      else x.grouped = false;
-      await runSliced(splitAdultG(t), t === 'live' ? p => say(msg, 55 + p * 15) : undefined);
-      x.byId = new Map(x.items.map(i => [i.id, i]));
-      x.catName = new Map(x.cats.map(c => [c.id, c.name]));
-      all = all.concat(x.items);
+      if (t === 'live') {
+        await runSliced(prepChannelsG(), p => say(msg, p * 55)); x.grouped = true;
+        await runSliced(splitAdultG(t), p => say(msg, 55 + p * 15));
+        x.byId = new Map(x.items.map(i => [i.id, i]));
+        x.catName = new Map(x.cats.map(c => [c.id, c.name]));
+        all = all.concat(x.items);
+      } else {
+        /* vod/series: fetching and grouping every copy of every title into one entry is the single
+           biggest cost in the app (confirmed: it OOM-crashes a Fire TV Stick on a 200k+ item
+           provider, and is slow even on hardware with enough RAM to survive it). Skip it here and do
+           it later, once, the first time the user actually opens Movies/Series/Search/Favourites
+           (ensureTitlesGrouped) — most sessions that only watch live TV never pay that cost at all.
+           This used to apply only to Xtream accounts, on the assumption that M3U accounts -- whose
+           whole catalog arrives pre-parsed in one playlist file, with no separate per-category fetch
+           to defer -- had "nothing to defer". That assumption was wrong: the grouping step itself (and
+           the adult split / id lookup map / global Search concat riding on it) is exactly as deferrable
+           for M3U as for Xtream. Skipping that deferral for M3U was why a large M3U playlist (182,569
+           raw vod + 49,476 series items, seen on the device this was diagnosed against) was fully
+           grouped and held in memory on every single boot, before the owner had even opened Movies --
+           found only once diagnostics showed vod/series fully populated immediately after applyData(),
+           before Home had even rendered, with Movies never having been opened that session. */
+        x.fetched = isM3u(); x.grouped = false;
+      }
     }
     const liveMsg = 'Preparing channels…';
     await runSliced(classifyLiveG(), p => say(liveMsg, 70 + p * 15));
