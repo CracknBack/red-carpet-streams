@@ -2701,9 +2701,20 @@ async function loadGuide(force) {
   const want = sportsEpgMap(false), every = sportsEpgMap(true), chans = [], chIdx = new Map(), items = [];
   GUIDE_AC = new AbortController();
   const now = nowMs(), from = now - 24 * 3600e3, from8 = now - 8 * 86400e3, to = now + 7 * 86400e3;
+  /* Hard ceiling on how many guide entries get held in memory. On the owner's real provider (49,121
+     channels) this array was still growing fast -- 5,549 entries at 22.9MB read -- when the app crashed
+     (V8 heap OOM) a few seconds later; there was no limit at all before this, so an unusually large
+     guide could grow the array without bound regardless of device memory. This caps it at a size
+     comfortably past what was confirmed safe tonight (the capture never got further before the crash),
+     logged once if hit so it's visible rather than silently dropping coverage. It's a safety ceiling, not
+     a confirmed fix for the root cause -- if the crash still happens with this in place, the array's own
+     size isn't the (sole) driver and the next diagnostic pass needs to look elsewhere. */
+  const ITEMS_CAP = 6000;
+  let itemsCapHit = false;
   let lastShow = 0, lastMem = 0;
   try {
     await streamXml(url, block => {
+      if (items.length >= ITEMS_CAP) { if (!itemsCapHit) { itemsCapHit = true; memLog('streamXml: hit ITEMS_CAP=' + ITEMS_CAP + ', dropping further entries'); } return; }
       const head = block.slice(0, block.indexOf('>') + 1);
       const ch = (head.match(/\bchannel="([^"]*)"/) || [])[1];
       if (!ch) return;
