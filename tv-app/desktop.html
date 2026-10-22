@@ -5299,7 +5299,7 @@ function settingsAction(i) {
     ui.liveLayout = ui.liveLayout === 'provider' ? 'country' : 'provider'; save('sp_ui', ui);
     Object.assign(B.live, {cats: [], lv: 0, cc: null, catId: null}); V++; renderMain();
   }
-  else if (a === 'logos') { ui.logos = ui.logos === 'provider' ? 'best' : 'provider'; save('sp_ui', ui); V++; Q.ver++; listView.reset(); renderMain(); }
+  else if (a === 'logos') { ui.logos = ui.logos === 'provider' ? 'best' : 'provider'; save('sp_ui', ui); startLogoDb(); V++; Q.ver++; listView.reset(); renderMain(); }
   else if (a === 'names') { ui.orig = !ui.orig; save('sp_ui', ui); V++; Q.ver++; renderMain(); }
   else if (a === 'adult') adultPinMenu();
   else if (a === 'adultkw') askText('Extra adult keywords', 'If some adult channels or categories aren’t being caught, type words from their names, separated by commas. They move into the locked section when the app restarts.', ui.adultKw || '', v => { ui.adultKw = v.trim(); save('sp_ui', ui); toast('Restarting to apply…'); setTimeout(() => location.reload(), 300); });
@@ -6301,7 +6301,15 @@ function loginKey(k, e) {
   }
 }
 let logoDbStarted = false;
-function enterMain() { show('main'); S.zone = 'cats'; showPage(anyFavs() ? 'favs' : 'live'); openHome(); if (!logoDbStarted) { logoDbStarted = true; loadLogoDb().catch(() => {}); } if (isM3u() && !EPGX) loadXmltv().catch(() => {}); }
+/* iptv-org's shared logo database (~32k channels, ~35k logos -- see buildLogoDbG) is a purely cosmetic
+   add-on: nicer channel icons than the provider's own. "Channel logos: Provider's only" already existed
+   as a setting (logoCands() below never reads LOGOMAP in that mode), but this download-and-build step
+   ran unconditionally regardless of it, wasting real memory on a multi-tens-of-MB structure the app
+   would then never read. Diagnosed via adb logcat against a real device: the WebView's JS heap hit a
+   V8 "Ineffective mark-compacts near heap limit" OOM around 223MB after ~2 minutes; this is a genuine,
+   substantial, previously wasted chunk of that ceiling on every account, not just a large one. */
+function startLogoDb() { if (!logoDbStarted && ui.logos !== 'provider') { logoDbStarted = true; loadLogoDb().catch(() => {}); } }
+function enterMain() { show('main'); S.zone = 'cats'; showPage(anyFavs() ? 'favs' : 'live'); openHome(); startLogoDb(); if (isM3u() && !EPGX) loadXmltv().catch(() => {}); }
 
 async function boot() {
   await idb.open();
