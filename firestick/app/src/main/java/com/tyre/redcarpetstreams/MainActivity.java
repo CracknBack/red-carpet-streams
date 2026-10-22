@@ -5,9 +5,11 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.webkit.ConsoleMessage;
 import android.webkit.JavascriptInterface;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebChromeClient;
@@ -129,7 +131,20 @@ public class MainActivity extends Activity {
                 return true;
             }
         });
-        w.setWebChromeClient(new WebChromeClient());
+        /* The default WebChromeClient's onConsoleMessage does nothing -- page console.log/warn/error
+           calls never reach logcat at all, at any level (confirmed: a diagnostic console.error() still
+           produced zero output in two separate builds). Overriding it to forward everything to Log is
+           what actually makes adb logcat able to see JS-side diagnostics, not just Chromium's own
+           internal engine logging (which is separate and was already visible). */
+        w.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onConsoleMessage(ConsoleMessage cm) {
+                int level = cm.messageLevel() == ConsoleMessage.MessageLevel.ERROR ? Log.ERROR
+                        : cm.messageLevel() == ConsoleMessage.MessageLevel.WARNING ? Log.WARN : Log.INFO;
+                Log.println(level, "RCS_Console", cm.message() + " (" + cm.sourceId() + ":" + cm.lineNumber() + ")");
+                return true;
+            }
+        });
         w.addJavascriptInterface(new Bridge(), "RCS");
         return w;
     }
