@@ -2592,8 +2592,18 @@ async function loadExtraGuides(chans, chIdx, items, from, to, every, force) {
   });
   const idx = new Map();
   for (const g of DATA.live.items) { const k = chKey(g.name); (idx.get(k) || idx.set(k, []).get(k)).push(g); }
+  /* These used to run one at a time (await inside a for-of): with several free guide sources selected,
+     their network+parse times simply added up -- a real, separate contributor to "it takes ages before
+     Live Sports shows anything", on top of the memory issue fixed separately. Fetching them concurrently
+     instead overlaps that network wait. Safe to do: JS is single-threaded, so the shared chans/chIdx/
+     items/xmap/notes/calS/itemsCapHit below are only ever mutated by one callback at a time regardless
+     of how many streamXml calls are in flight -- interleaved, never simultaneous, same as any other
+     async code in this app. The only visible difference is notes ending up in a different order and
+     chans/items being interleaved rather than strictly grouped by source, neither of which anything
+     downstream depends on (chIdx.get(cl) === undefined is checked before every insert, regardless of
+     which source's callback runs first). */
   let itemsCapHit = false;
-  for (const [name, url] of sel) {
+  await Promise.all(sel.map(async ([name, url]) => {
     const ids = new Map(), lim = new Map();
     let count = 0;
     try {
@@ -2643,7 +2653,7 @@ async function loadExtraGuides(chans, chIdx, items, from, to, every, force) {
       });
       notes.push('Free ' + name + ' guide: ' + count + ' of your channels matched');
     } catch (e) { notes.push('Free ' + name + ' guide couldn’t be downloaded (' + e.message + ')'); }
-  }
+  }));
   /* If the same programmes sit at a clearly different time in the provider's guide, the provider's times are off. */
   let calOut = null;
   if (calS.length >= 8) {
