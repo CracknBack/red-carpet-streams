@@ -2985,6 +2985,14 @@ function* buildEventsG() {
   perCh.forEach(list => list.forEach(e => { if (!e.used) all.push(e); }));
   all.sort((a, b) => a.st - b.st);
   const fixtures = [], shows = new Map();
+  /* keyIndex/teamIndex: candidate lookups for the fixtures.find() calls below. On a big guide (6000+
+     items) a linear scan of the whole, ever-growing fixtures array per event made this loop O(n^2) --
+     measured at 100+ seconds on a Fire TV Stick, which is what made Home's banner (and the first
+     return to it) feel frozen. These indexes narrow each find() to the handful of fixtures that could
+     possibly match (same exact key, or same first known team) -- the full original condition is still
+     re-checked against each candidate below, so the result is identical, just not an O(n) scan to get there. */
+  const keyIndex = new Map(), teamIndex = new Map();
+  const idxPush = (map, key, f) => { let a = map.get(key); if (!a) { a = []; map.set(key, a); } a.push(f); };
   for (const e of all) {
     const info = e.info;
     if (!info.teams) {
@@ -2994,13 +3002,24 @@ function* buildEventsG() {
       f.items.push(e); continue;
     }
     const k = info.key;
-    let f = fixtures.find(x => x.teamKeys && e.st - x.last <= 10 * 86400e3 && (x.keys.has(k) || (info.known.length && info.known.every(t => x.teamKeys.has(t))) || (info.known.length === 1 && x.keys.has(k))));
-    if (!f) {
-      /* a single known club joins another fixture of that club only within 20 hours (it can't play twice that close) */
-      f = info.known.length === 1 ? fixtures.find(x => x.teamKeys && e.st - x.last <= 20 * 3600e3 && x.teamKeys.has(info.known[0])) : null;
+    let f = null, bestSeq = Infinity;
+    const cands1 = (keyIndex.get(k) || []).concat(info.known.length ? (teamIndex.get(info.known[0]) || []) : []);
+    for (const x of cands1) {
+      if (x._seq >= bestSeq || !x.teamKeys || e.st - x.last > 10 * 86400e3) continue;
+      if (x.keys.has(k) || (info.known.length && info.known.every(t => x.teamKeys.has(t)))) { f = x; bestSeq = x._seq; }
     }
-    if (!f) { f = {first: e.st, last: e.st, items: [], keys: new Set(), teamKeys: new Set()}; fixtures.push(f); }
-    f.items.push(e); f.last = Math.max(f.last, e.st); f.keys.add(k); info.known.forEach(t => f.teamKeys.add(t));
+    if (!f && info.known.length === 1) {
+      /* a single known club joins another fixture of that club only within 20 hours (it can't play twice that close) */
+      bestSeq = Infinity;
+      for (const x of (teamIndex.get(info.known[0]) || [])) {
+        if (x._seq >= bestSeq || !x.teamKeys || e.st - x.last > 20 * 3600e3) continue;
+        if (x.teamKeys.has(info.known[0])) { f = x; bestSeq = x._seq; }
+      }
+    }
+    if (!f) { f = {first: e.st, last: e.st, items: [], keys: new Set(), teamKeys: new Set(), _seq: fixtures.length}; fixtures.push(f); }
+    f.items.push(e); f.last = Math.max(f.last, e.st);
+    if (!f.keys.has(k)) { f.keys.add(k); idxPush(keyIndex, k, f); }
+    info.known.forEach(t => { if (!f.teamKeys.has(t)) { f.teamKeys.add(t); idxPush(teamIndex, t, f); } });
     if ((++n & 511) === 0) yield;
   }
   yield;
@@ -4676,7 +4695,16 @@ async function showPage(p) {
      empty instead of attempting it. ensureVodSeriesReady hides its own spinner either way (its own
      finally), but a failure here was otherwise uncaught and left the page stuck mid-switch with nothing
      rendered; catch it so the page still opens. */
-  if (p === 'search') { try { await ensureVodSeriesReady(); } catch (err) { toast(err && err.message ? err.message : 'Could not load movies/series.'); } }
+  /* Search used to await the whole movies+series catalog before the page would even open -- on this
+     provider's size (124,390 movies, 34,143 series) that's the same multi-minute, device-freezing cost
+     buildEventsG() had, just paid again on the one page everything else was already fixed to avoid. The
+     page now opens immediately (live channels/games search works right away, since DATA.live is always
+     ready) and movies/series results fill in once the background fetch finishes. */
+  if (p === 'search' && DATA && !(DATA.vod.grouped && DATA.series.grouped)) {
+    ensureVodSeriesReady().then(() => {
+      if (S.page === 'search') { Q.last = null; renderMain(); }
+    }).catch(err => toast(err && err.message ? err.message : 'Could not load movies/series.'));
+  }
   if (S.page !== p) return;   /* the user moved on again while that was loading */
   if (browse) {
     ensureCats(p); catView.reset(); listView.reset(); gridView.reset();
@@ -4841,9 +4869,10 @@ function renderSearchHead() {
   $('qclear').classList.toggle('hidden', !Q.text);
   $('qclear').classList.toggle('focus', S.zone === 'qclear');
   let st = '';
+  const vsLoading = DATA && !(DATA.vod.grouped && DATA.series.grouped);
   if (Q.busy) st = 'Checking for close spellings…';
-  else if (Q.text) { const n = (Q.counts.all || 0) + Q.games.length; st = n ? n.toLocaleString() + (n === 1 ? ' result' : ' results') : 'No matches'; }
-  else st = GUIDE_MSG || (GUIDE && GUIDE.ts ? 'TV guide updated ' + clockStr(new Date(GUIDE.ts)) + (GUIDE.until ? ', runs to ' + new Date(GUIDE.until).toLocaleDateString([], {weekday: 'short'}) : '') + (GUIDE.shift ? ', times corrected' : '') : '');
+  else if (Q.text) { const n = (Q.counts.all || 0) + Q.games.length; st = n ? n.toLocaleString() + (n === 1 ? ' result' : ' results') : 'No matches'; if (vsLoading) st += ' (movies & series still loading…)'; }
+  else st = vsLoading ? 'Movies & series still loading…' : (GUIDE_MSG || (GUIDE && GUIDE.ts ? 'TV guide updated ' + clockStr(new Date(GUIDE.ts)) + (GUIDE.until ? ', runs to ' + new Date(GUIDE.until).toLocaleDateString([], {weekday: 'short'}) : '') + (GUIDE.shift ? ', times corrected' : '') : ''));
   $('qstat').textContent = st;
 }
 function renderSearch() {
