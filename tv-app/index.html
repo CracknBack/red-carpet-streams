@@ -4731,17 +4731,14 @@ async function showPage(p) {
      empty instead of attempting it. ensureVodSeriesReady hides its own spinner either way (its own
      finally), but a failure here was otherwise uncaught and left the page stuck mid-switch with nothing
      rendered; catch it so the page still opens. */
-  /* Search used to await the whole movies+series catalog before the page would even open -- on this
-     provider's size (124,390 movies, 34,143 series) that's the same multi-minute, device-freezing cost
-     buildEventsG() had, just paid again on the one page everything else was already fixed to avoid. The
-     page now opens immediately (live channels/games search works right away, since DATA.live is always
-     ready) and movies/series results fill in once the background fetch finishes. */
-  if (p === 'search' && DATA && !(DATA.vod.grouped && DATA.series.grouped)) {
-    ensureVodSeriesReady().then(() => {
-      if (S.page === 'search') { Q.last = null; renderMain(); }
-    }).catch(err => toast(err && err.message ? err.message : 'Could not load movies/series.'));
-  }
-  if (S.page !== p) return;   /* the user moved on again while that was loading */
+  /* Search used to fetch the whole movies+series catalog (first blocking page-open, then in the
+     background once that was fixed) -- on this provider's size (50,995 grouped movie titles, 49,545+
+     raw series items, confirmed on device) that OOM-crashes the WebView outright, whether the fetch
+     blocks the UI or not. It's not a slowness problem to slice around: holding both catalogs in memory
+     at once is simply too big for this device. Search no longer fetches them at all -- it covers Live
+     TV and Sports (Games), same as everything that already works well; Movies/Series are still browsable
+     normally, just by category rather than by typed search. */
+  if (S.page !== p) return;
   if (browse) {
     ensureCats(p); catView.reset(); listView.reset(); gridView.reset();
     /* ensureCats above auto-selects a default category purely synchronously — without this, that
@@ -4905,10 +4902,9 @@ function renderSearchHead() {
   $('qclear').classList.toggle('hidden', !Q.text);
   $('qclear').classList.toggle('focus', S.zone === 'qclear');
   let st = '';
-  const vsLoading = DATA && !(DATA.vod.grouped && DATA.series.grouped);
   if (Q.busy) st = 'Checking for close spellings…';
-  else if (Q.text) { const n = (Q.counts.all || 0) + Q.games.length; st = n ? n.toLocaleString() + (n === 1 ? ' result' : ' results') : 'No matches'; if (vsLoading) st += ' (movies & series still loading…)'; }
-  else st = vsLoading ? 'Movies & series still loading…' : (GUIDE_MSG || (GUIDE && GUIDE.ts ? 'TV guide updated ' + clockStr(new Date(GUIDE.ts)) + (GUIDE.until ? ', runs to ' + new Date(GUIDE.until).toLocaleDateString([], {weekday: 'short'}) : '') + (GUIDE.shift ? ', times corrected' : '') : ''));
+  else if (Q.text) { const n = (Q.counts.all || 0) + Q.games.length; st = n ? n.toLocaleString() + (n === 1 ? ' result' : ' results') : 'No matches'; }
+  else st = GUIDE_MSG || (GUIDE && GUIDE.ts ? 'TV guide updated ' + clockStr(new Date(GUIDE.ts)) + (GUIDE.until ? ', runs to ' + new Date(GUIDE.until).toLocaleDateString([], {weekday: 'short'}) : '') + (GUIDE.shift ? ', times corrected' : '') : 'Search covers Live TV and Sports. Browse Movies and Series by category.');
   $('qstat').textContent = st;
 }
 function renderSearch() {
