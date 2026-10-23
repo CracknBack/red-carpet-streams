@@ -2556,6 +2556,15 @@ function expandEpgId(id) {
     .replace(/(^|[.\s])Cricket/g, '$1 Cricket').replace(/SkySp\+/g, 'Sky Sports Plus ');
   return t.replace(/[._]/g, ' ').replace(/\s+/g, ' ').trim();
 }
+/* Shared with loadGuide below: a hard ceiling on how many guide entries get held in the one shared
+   `items` array, total, across BOTH the provider's own guide (loadGuide's own streamXml call) AND every
+   free guide this function may add on top of it. Confirmed live against the real device: loadGuide's
+   own cap (6,000) protected its own fetch correctly, but this function pushes into the exact same array
+   with no cap of its own -- so a provider whose guide alone stayed under 6,000 could still be pushed
+   well past it, and into a V8 heap OOM, by the free guides loaded afterwards (pickFreeGuides can select
+   several sources in one run, each iterated here in its own streamXml call, all onto the same array).
+   That gap -- not the original array itself, already capped -- was the actual still-unbounded growth. */
+const ITEMS_CAP = 6000;
 async function loadExtraGuides(chans, chIdx, items, from, to, every, force) {
   /* a channel the provider's own guide covers keeps the provider's listings, but a free guide may still fill in
      everything AFTER where the provider's guide stops (providers usually list only a day or two ahead) */
@@ -2584,11 +2593,13 @@ async function loadExtraGuides(chans, chIdx, items, from, to, every, force) {
   });
   const idx = new Map();
   for (const g of DATA.live.items) { const k = chKey(g.name); (idx.get(k) || idx.set(k, []).get(k)).push(g); }
+  let itemsCapHit = false;
   for (const [name, url] of sel) {
     const ids = new Map(), lim = new Map();
     let count = 0;
     try {
       await streamXml(url, block => {
+        if (items.length >= ITEMS_CAP) { if (!itemsCapHit) { itemsCapHit = true; memLog('loadExtraGuides: hit ITEMS_CAP=' + ITEMS_CAP + ' (shared with loadGuide), dropping further entries from ' + name + ' and any guide after it'); } return; }
         const head = block.slice(0, block.indexOf('>') + 1);
         const id = (head.match(/\bchannel="([^"]*)"/) || [])[1];
         const gs = id && ids.get(id);
@@ -2720,8 +2731,8 @@ async function loadGuide(force) {
      comfortably past what was confirmed safe tonight (the capture never got further before the crash),
      logged once if hit so it's visible rather than silently dropping coverage. It's a safety ceiling, not
      a confirmed fix for the root cause -- if the crash still happens with this in place, the array's own
-     size isn't the (sole) driver and the next diagnostic pass needs to look elsewhere. */
-  const ITEMS_CAP = 6000;
+     size isn't the (sole) driver and the next diagnostic pass needs to look elsewhere. ITEMS_CAP itself
+     is now shared with loadExtraGuides (see there) -- this only guards loadGuide's own fetch. */
   let itemsCapHit = false;
   let lastShow = 0, lastMem = 0;
   try {
