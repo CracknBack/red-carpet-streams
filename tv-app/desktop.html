@@ -1244,6 +1244,26 @@ function* procItemsG(a, t) {
   return out;
 }
 const procItems = (a, t) => runSync(procItemsG(a, t));
+/* A search-only index: every movie/series stream, but reduced to just {id, name, cat} -- none of
+   procItemsG's icon/ext/rating/year fields, and no title-grouping (no .vers merging multiple quality
+   copies into one entry). That's the whole point: the full, grouped catalog is what OOM-crashed this
+   device (confirmed on device: 50,995 grouped movie titles plus 49,545+ raw series items together,
+   while Search was open). A lean {id,name,cat} record costs a small fraction of a full grouped title,
+   so holding every stream in the account at once stays well under what crashed before. Search matches
+   against this; opening a result hydrates it on demand via ensureCategoryItems (see openItem), the same
+   cheap per-category fetch Movies/Series browsing already uses. */
+function* procSearchIndexG(a, t) {
+  const out = []; let n = 0;
+  for (const x of arr(a)) {
+    if ((++n & 511) === 0) yield;
+    const c = clean(x.name, t !== 'live');
+    if (c.header) continue;
+    const it = {t, lite: 1, id: String(t === 'vod' ? x.stream_id : x.series_id), name: c.name, cat: String(x.category_id)};
+    indexItem(it);
+    out.push(it);
+  }
+  return out;
+}
 
 const COLL = new Intl.Collator(undefined, {numeric: true, sensitivity: 'base'});
 function azSort(list) { const r = list.slice().sort((a, b) => COLL.compare(a.name, b.name)); r.az = true; return r; }
@@ -3926,6 +3946,45 @@ async function ensureVodSeriesReady() {
   await ensureTitlesGrouped('vod');
   await ensureTitlesGrouped('series');
 }
+/* catName used to only get built inside ensureTitlesGrouped, which Search no longer calls for a large
+   Xtream account (see ensureSearchIndex below) -- but d.cats itself is always fetched eagerly and
+   cheaply at login, regardless of catalog size, so there's no reason catName needs that full pass too. */
+function catNameOf(t, catId) {
+  const d = DATA[t];
+  if (!d.catName) d.catName = new Map(d.cats.map(c => [c.id, c.name]));
+  return d.catName.get(catId);
+}
+/* The search-only counterpart to ensureVodSeriesReady: builds the lean {id,name,cat} index (see
+   procSearchIndexG) instead of fetching and grouping the full catalog. M3U has no per-category fetch to
+   hydrate a result from later (the whole playlist arrives pre-parsed as one file), so for M3U this falls
+   back to the original full-catalog path -- unavoidable there, but M3U catalogs are the user's own
+   playlist file, not an Xtream provider's hundred-thousand-stream library, so the same crash risk doesn't
+   apply the same way. */
+let SRCHIDX = {vod: null, series: null};
+async function ensureSearchIndex(t) {
+  if (!DATA || SRCHIDX[t]) return;
+  const own = cacheKey() + ':srchidx:' + t;
+  const cached = await idb.get(own);
+  if (cached && cached._updated === DATA.updated) { SRCHIDX[t] = cached.items; return; }
+  const raw = await api(t === 'vod' ? 'get_vod_streams' : 'get_series');
+  let items = await runSliced(procSearchIndexG(raw, t));
+  /* A lean {id,name,cat} entry is a small fraction of a full grouped title (see procSearchIndexG), so
+     this ceiling is far above anything realistic -- a defensive backstop, not expected to trigger, same
+     reasoning as the guide items cap. */
+  if (items.length > 250000) {
+    toast((t === 'vod' ? 'Movies' : 'Series') + ' search index is very large (' + items.length.toLocaleString() + ' items) -- showing the first 250,000.');
+    items = items.slice(0, 250000);
+  }
+  SRCHIDX[t] = items;
+  await idb.set(own, {items, _updated: DATA.updated});
+}
+async function ensureSearchCatalog() {
+  if (!DATA) return;
+  if (isM3u()) { await ensureVodSeriesReady(); return; }
+  await ensureSearchIndex('vod');
+  await ensureSearchIndex('series');
+  ALL = DATA.live.items.concat(SRCHIDX.vod || [], SRCHIDX.series || []);
+}
 /* Fetches and groups ONE provider category's movies/series (a few hundred items, typically), instead
    of the whole catalog — the actual fix for this crash, not just a reordering of when the full-catalog
    cost happens. Cached per category (own IndexedDB entry) so revisiting is instant. Correctness notes:
@@ -4732,13 +4791,18 @@ async function showPage(p) {
      empty instead of attempting it. ensureVodSeriesReady hides its own spinner either way (its own
      finally), but a failure here was otherwise uncaught and left the page stuck mid-switch with nothing
      rendered; catch it so the page still opens. */
-  /* Search used to fetch the whole movies+series catalog (first blocking page-open, then in the
-     background once that was fixed) -- on this provider's size (50,995 grouped movie titles, 49,545+
-     raw series items, confirmed on device) that OOM-crashes the WebView outright, whether the fetch
-     blocks the UI or not. It's not a slowness problem to slice around: holding both catalogs in memory
-     at once is simply too big for this device. Search no longer fetches them at all -- it covers Live
-     TV and Sports (Games), same as everything that already works well; Movies/Series are still browsable
-     normally, just by category rather than by typed search. */
+  /* Search used to fetch and group the whole movies+series catalog -- on this provider's size (50,995
+     grouped movie titles, 49,545+ raw series items, confirmed on device) that OOM-crashed the WebView
+     outright, whether the fetch blocked the UI or ran in the background. Holding every item's full
+     details (icon, rating, grouped version copies, ...) in memory at once was simply too big for this
+     device. ensureSearchCatalog builds a lean {id,name,cat} index instead (procSearchIndexG) -- a small
+     fraction of the memory -- which Search matches against; opening a result hydrates the full item on
+     demand via ensureCategoryItems, same as Movies/Series browsing already does (see openItem). */
+  if (p === 'search' && DATA && !(SRCHIDX.vod && SRCHIDX.series) && !(isM3u() && DATA.vod.grouped && DATA.series.grouped)) {
+    ensureSearchCatalog().then(() => {
+      if (S.page === 'search') { Q.last = null; renderMain(); }
+    }).catch(err => toast(err && err.message ? err.message : 'Could not load movies/series.'));
+  }
   if (S.page !== p) return;
   if (browse) {
     ensureCats(p); catView.reset(); listView.reset(); gridView.reset();
@@ -4889,7 +4953,7 @@ function resRow(x, i) {
     return '<div class="row r gres" data-i="' + i + '"><span class="rwhen">' + when + '</span><div class="rt"><span class="name">' + highlight(x.label, Q.toks) +
       '</span><span class="sub">' + esc(sub) + '</span></div></div>';
   }
-  const cat = DATA[x.t].catName.get(x.cat);
+  const cat = catNameOf(x.t, x.cat);
   const sub = x.plc ? x.gamesText : (x.t === 'live' ? ['Live TV', CNAME[x.cc] && x.cc !== 'ZZ' ? CNAME[x.cc] : '', x.g] : [x.t === 'vod' && x.year ? 'Movie, ' + x.year : TYPE_LABEL[x.t], x.vers && x.vers.length > 1 ? x.vers.length + ' versions' : '', cat]).filter(Boolean).join('  ·  ') ;
   const img = x.icon ? '<img class="' + (x.t === 'live' ? '' : 'pos') + '" src="' + esc(x.icon) + '" loading="lazy" decoding="async" onerror="this.style.visibility=\'hidden\'">' : '';
   return '<div class="row r" data-i="' + i + '">' + (x.t === 'live' ? logoTile(x, 'res-l') : '<span class="th">' + img + '</span>') + '<div class="rt"><span class="name">' +
@@ -4903,9 +4967,10 @@ function renderSearchHead() {
   $('qclear').classList.toggle('hidden', !Q.text);
   $('qclear').classList.toggle('focus', S.zone === 'qclear');
   let st = '';
+  const idxLoading = !!DATA && (isM3u() ? !(DATA.vod.grouped && DATA.series.grouped) : !(SRCHIDX.vod && SRCHIDX.series));
   if (Q.busy) st = 'Checking for close spellings…';
-  else if (Q.text) { const n = (Q.counts.all || 0) + Q.games.length; st = n ? n.toLocaleString() + (n === 1 ? ' result' : ' results') : 'No matches'; }
-  else st = GUIDE_MSG || (GUIDE && GUIDE.ts ? 'TV guide updated ' + clockStr(new Date(GUIDE.ts)) + (GUIDE.until ? ', runs to ' + new Date(GUIDE.until).toLocaleDateString([], {weekday: 'short'}) : '') + (GUIDE.shift ? ', times corrected' : '') : 'Search covers Live TV and Sports. Browse Movies and Series by category.');
+  else if (Q.text) { const n = (Q.counts.all || 0) + Q.games.length; st = n ? n.toLocaleString() + (n === 1 ? ' result' : ' results') : 'No matches'; if (idxLoading) st += ' (movies & series still indexing…)'; }
+  else st = idxLoading ? 'Indexing movies & series…' : (GUIDE_MSG || (GUIDE && GUIDE.ts ? 'TV guide updated ' + clockStr(new Date(GUIDE.ts)) + (GUIDE.until ? ', runs to ' + new Date(GUIDE.until).toLocaleDateString([], {weekday: 'short'}) : '') + (GUIDE.shift ? ', times corrected' : '') : ''));
   $('qstat').textContent = st;
 }
 function renderSearch() {
@@ -5023,9 +5088,24 @@ function openResult(x) {
   if (x.t === 'live' && !Q.text) { const l = resultList().filter(r => !r.hdr && r.t === 'live'); play(l, Math.max(0, l.indexOf(x))); return; }
   openItem(x, Q.res);
 }
-function openItem(x, list) {
-  if (x.t === 'live') { const lives = list.filter(i => i.t === 'live'); play(lives, lives.indexOf(x)); }
-  else if (x.t === 'vod') openMovie(x);
+async function openItem(x, list) {
+  if (x.t === 'live') { const lives = list.filter(i => i.t === 'live'); play(lives, lives.indexOf(x)); return; }
+  /* A result from the lean search index (see procSearchIndexG) isn't a real playable item yet -- it's
+     just {id,name,cat}. Hydrate it the same way opening a category does: fetch that one category
+     (cheap, cached) and look the id up in verToTitle for the full grouped title. Every other caller of
+     openItem passes an already-hydrated item from normal category browsing, so x.lite is never set for
+     them and this branch is skipped entirely. */
+  if (x.lite) {
+    loading(true, 'Loading…');
+    try {
+      await ensureCategoryItems(x.t, x.cat);
+      const full = DATA[x.t].verToTitle && DATA[x.t].verToTitle.get(x.id);
+      if (!full) { toast('Couldn’t find that title -- it may have changed on the provider.'); return; }
+      x = full;
+    } catch (err) { toast('Couldn’t load that title: ' + (err && err.message ? err.message : err)); return; }
+    finally { loading(false); }
+  }
+  if (x.t === 'vod') openMovie(x);
   else openSeries(x);
 }
 function pickChip(c) {
