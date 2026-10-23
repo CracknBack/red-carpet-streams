@@ -186,6 +186,7 @@ h2{font-size:3rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overfl
   justify-content:flex-end;background:linear-gradient(90deg,rgba(8,13,20,.86) 0,rgba(8,13,20,.62) 38%,rgba(8,13,20,.12) 62%,rgba(8,13,20,0) 78%),url(hero-banner.jpg) 85% 40%/cover no-repeat}
 .hb-game .hb-title,.hb-game .hb-sub{text-shadow:0 .2rem 1rem rgba(0,0,0,.9)}
 .hb-game.idle{cursor:default}
+.hb-building{text-shadow:0 .2rem 1rem rgba(0,0,0,.9);font-size:1.9rem;color:#E9CBA0}
 .hb-pill{align-self:flex-start;font-weight:800;letter-spacing:.1em;font-size:2.1rem;padding:.2rem 1.4rem;border-radius:.6rem;background:#C41E2D;color:#fff}
 .hb-pill.next{background:none;border:.2rem solid #E9CBA0;color:#E9CBA0}
 .hb-title{text-shadow:0 .2rem 1rem rgba(0,0,0,.8);font-size:3.2rem;font-weight:700;text-transform:uppercase;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -697,6 +698,7 @@ html.light .hslot .hd{color:#8A5A1C}
 html.light .hslot.s0.focus{box-shadow:inset 0 0 0 .5rem #FCF8EE,inset 0 0 0 .62rem rgba(170,24,40,.95),0 0 6rem rgba(231,185,111,.4),0 0 2rem rgba(231,185,111,.3)}
 html.light .hstrip .slabel{color:#8A5A1C}
 html.light .hbanner{background:linear-gradient(90deg,rgba(252,248,238,0.95),rgba(252,248,238,0.97));box-shadow:0 1rem 3rem rgba(90,60,30,0.22)}
+html.light .hb-building{color:#8A5A1C}
 html.light .hb-find{color:#8A5A1C}
 html.light .hb-badge{color:#8A5A1C}
 html.light .hb-cl{color:#8A5A1C}
@@ -3272,7 +3274,12 @@ function renderHome() {
   $('h-strip-title').textContent = hb.title;
   $('h-strip-wrap').classList.toggle('nolive', !hb.n);
   const foc = i => HOME.zone === 'strip' && HOME.card === i ? ' focus' : '';
-  let b = hb.n ? '' : '<div class="hb-game idle"></div>', chipHtml = '';      /* no live game: the same hero picture, nothing written on it */
+  /* An empty banner used to just be a blank hero picture with no explanation — indistinguishable from
+     "broken" while fixtures/F1 are still loading. Say so, but only while genuinely still loading
+     (FD.busy/F1.busy, or neither has ever completed a load yet) — once both have finished at least
+     once, an empty banner correctly means "checked, nothing on right now", not "still working". */
+  const stillBuilding = !hb.n && (FD.busy || F1.busy || (!FD.ts && !F1.ts));
+  let b = hb.n ? '' : (stillBuilding ? '<div class="hb-game idle"><div class="hb-building"><span class="hbd"></span>Building your sports guide…</div></div>' : '<div class="hb-game idle"></div>'), chipHtml = '';      /* no live game: the same hero picture, nothing written on it */
   hb.cards.forEach((c, i) => {
     if (c.type === 'game') {
       const ev = c.ev, nowT = nowMs();
