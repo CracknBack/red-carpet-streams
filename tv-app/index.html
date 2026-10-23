@@ -4141,6 +4141,12 @@ function ensureCats(t) {
     if (t === 'favs') i = Math.max(0, b.cats.findIndex(c => specialList(c.ft, '__fav').length));
     else if (favs[t].length) i = 0;
     else if (t === 'live') i = b.cats.length > 3 ? 3 : 2;
+    /* vod/series: index 2 ("Recently added") and 3 ("All A-Z") both need the WHOLE catalog fetched —
+       that was fine when everything needed it anyway, but now it silently forces the expensive path by
+       default on first visit, every time, for anyone without favourites yet. Land on the first real
+       provider category instead (index 4, after __fav/__cont/__new/__all) — cheap, by design. This is
+       the actual cause of "series always crashes": it was never a category, it was this default. */
+    else if (t === 'vod' || t === 'series') i = Math.min(4, b.cats.length - 1);
     else i = 2;
   }
   selectCat(t, i, true);
