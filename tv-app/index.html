@@ -1936,7 +1936,22 @@ function fixtureEvents() {
     p.teams.forEach(t => teamTokens(t).concat([norm(canonTeam(t))]).forEach(k => { let a = byTeam.get(k); if (!a) { a = []; byTeam.set(k, a); } a.push(i); }));
   });
   if (gitems.length) calibrateGuide(byTeam);
-  const nameChans = DATA.live.items.filter(g => (englishChannel(g) || homeAny(g)) && /\s(v|vs\.?)\s|\s[-–]\s/i.test(g.raw || g.name));
+  /* Precompute and index name-channels' parsed team pairs ONCE, outside the fixture loop below -- this
+     used to call nameTeams() (several regexes plus string work) for every single (fixture x channel)
+     pair, completely unmemoized, unlike the TSDB loop just below it which already caches via t._tm.
+     Confirmed via memLog bisection: this was the real ~90+ second cost per buildEvents pass, independent
+     of the TV guide entirely (it still ran this way on a guide with zero items). Indexed by team token
+     the same way byTeam already is above, so each fixture only checks channels that could plausibly
+     name one of its two teams, instead of every name-like channel in the account. */
+  const nameChanIdx = new Map();
+  const idxNC = (k, e) => { let a = nameChanIdx.get(k); if (!a) { a = []; nameChanIdx.set(k, a); } a.push(e); };
+  DATA.live.items.forEach(g => {
+    if (!((englishChannel(g) || homeAny(g)) && /\s(v|vs\.?)\s|\s[-–]\s/i.test(g.raw || g.name))) return;
+    const nt = nameTeams(g.raw || g.name);
+    if (!nt) return;
+    const e = {g, nt};
+    [nt[0], nt[1]].forEach(tn => teamTokens(tn).concat([norm(canonTeam(tn))]).forEach(k => idxNC(k, e)));
+  });
   const out = [];
   for (const f of FD.list) {
     const kick = Date.parse(f.utcDate), home = canonTeam(f.homeFull || f.home), away = canonTeam(f.awayFull || f.away);
@@ -1970,11 +1985,12 @@ function fixtureEvents() {
       });
     });
     /* provider channels named after this match */
-    nameChans.forEach(g => {
+    const ncCand = new Map();
+    [home, away].forEach(tn => teamTokens(tn).concat([norm(canonTeam(tn))]).forEach(k => (nameChanIdx.get(k) || []).forEach(e => ncCand.set(e.g.id, e))));
+    ncCand.forEach(({g, nt}) => {
       if (!langOk(g, f.comp)) return;
       if (chans.has(g.id)) return;
-      const nt = nameTeams(g.raw || g.name);
-      if (nt && pairMatch(nt, home, away)) chans.set(g.id, {g, kind: 'name', start: kick, kick, stop: kick + 2.25 * 3600e3, lang: leagueLang(g, f.comp), region: regionOf(g), epg: ''});
+      if (pairMatch(nt, home, away)) chans.set(g.id, {g, kind: 'name', start: kick, kick, stop: kick + 2.25 * 3600e3, lang: leagueLang(g, f.comp), region: regionOf(g), epg: ''});
     });
     /* TheSportsDB TV listings for this match */
     TSDB.list.forEach(t => {
