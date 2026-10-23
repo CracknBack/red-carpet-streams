@@ -2925,9 +2925,22 @@ function nameTime(h, m, tzw) {
   while (t > now + 21 * 3600e3) t -= 864e5;
   return t;
 }
-function addNameEvents(out) {
+/* This used to scan the whole live channel list (49,022 groups on the provider this was diagnosed
+   against) and, for every one that looked sports-related, do an out.find() over the whole,
+   ever-growing events array -- an O(n^2) scan independent of the TV guide entirely, which is why it
+   was still the dominant cost (100+ seconds) even on the very first buildEvents pass, before any guide
+   had loaded. teamIdx narrows each find() to the handful of events that already mention one of this
+   channel's teams; the full original condition is still re-checked against each candidate, so the
+   result is identical. Converted to a generator (yield* from buildEventsG) since the channel loop
+   itself is large enough to be worth slicing even once the per-channel cost is cheap. */
+function* addNameEvents(out) {
   const now = nowMs();
+  const teamIdx = new Map();
+  const idxEv = ev => { if (!ev.teams) return; for (const tn of ev.teams) for (const key of [tn, norm(tn)]) { let a = teamIdx.get(key); if (!a) { a = []; teamIdx.set(key, a); } a.push(ev); } };
+  out.forEach((ev, i) => { ev._seq = i; idxEv(ev); });
+  let n = 0;
   for (const g of DATA.live.items) {
+    if ((++n & 1023) === 0) yield;
     if (g.g !== 'Sports' && !/\b(ppv|events?|match|epl|football|soccer|fight)\b/i.test(g.raw + ' ' + (DATA.live.catName.get(g.cat) || ''))) continue;
     let raw = String(g.raw || g.name), kick = 0;
     const tm = raw.match(/(?:@\s*)?\b([01]?\d|2[0-3])[:.h]([0-5]\d)\b\s*(UK|GMT|BST|CET|CEST|ET|EST|EDT|AEST|AEDT)?/i);
@@ -2935,15 +2948,23 @@ function addNameEvents(out) {
     const info = parseEvent(raw.replace(/[@|]\s*$/, ''), '', '');
     if (!info.teams) continue;
     /* a guide fixture involving the same club within the day: add this channel to it */
-    const f = out.find(ev => ev.teams && ev.teams.some(tn => info.known.includes(tn) || norm(tn) === norm(info.teams[0]) || norm(tn) === norm(info.teams[1])) &&
-      Math.abs((kick || now) - ev.kick) < 20 * 3600e3);
+    const cands = new Set();
+    info.known.forEach(k => (teamIdx.get(k) || []).forEach(ev => cands.add(ev)));
+    [info.teams[0], info.teams[1]].forEach(tn => { if (tn) (teamIdx.get(norm(tn)) || []).forEach(ev => cands.add(ev)); });
+    let f = null, bestSeq = Infinity;
+    cands.forEach(ev => {
+      if (ev._seq >= bestSeq) return;
+      if (ev.teams && ev.teams.some(tn => info.known.includes(tn) || norm(tn) === norm(info.teams[0]) || norm(tn) === norm(info.teams[1])) &&
+        Math.abs((kick || now) - ev.kick) < 20 * 3600e3) { f = ev; bestSeq = ev._seq; }
+    });
     const entry = {g, kind: 'name', lang: chLang(g), epg: '', start: kick || now, kick: kick || now, stop: (kick || now) + 2.5 * 3600e3};
     if (f) {
       if (!f.chans.some(c => c.g.id === g.id)) f.chans.push(Object.assign(entry, {start: f.start, kick: f.kick, stop: f.stop}));
       continue;
     }
-    out.push({key: 'n:' + g.id, label: info.label, teams: info.teams, comp: info.comp || compOf(g.name), live: false, liveEvent: !!kick, isEvent: true, nameOnly: true, timed: !!kick,
-      text: info.text + norm(g.name) + ' ', kick: kick || now, start: kick ? kick - 15 * 60e3 : now, stop: kick ? kick + 2.5 * 3600e3 : now + 24 * 3600e3, chans: [entry], reps: []});
+    const newEv = {key: 'n:' + g.id, label: info.label, teams: info.teams, comp: info.comp || compOf(g.name), live: false, liveEvent: !!kick, isEvent: true, nameOnly: true, timed: !!kick,
+      text: info.text + norm(g.name) + ' ', kick: kick || now, start: kick ? kick - 15 * 60e3 : now, stop: kick ? kick + 2.5 * 3600e3 : now + 24 * 3600e3, chans: [entry], reps: [], _seq: out.length};
+    out.push(newEv); idxEv(newEv);
   }
 }
 /* buildEvents() used to be one fully synchronous function. On a big enough guide (this was diagnosed
@@ -3089,7 +3110,7 @@ function* buildEventsG() {
   }
   yield;
   learnBroadcasters(out);
-  addNameEvents(out);
+  yield* addNameEvents(out);
   const f1 = f1Events();
   if (FD.list.length) {
     /* with real fixtures, football guide entries for those competitions are replaced by the fixtures themselves */
