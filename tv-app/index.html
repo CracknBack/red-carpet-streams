@@ -3688,6 +3688,67 @@ async function ensureVodSeriesReady() {
   await ensureTitlesGrouped('vod');
   await ensureTitlesGrouped('series');
 }
+/* Fetches and groups ONE provider category's movies/series (a few hundred items, typically), instead
+   of the whole catalog — the actual fix for the crash, not just a reordering of when the full-catalog
+   cost happens. Cached per category (own IndexedDB entry) so revisiting is instant. Correctness notes,
+   checked carefully before writing this:
+   - Categories (d.cats) are always loaded eagerly and cheaply, so grouping a subset here never needs
+     the full item list (versionInfo only reads category metadata, never other items).
+   - Adult-content filtering (splitAdultList) applies the exact same rules as the whole-catalog path
+     (splitAdultG), factored out so there is only one place that logic can drift from itself.
+   - "Other versions" during playback (verToTitle) and "remembered preferred copy" (ui.vpick, keyed by
+     item id) both still work for items opened this way — verToTitle is accumulated here too;
+     ui.vpick needs nothing, it only ever reads the item object handed to it, never a global lookup. */
+async function ensureCategoryItems(t, catId) {
+  const d = DATA && DATA[t];
+  if (!d) return;
+  if (!d.catItems) d.catItems = new Map();
+  if (d.catItems.has(catId)) return;
+  const label = t === 'vod' ? 'movies' : 'series';
+  loading(true, 'Loading ' + label + '…');
+  try {
+    let items;
+    if (isM3u()) {
+      /* M3U accounts already have everything fetched, grouped and adult-split eagerly (see applyData) —
+         there is no separate per-category fetch possible for a playlist file, just filter what's there. */
+      items = d.items.filter(it => it.cats ? it.cats.has(catId) : it.cat === catId);
+    } else {
+      const own = cacheKey() + ':' + t + ':cat:' + catId;
+      const cached = await idb.get(own);
+      if (cached && cached._updated === DATA.updated) {
+        items = cached.items;
+      } else {
+        const raw = await api(t === 'vod' ? 'get_vod_streams' : 'get_series', '&category_id=' + encodeURIComponent(catId));
+        const flat = await runSliced(procItemsG(raw, t));
+        const split = splitAdultList(t, flat);
+        items = await runSliced(groupTitlesG(t, split.keep));
+        if (split.adult.length) { d.adult = (d.adult || []).concat(split.adult); }
+        await idb.set(own, {items, _updated: DATA.updated});
+      }
+    }
+    if (!d.verToTitle) d.verToTitle = new Map();
+    items.forEach(g => (g.vers || []).forEach(v => d.verToTitle.set(v.id, g)));
+    d.catItems.set(catId, items);
+  } catch (err) {
+    toast('Couldn’t load that category: ' + err.message);
+  } finally { loading(false); }
+}
+/* Figures out whether a tapped category tile needs the full catalog (Favourites/Continue watching/
+   Recently added/All A-Z genuinely cannot know what qualifies without having seen everything) or just
+   one category (the common case, and the one that's actually fast). */
+async function ensureCategoryReady(t, c) {
+  if (c.id === '__fav' || c.id === '__cont' || c.id === '__new' || c.id === '__all') await ensureTitlesGrouped(t);
+  else if (!String(c.id).startsWith('__') && c.id !== 'up' && !c.kind) await ensureCategoryItems(t, c.id);
+}
+/* Re-sorts every copy-of-a-title list (.vers) by the current quality/language preference — needed by
+   both the picture-quality setting and the language setting, for items loaded via ensureCategoryItems
+   (the old resortVersions() only walked DATA[t].items, which stays empty in the per-category world). */
+function resortCatItemVersions() {
+  if (!DATA) return;
+  ['vod', 'series'].forEach(t => {
+    if (DATA[t].catItems) DATA[t].catItems.forEach(list => list.forEach(g => { if (g.vers && g.vers.length > 1) g.vers.sort(verCmp); }));
+  });
+}
 /* newest progress among a title's copies */
 function titleProg(g) {
   let best = null;
@@ -3903,8 +3964,25 @@ function buildCats(t) {
 function buildCats0(t) {
   if (t === 'favs') return favCats();
   if (t === 'live' && ui.liveLayout !== 'provider') return buildLiveCats();
-  if (t === 'vod' || t === 'series') return buildLibCats(t);
+  if (t === 'vod' || t === 'series') return buildVodCats(t);
   return buildProviderCats(t);
+}
+/* The default Movies/Series menu: every provider category, shown immediately (names only — counts fill
+   in as each category is actually opened, via ensureCategoryItems, instead of needing the whole catalog
+   fetched just to count it). buildLibCats (New releases/Top rated/Languages/All A-Z) still exists and
+   still works, it is just not the default anymore — those need the whole catalog by nature (you cannot
+   know what is "top rated" without having seen every rating), so they stay behind the explicit "All
+   movies/series (full catalogue)" tile below, same as before, not something every visit pays for. */
+function buildVodCats(t) {
+  const d = DATA[t], bad = adultBadCats(t);
+  const v = [{id: '__fav', name: 'Favourites'}, {id: '__cont', name: 'Continue watching'}, {id: '__new', name: 'Recently added'}];
+  v.push({id: '__all', name: (t === 'vod' ? 'All movies' : 'All series') + ' (full catalogue, A to Z)'});
+  d.cats.forEach(c => {
+    if (bad.has(c.id)) return;
+    const n = d.catItems && d.catItems.has(c.id) ? d.catItems.get(c.id).length : undefined;
+    v.push({id: c.id, name: c.name, raw: c.raw, co: c.co, n});
+  });
+  return v;
 }
 /* ---------- movies and series: a short menu instead of the provider's hundreds of categories ---------- */
 const LANG_LABEL = c => c === '' ? 'Other / not labelled' : c === 'multi' ? 'Multi-language' : c === 'vost' ? 'Original with subtitles' : (LANGS[c] || c.toUpperCase());
@@ -4051,6 +4129,7 @@ function itemsFor(t, c) {
   }
   if (String(c.id).startsWith('lang:')) return sortItems(t, libIndex(t).langMap.get(c.id.slice(5)) || []);
   if (c.id === '__all' && (t === 'vod' || t === 'series')) return libIndex(t).az;   /* cached — see libIndexG */
+  if ((t === 'vod' || t === 'series') && d.catItems && d.catItems.has(c.id)) return sortItems(t, d.catItems.get(c.id));
   return sortItems(t, c.id === '__all' ? d.items : d.items.filter(it => it.cats ? it.cats.has(c.id) : it.cat === c.id));
 }
 function ensureCats(t) {
@@ -4380,11 +4459,26 @@ async function showPage(p) {
   if (p === 'search') loadF1(false);
   if (p === 'search' && ui.tsdbKey) loadTsdb(false);
   if (p === 'search' && !GUIDE_BUSY && (!GUIDE || Date.now() - GUIDE.ts > 3 * 3600e3)) loadGuide(false);
-  /* movies/series are only fully prepared once something actually needs them: this page, a search,
-     or favourites (which can mix in a movie/series pick) — see ensureTitlesGrouped. */
-  if (p === 'vod' || p === 'series' || p === 'search' || p === 'favs') await ensureVodSeriesReady();
+  /* Opening Movies/Series itself is cheap now — just the category list (ensureCats below), nothing
+     fetched yet. The whole catalog is only pulled in for Search and Favourites (both can need any
+     item from any category) or when a specific category/All-A-Z/etc is actually picked — see
+     ensureCategoryReady, called from the category-selection key/click handlers. */
+  if (p === 'search' || p === 'favs') await ensureVodSeriesReady();
   if (S.page !== p) return;   /* the user moved on again while that was loading */
-  if (browse) { ensureCats(p); catView.reset(); listView.reset(); gridView.reset(); }
+  if (browse) {
+    ensureCats(p); catView.reset(); listView.reset(); gridView.reset();
+    /* ensureCats above auto-selects a default category (e.g. Favourites, if any exist) purely
+       synchronously — without this, that default selection would silently show empty until the user
+       clicked away and back, since it bypasses the key/click handlers' fetch gate entirely. */
+    if (p === 'vod' || p === 'series') {
+      const b = B[p], c = b.cats[b.cat];
+      if (c) ensureCategoryReady(p, c).then(() => {
+        if (S.page !== p || B[p].cats[B[p].cat] !== c) return;
+        selectCat(p, B[p].cat, true);
+        renderMain();
+      });
+    }
+  }
   if (p === 'search') resView.reset();
   renderMain();
 }
@@ -5213,6 +5307,7 @@ function settingsAction(i) {
   else if (a === 'lang') {
     ui.lang = LANG_ORDER[(LANG_ORDER.indexOf(ui.lang) + 1) % LANG_ORDER.length]; save('sp_ui', ui);
     if (DATA) { ['vod', 'series'].forEach(t => { if (!DATA[t].grouped) return; prepTitles(t); DATA[t].byId = new Map(DATA[t].items.map(x => [x.id, x])); B[t].cats = []; });
+      resortCatItemVersions();
       ALL = DATA.live.items.concat(DATA.vod.items, DATA.series.items); Q.last = null; }
     EVENTS = null; V++; renderMain();
   }
@@ -5283,7 +5378,24 @@ function browseKey(k) {
     else if (k === KEY.CH_UP) selectCat(t, b.cat - catView.page());
     else if (k === KEY.CH_DOWN) selectCat(t, b.cat + catView.page());
     else if (k === KEY.LEFT || k === KEY.BACK) S.zone = 'rail';
-    else if ((k === KEY.RIGHT || k === KEY.ENTER) && b.items.length) S.zone = 'items';
+    else if (k === KEY.RIGHT || k === KEY.ENTER) {
+      const c = b.cats[b.cat];
+      /* vod/series: a regular category (or Favourites/Continue watching/Recently added/All A-Z) may not
+         be loaded yet — fetch it first (ensureCategoryReady shows its own "Loading…" spinner), THEN
+         commit into the items zone. Guarded against the user having moved to a different category or
+         page entirely while that fetch was in flight. */
+      if ((t === 'vod' || t === 'series') && c) {
+        ensureCategoryReady(t, c).then(() => {
+          const bb = B[t];
+          if (S.page !== t || S.zone !== 'cats' || bb.cats[bb.cat] !== c) return;
+          selectCat(t, bb.cat, true);
+          if (bb.items.length) S.zone = 'items';
+          renderMain();
+        });
+        return;
+      }
+      if (b.items.length) S.zone = 'items'; else return;
+    }
     else return;
     renderMain(); return;
   }
@@ -6015,19 +6127,26 @@ function adultText(str, extra) {
   if (ADULT_CAT_RE.test(str) && !ADULT_OK_RE.test(str)) return true;
   const low = str.toLowerCase(); return extra.some(k => low.indexOf(k) >= 0);
 }
+/* Pulled out of splitAdultG, unchanged, so the per-category fetch path (ensureCategoryItems) can apply
+   the exact same adult-content rules to a single category's items instead of the whole catalog —
+   same inputs, same logic, same result either way. */
+const adultKwList = () => String(ui.adultKw || '').toLowerCase().split(',').map(k => k.trim()).filter(Boolean);
+function adultBadCats(t) {
+  const x = D_()[t], extra = adultKwList();
+  return new Set(x.cats.filter(c => adultText((c.raw || '') + ' ' + (c.name || ''), extra)).map(c => c.id));
+}
+function isAdultItem(t, g, bad, extra) {
+  const catsOf = g.cats ? [...g.cats] : [g.cat];
+  const nm = String(g.raw || g.name || '');
+  if (bad.size && catsOf.length && catsOf.every(c => bad.has(c))) return true;
+  if (extra.some(k => nm.toLowerCase().indexOf(k) >= 0)) return true;
+  return (t === 'live' ? ADULT_NAME_RE.test(nm) : /\b(xxx|porn\w*)\b/i.test(nm)) && !ADULT_OK_RE.test(nm);
+}
 function* splitAdultG(t) {
-  const x = D_()[t], extra = String(ui.adultKw || '').toLowerCase().split(',').map(k => k.trim()).filter(Boolean);
-  const bad = new Set(x.cats.filter(c => adultText((c.raw || '') + ' ' + (c.name || ''), extra)).map(c => c.id));
-  const catsOf = g => g.cats ? [...g.cats] : [g.cat];
-  const isAd = g => {
-    const nm = String(g.raw || g.name || '');
-    if (bad.size && catsOf(g).length && catsOf(g).every(c => bad.has(c))) return true;
-    if (extra.some(k => nm.toLowerCase().indexOf(k) >= 0)) return true;
-    return (t === 'live' ? ADULT_NAME_RE.test(nm) : /\b(xxx|porn\w*)\b/i.test(nm)) && !ADULT_OK_RE.test(nm);
-  };
+  const x = D_()[t], extra = adultKwList(), bad = adultBadCats(t);
   const adult = [], keep = [];
   let n = 0;
-  for (const g of x.items) { (isAd(g) ? adult : keep).push(g); if ((++n & 127) === 0) yield; }
+  for (const g of x.items) { (isAdultItem(t, g, bad, extra) ? adult : keep).push(g); if ((++n & 127) === 0) yield; }
   x.adult = adult;
   if (!adult.length) return;
   x.items = keep;
@@ -6035,6 +6154,14 @@ function* splitAdultG(t) {
   adult.forEach(g => { g.isAdult = true; (g.vers || []).forEach(v => { v.isAdult = true; if (x.verToTitle) x.verToTitle.delete(v.id); }); });
 }
 const splitAdult = t => runSync(splitAdultG(t));
+/* Same filtering rules as splitAdultG, applied to an arbitrary list (one category's items) instead of
+   the whole dataset — used by ensureCategoryItems, which never loads the whole dataset. */
+function splitAdultList(t, items) {
+  const extra = adultKwList(), bad = adultBadCats(t);
+  const adult = [], keep = [];
+  for (const g of items) (isAdultItem(t, g, bad, extra) ? adult : keep).push(g);
+  return {keep, adult};
+}
 function askPin(title, msg, cb) {
   askText(title, msg, '', v => cb(String(v).trim()));
   const inp = $('ask-in'); inp.type = 'password'; inp.setAttribute('inputmode', 'numeric'); inp.setAttribute('maxlength', '8'); inp.setAttribute('autocomplete', 'off');
@@ -6088,6 +6215,7 @@ function qPenalty(v) {
 function resortVersions() {
   if (!DATA) return;
   ['vod', 'series'].forEach(t => DATA[t].items.forEach(g => { if (g.vers && g.vers.length > 1) g.vers.sort(verCmp); }));
+  resortCatItemVersions();
   V++; try { mvView.reset(); } catch (e) { }
 }
 const pickKey = g => ACCT.cur + ':' + g.id;
@@ -6289,6 +6417,18 @@ $('cats').addEventListener('click', e => {
   if (S.page === 'live' && c && c.kind === 'country') drillIn();
   else if (S.page === 'live' && c && c.kind === 'up') drillOut();
   renderMain();
+  /* Mouse/PC: clicking a vod/series category shows the highlight move instantly (above), then the
+     actual items fetch happens in the background and re-renders once ready — same fetch as the
+     keyboard path (browseKey), just without blocking the initial click feedback. */
+  if ((S.page === 'vod' || S.page === 'series') && c) {
+    const t = S.page;
+    ensureCategoryReady(t, c).then(() => {
+      const b = B[t];
+      if (S.page !== t || b.cats[b.cat] !== c) return;
+      selectCat(t, b.cat, true);
+      renderMain();
+    });
+  }
 });
 $('pv').addEventListener('click', () => { const b = B[S.page]; if (b.items[b.item]) openItem(b.items[b.item], b.items); });
 $('list').addEventListener('click', e => { const i = idxOf(e); if (i < 0) return; const b = B[S.page]; b.item = i; S.zone = 'items'; openItem(b.items[i], b.items); });
