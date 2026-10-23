@@ -2977,7 +2977,13 @@ function* addNameEvents(out) {
    buildEvents() (sync, via runSync -- every existing caller except Home's banner, unchanged behaviour)
    and ensureEventsAsync() (sliced, via runSliced -- Home's banner only, see there for why). */
 function* buildEventsG() {
+  /* TEMPORARY diagnostic instrumentation: the two O(n^2) fixes already applied (fixtures.find() and
+     addNameEvents' out.find()) didn't move the measured ~100s-per-pass time on device, so this bisects
+     the remaining stages directly instead of guessing further. Remove once the real remaining cost is
+     identified and fixed. */
+  memLog('buildEventsG: epgMap start');
   const epgMap = sportsEpgMap(true), perCh = new Map(), now = nowMs();
+  memLog('buildEventsG: epgMap done');
   /* 1. read every guide entry once, channel by channel */
   let n = 0;
   for (const [ci, st, en, title, sub] of ((GUIDE && GUIDE.items) || [])) {
@@ -2987,6 +2993,7 @@ function* buildEventsG() {
     (perCh.get(ci) || perCh.set(ci, []).get(ci)).push({ci, st, en: en || st + 2 * 3600e3, title, groups, info: parseEvent(title, sub, first ? first.name : '')});
     if ((++n & 511) === 0) yield;
   }
+  memLog('buildEventsG: perCh built');
   yield;
   /* 2. a pre-match show that runs straight into a match on the same channel counts as that match's coverage */
   perCh.forEach(list => {
@@ -3043,6 +3050,7 @@ function* buildEventsG() {
     info.known.forEach(t => { if (!f.teamKeys.has(t)) { f.teamKeys.add(t); idxPush(teamIndex, t, f); } });
     if ((++n & 511) === 0) yield;
   }
+  memLog('buildEventsG: fixtures built, n=' + fixtures.length);
   yield;
   /* 4. split each club's airings into broadcasts (airings within 45 minutes of each other).
         The first broadcast is the live match. A later broadcast is a new match (say, a second leg)
@@ -3109,15 +3117,21 @@ function* buildEventsG() {
     out.push(ev);
     if ((++n & 255) === 0) yield;
   }
+  memLog('buildEventsG: groups built, out=' + out.length);
   yield;
   learnBroadcasters(out);
+  memLog('buildEventsG: learnBroadcasters done');
   yield* addNameEvents(out);
+  memLog('buildEventsG: addNameEvents done, out=' + out.length);
   const f1 = f1Events();
+  memLog('buildEventsG: f1Events done');
   if (FD.list.length) {
     /* with real fixtures, football guide entries for those competitions are replaced by the fixtures themselves */
     const fx = fixtureEvents(), covered = ev => ev.teams && fx.some(f => Math.abs(f.kick - ev.kick) < 20 * 3600e3 && ev.teams.some(t => f.teams.map(norm).includes(norm(t))));
+    memLog('buildEventsG: fixtureEvents done');
     EVENTS = fx.concat(f1, out.filter(ev => !FD_NAMES.has(ev.comp) && !(f1.length && ev.comp === 'Formula 1') && !covered(ev)));
   } else EVENTS = f1.concat(out.filter(ev => !(f1.length && ev.comp === 'Formula 1')));
+  memLog('buildEventsG: assigned EVENTS, len=' + EVENTS.length);
 }
 const buildEvents = () => runSync(buildEventsG());
 let EVENTS_BUILDING = false;
