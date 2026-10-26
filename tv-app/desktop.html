@@ -1027,7 +1027,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.20.0';
+const APP_VERSION = '3.20.1';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 const PC = !!window.RCSPC || !!window.RCS_DESKTOP;   /* Windows app, or the no-install desktop version */
 const PHONE = FIRE && navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) < 700;   /* Android phone */
@@ -2134,7 +2134,14 @@ function fixtureEvents() {
   const nameChanIdx = new Map();
   const idxNC = (k, e) => { let a = nameChanIdx.get(k); if (!a) { a = []; nameChanIdx.set(k, a); } a.push(e); };
   DATA.live.items.forEach(g => {
-    if (!((englishChannel(g) || homeAny(g)) && /\s(v|vs\.?)\s|\s[-–]\s/i.test(g.raw || g.name))) return;
+    /* Used to also require englishChannel(g)||homeAny(g) here, before a channel could even be considered.
+       That silently dropped channels explicitly named after the match just because the provider tagged
+       them with a different country/language -- e.g. a PPV event channel named "PSG - Lyon - Ligue 1"
+       distributed via DAZN's German or Spanish app, tagged DE/ES. The exact two-team pairMatch() check
+       below is already the real filter; a channel whose own name names both teams is strong evidence on
+       its own, in any language. English still sorts first wherever .lang is used downstream (hero
+       channel picks, region grouping, search ranking) -- this only stops excluding the others outright. */
+    if (!/\s(v|vs\.?)\s|\s[-–]\s/i.test(g.raw || g.name)) return;
     const nt = nameTeams(g.raw || g.name);
     if (!nt) return;
     const e = {g, nt};
@@ -2292,7 +2299,7 @@ function fixtureList(ev) {
 
 
 /* ================= pinned channels (yours) ================= */
-const PIN_COMPS = ['Premier League', 'Champions League'];
+/* PIN_COMPS is defined below, once COMPS exists (a const can't be used before its own declaration runs). */
 function pinList(c) { ui.pins = ui.pins || {}; return ui.pins[c] || (ui.pins[c] = []); }
 const pinIdx = (c, g) => pinList(c).findIndex(p => String(p.id) === String(g.id) || p.n === chKey(g.name));
 const isPinned = (c, g) => pinIdx(c, g) >= 0;
@@ -2672,6 +2679,12 @@ const COMP_DISPLAY = {
 };
 const compLabel = c => COMP_DISPLAY[c] || c;
 const chipLabel = id => String(id).startsWith('team:') ? id.slice(5) : compLabel(id);
+/* every competition is pinnable now -- this used to be just Premier League/Champions League. The pin
+   MENU (openOpts) still only ever offers a short, relevant subset at a time (the current game's
+   competition, or your chip tabs) -- a 37-item "pin to..." list would be unusable on a remote. This full
+   list is only for places that summarise what's already pinned (pinSummary, Settings), which are cheap
+   regardless of length since an un-pinned competition just doesn't show up there. */
+const PIN_COMPS = COMPS.map(([c]) => c);
 function parseShortcut(x) {
   const n = norm(x);
   if (!n) return '';
@@ -6985,7 +6998,15 @@ function optItems() {
   if (sc === 'game') it.push({l: 'Search channels for this game', a: doGameSearch});
   if (sc === 'game' && ui.aiKey && GS.ev && GS.ev.fixture) it.push({l: 'Look this game up online again', a: () => runLookup(GS.ev, true)});
   const pt = pinTarget();
-  if (pt) PIN_COMPS.forEach(c => it.push({l: (isPinned(c, pt) ? 'Unpin ' : 'Pin ') + disp(pt) + (isPinned(c, pt) ? ' from ' : ' to ') + compLabel(c), a: () => { togglePin(c, pt); if (S.screen === 'game') { GS.list = gameList(GS.ev); gChansView.reset(); renderGame(); } else renderMain(); }}));
+  /* 37 "Pin to <comp>" rows would be unusable on a remote -- offer the one that's actually relevant
+     (the game you're looking at) when there is one, else your chip tabs, which is still every
+     competition most people would ever pin here in practice. Anything pinned previously to a
+     competition outside that list stays pinned (pinSummary/Settings still show it) -- this only
+     narrows what the menu offers going forward. */
+  if (pt) {
+    const pinnableHere = S.screen === 'game' && GS.ev && GS.ev.comp ? [GS.ev.comp] : chipsList();
+    pinnableHere.forEach(c => it.push({l: (isPinned(c, pt) ? 'Unpin ' : 'Pin ') + disp(pt) + (isPinned(c, pt) ? ' from ' : ' to ') + compLabel(c), a: () => { togglePin(c, pt); if (S.screen === 'game') { GS.list = gameList(GS.ev); gChansView.reset(); renderGame(); } else renderMain(); }}));
+  }
   if (sc === 'main' || sc === 'movie' || sc === 'series') it.push({l: 'Settings', a: () => { if (S.screen !== 'main') show('main'); S.zone = 'set'; showPage('settings'); }});
   return it;
 }
