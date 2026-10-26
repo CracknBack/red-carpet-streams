@@ -709,11 +709,16 @@ html:not(.phone) #g-chans .csec{grid-template-columns:repeat(var(--gc,4),1fr)}
 
 
 
-/* the home banner: "Live sports" and "Search event" are two boxes side by side */
+/* the home banner: "Sports Hub" (live/replay/upcoming game + tabs) and "Browse" (sport chips) side by side */
 .hrow2{display:flex;gap:2.4rem;align-items:flex-start}
 .hcol{min-width:0}
 .hlive{flex:1.15}
 .hfind{flex:1}
+.hhead{display:flex;align-items:baseline;justify-content:space-between;gap:1.2rem}
+.hbtabs{display:flex;gap:.7rem;margin-bottom:.8rem}
+.hbtab{font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:1.25rem;color:var(--muted);border:.15rem solid transparent;border-radius:.5rem;padding:.3rem 1.1rem;cursor:pointer;background:rgba(255,255,255,.04)}
+.hbtab.on{color:#E9CBA0;border-color:#B98B55}
+.hbtab.focus{outline:.2rem solid var(--amber);outline-offset:.15rem}
 #h-find .hb-chips{display:flex;align-items:center;justify-content:space-between;gap:.4rem;width:100%;padding:0 1.6rem}
 #h-find .hb-chip{flex:1 1 0;min-width:0;gap:.5rem}
 #h-find .hb-logo{width:100%;height:6.4rem}
@@ -827,6 +832,7 @@ html.light .ctile.focus .ct-logo .lt{border-color:#D9C7A3}
 html.light .chead.doubt{color:#8A5A1C}
 html.light .cmore{color:#8A5A1C}
 html.light .chip.lift{box-shadow:0 1.3rem 2.2rem rgba(90,60,30,0.28),0 0 2.6rem rgba(231,185,111,.6)}
+html.light .hbtab.on{color:#8A5A1C}
 
 html.light{--bg:#F6EEDC;--panel:#FFFDF7;--raise:#F2E7CF;--line:#D9C7A3;--text:#3A1D18;--muted:#7B6650;--amber:#9A5B16;--amber-soft:rgba(154,91,22,.14);--focus-bg:linear-gradient(90deg,rgba(168,28,44,.18),rgba(168,28,44,.04));--red2:#B02030;--red-deep:#8E1522;color-scheme:light}
 html.light body{background:#F6EEDC;color:#3A1D18}
@@ -962,7 +968,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
   <div class="hwrap">
     <div class="hhead"><img src="logo.png" class="hlogo" alt=""><div class="hclock"><div id="h-time" class="htime"></div><div id="h-date" class="hdate"></div><div id="h-sub" class="hsub"></div></div><button id="h-theme" class="htheme" type="button" aria-label="Switch between light and dark"><span class="th-sun"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.3 5.3l1.9 1.9M16.8 16.8l1.9 1.9M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9"/></svg></span><span class="th-moon"><svg viewBox="0 0 24 24"><path d="M20.2 14.6A8.6 8.6 0 0 1 9.4 3.8a8.6 8.6 0 1 0 10.8 10.8z"/></svg></span></button></div>
     <div id="h-tiles" class="hcar"></div>
-    <div id="h-strip-wrap" class="hstrip"><div class="hrow2"><div class="hcol hlive"><div id="h-strip-title" class="slabel"></div><div id="h-strip" class="hbanner"></div></div><div class="hcol hfind"><div id="h-find-title" class="slabel">Search event</div><div id="h-find" class="hbanner"></div></div></div></div>
+    <div id="h-strip-wrap" class="hstrip"><div class="hrow2"><div class="hcol hlive"><div class="hhead"><div id="h-strip-title" class="slabel"></div><div id="h-strip-tabs" class="hbtabs"></div></div><div id="h-strip" class="hbanner"></div></div><div class="hcol hfind"><div id="h-find-title" class="slabel">Browse</div><div id="h-find" class="hbanner"></div></div></div></div>
   </div>
   <div id="h-ver" class="hver"></div>
   <footer id="hhints" class="hints"></footer>
@@ -2278,7 +2284,7 @@ function fixtureList(ev) {
   });
   if (maybe.length) {
     maybe.sort((a, b) => a.lang - b.lang || regions.indexOf(a.region) - regions.indexOf(b.region) || (QRK[b.g.ql] || 1.5) - (QRK[a.g.ql] || 1.5));
-    rows.push({hdr: sure.length ? 'Might also show it (not confirmed)' : 'Not in any TV guide yet. These usually show ' + ev.comp + (ukBlackout(ev) ? ' (UK Saturday 3pm games aren’t shown live in the UK, so UK channels are left out)' : '')}, ...(() => { const n = {}; return maybe.filter(x => (n[x.region] = (n[x.region] || 0) + 1) <= 6).slice(0, 22); })());
+    rows.push({hdr: sure.length ? 'Might also show it (not confirmed)' : 'Not in any TV guide yet. These usually show ' + compLabel(ev.comp) + (ukBlackout(ev) ? ' (UK Saturday 3pm games aren’t shown live in the UK, so UK channels are left out)' : '')}, ...(() => { const n = {}; return maybe.filter(x => (n[x.region] = (n[x.region] || 0) + 1) <= 6).slice(0, 22); })());
   }
   return rows;
 }
@@ -2309,7 +2315,7 @@ function pinTarget() {
   }
   return null;
 }
-function pinSummary() { return PIN_COMPS.map(c => pinList(c).length ? c + ' ' + pinList(c).length : '').filter(Boolean).join(' · ') || 'None yet'; }
+function pinSummary() { return PIN_COMPS.map(c => pinList(c).length ? compLabel(c) + ' ' + pinList(c).length : '').filter(Boolean).join(' · ') || 'None yet'; }
 
 /* ================= TheSportsDB TV listings (optional paid key) =================
    Each listing names a match, the channel and the country it airs in. It is used as an extra source of
@@ -2475,7 +2481,7 @@ function plChannelRows(comp) {
     const t = ev => evState(ev, now) === 0 ? 'LIVE' : (dayWord(ev.kick) + clockStr(new Date(ev.kick))).trim();
     row.every = allIds.has(e.g.id);
     row.plc = true; row.label = e.label; row.nGames = e.games.length; row.soon = e.games.length ? e.games[0].kick : Infinity;
-    row.gamesText = e.games.length ? e.games.slice(0, 2).map(ev => ev.label + ' · ' + t(ev)).join('   ·   ') + (e.games.length > 2 ? '   +' + (e.games.length - 2) + ' more' : '') : (row.every ? 'Shows every ' + comp + ' match' : 'Usually shows the ' + comp);
+    row.gamesText = e.games.length ? e.games.slice(0, 2).map(ev => ev.label + ' · ' + t(ev)).join('   ·   ') + (e.games.length > 2 ? '   +' + (e.games.length - 2) + ' more' : '') : (row.every ? 'Shows every ' + compLabel(comp) + ' match' : 'Usually shows the ' + compLabel(comp));
     return row;
   });
   const order = new Map(usual.map((g, i) => [g.id, i]));
@@ -2645,7 +2651,26 @@ function compOf(text) {
 }
 const DEFAULT_CHIPS = ['Premier League', 'Champions League', 'Europa League', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1', 'Formula 1'];
 const chipsList = () => ui.chips || DEFAULT_CHIPS;
-const chipLabel = id => id === 'Formula 1' ? 'F1' : String(id).startsWith('team:') ? id.slice(5) : id;
+/* Display-only: every COMPS entry's first element is also the literal ev.comp value used throughout
+   fixture matching (fixtureEvents, FD_COMPS, ALL_MATCH) and, critically, is matched byte-for-byte
+   against guide-v2.json's own "comp" field (see rcs-guide's resolve_v2.py LEAGUES config) -- so those
+   internal keys can never change. This map only swaps what's shown on screen, for real named
+   leagues/brands we don't hold rights to, for a generic sport/country description instead. */
+const COMP_DISPLAY = {
+  'Premier League': 'English Football', 'FA Cup': 'English Football (Cup)', 'League Cup': 'English Football (League Cup)',
+  'Champions League': 'European Football (Champions)', 'Europa League': 'European Football (Europa)',
+  'La Liga': 'Spanish Football', 'Serie A': 'Italian Football', 'Ligue 1': 'French Football', 'Bundesliga': 'German Football',
+  'Eredivisie': 'Dutch Football', 'Primeira Liga': 'Portuguese Football', 'Belgian Pro League': 'Belgian Football',
+  'Scottish Premiership': 'Scottish Football', 'League of Ireland': 'Irish Football', 'Austrian Bundesliga': 'Austrian Football',
+  'Greek Super League': 'Greek Football', 'Turkish Super Lig': 'Turkish Football', 'Swiss Super League': 'Swiss Football',
+  'A-League': 'Australian Soccer', 'AFL': 'Australian Rules Football', 'NRL': 'Rugby League (Australia)',
+  'Formula 1': 'Grand Prix Racing', 'MotoGP': 'Motorcycle Racing', 'IndyCar': 'American Open-Wheel Racing', 'NASCAR': 'American Stock Car Racing',
+  'NBA': 'USA Basketball', 'NHL': 'USA Ice Hockey', 'MLB': 'USA Baseball', 'NFL': 'American Football',
+  'ATP Tour': 'Men’s Tennis', 'WTA Tour': 'Women’s Tennis', 'PGA Tour': 'American Golf', 'European Tour': 'European Golf',
+  'UFC': 'Mixed Martial Arts'
+};
+const compLabel = c => COMP_DISPLAY[c] || c;
+const chipLabel = id => String(id).startsWith('team:') ? id.slice(5) : compLabel(id);
 function parseShortcut(x) {
   const n = norm(x);
   if (!n) return '';
@@ -2673,7 +2698,7 @@ function addChip(id) {
 }
 function askAddChip() {
   const have = new Set(chipsList());
-  const items = COMPS.map(([c]) => c).filter(c => !have.has(c)).map(c => ({l: c, a: () => addChip(c)}));
+  const items = COMPS.map(([c]) => c).filter(c => !have.has(c)).map(c => ({l: compLabel(c), a: () => addChip(c)}));
   items.push({l: 'A team instead…', a: askShortcuts});
   openMenu(items);
 }
@@ -3484,7 +3509,7 @@ function dayWord(ts) {
 const LANG_TXT = ['English', 'Language not certain', 'Other language'];
 function covText(x, past, canReplay) {
   if (x.kind === 'pinned') return 'Your pinned channel · this match isn’t confirmed in any guide';
-  if (x.kind === 'every') return 'Shows every ' + (GS.ev && GS.ev.comp || '') + ' match (its rights deal)' + (isAppFeed(x.g) ? ' · streaming-app feed, may be offline' : '');
+  if (x.kind === 'every') return 'Shows every ' + (GS.ev && compLabel(GS.ev.comp) || '') + ' match (its rights deal)' + (isAppFeed(x.g) ? ' · streaming-app feed, may be offline' : '');
   if (x.kind === 'online') return 'Reported online · ' + [x.online.country, x.online.conf && x.online.conf + ' confidence', x.online.src].filter(Boolean).join(' · ') + (isAppFeed(x.g) ? ' · streaming-app feed, may be offline' : '');
   const pre = (x.pinned ? 'Your pinned channel · ' : '') + (x.online ? 'Also reported online · ' : '') + (x.source === 'tsdb' ? 'Listed by TheSportsDB · ' : x.source === 'both' ? 'Listed by TheSportsDB and the guide · ' : '');
   const base = covText0(x, past, canReplay);
@@ -3493,7 +3518,7 @@ function covText(x, past, canReplay) {
 function covText0(x, past, canReplay) {
   if (x.kind === 'found') return x.why + ' · not confirmed for this match';
   const tt = t => (dayWord(t) + clockStr(new Date(t))).trim();
-  if (x.kind === 'compch') return 'Shows ' + (GS.ev && GS.ev.comp || 'this competition') + '; this match not confirmed';
+  if (x.kind === 'compch') return 'Shows ' + (GS.ev && compLabel(GS.ev.comp) || 'this competition') + '; this match not confirmed';
   if (x.kind === 'preview') return 'Preview show at ' + tt(x.start);
   if (x.kind === 'catchup') return 'Catch-up: watch from the start';
   if (x.kind === 'live' && GS.ev && GS.ev.fixture && x.start > nowMs()) return (x.confirmed ? 'Confirmed by its own guide · ' : 'Listed in the TV guide · ') + 'coverage from ' + tt(x.start);
@@ -3607,7 +3632,17 @@ function catList() {
   askText('Category list', lines.join('\n') + '\n\nSelect all and copy, then send it. Press OK or Back to close.', '', () => {}, true);
 }
 /* ================= start screen ================= */
-const HOME = {zone: 'tiles', tile: 2, card: 0, cards: [], cardKind: '', liveIdx: 0, fade: false};
+const HOME = {zone: 'tiles', tile: 2, card: 0, cards: [], cardKind: '', liveIdx: 0, fade: false, mode: 'auto', tab: 0};
+/* "auto" (the default) shows whichever of these has something, in this order; picking a tab pins to
+   just that one -- even when it's empty, so the choice sticks instead of silently reverting to auto */
+const HB_TABS = [['live', 'Live Now'], ['replay', 'Replay'], ['upcoming', 'Upcoming']];
+/* Deliberately NOT adding a dedicated "Sports Hub" tile here: a 7th carousel tile needs its own full
+   page (another showPage() target, another S.zone, its own key handling) duplicating what the hlive
+   box below already does -- live/replay/upcoming game + sport chips, now with explicit tabs. That's a
+   much bigger, less-tested surface to add overnight with no chance to walk through every control by
+   hand. The hlive box already sits one DOWN-press below this carousel, so it's not meaningfully harder
+   to reach; a real dedicated page is worth doing later, with time to test it properly, not bolted on
+   in a hurry. */
 const HOME_TILES = [['settings', 'Settings'], ['search', 'Search'], ['live', 'Live TV'], ['vod', 'Movies'], ['series', 'TV Series'], ['favs', 'Favourites']];
 function homeDetail(id) {
   if (!DATA) return '';
@@ -3644,9 +3679,19 @@ function openHome() {
   setTimeout(() => { if (!isM3u() && S.screen !== 'player' && !GUIDE_BUSY && (!GUIDE || Date.now() - GUIDE.ts > 3 * 3600e3)) loadGuide(false).then(() => { if (S.screen === 'home') renderHome(); }); }, 45000);
   renderHome();
 }
-/* league and sport icons: save files named like lg-premier-league.png, lg-champions-league.png, lg-f1... beside the app and they appear by themselves */
-/* the icon files you have supplied; any competition without its own gets the football icon (football only) */
-const LG_OWN = {'Premier League': 'lg-premier-league.png', 'Champions League': 'lg-champions-league.png', 'Europa League': 'lg-europa-league.png', 'Bundesliga': 'lg-bundesliga.png', 'La Liga': 'lg-la-liga.png', 'Serie A': 'lg-serie-a.png', 'Ligue 1': 'lg-ligue-1.png', 'F1': 'lg-f1.png', 'Formula 1': 'lg-f1.png'};
+/* league and sport icons: generic sport icons (not league crests -- we don't hold rights to those), one
+   per sport/discipline rather than one per competition, since several COMPS entries are really the same
+   sport (every football league shares the ball icon, both tennis tours share the racket, etc). */
+const LG_OWN = {
+  'Premier League': 'lg-football.png', 'Champions League': 'lg-football.png', 'Europa League': 'lg-football.png', 'FA Cup': 'lg-football.png', 'League Cup': 'lg-football.png',
+  'La Liga': 'lg-football.png', 'Serie A': 'lg-football.png', 'Ligue 1': 'lg-football.png', 'Bundesliga': 'lg-football.png', 'A-League': 'lg-football.png',
+  'Eredivisie': 'lg-football.png', 'Primeira Liga': 'lg-football.png', 'Belgian Pro League': 'lg-football.png', 'Scottish Premiership': 'lg-football.png',
+  'League of Ireland': 'lg-football.png', 'Austrian Bundesliga': 'lg-football.png', 'Greek Super League': 'lg-football.png', 'Turkish Super Lig': 'lg-football.png', 'Swiss Super League': 'lg-football.png',
+  'Rugby': 'lg-rugby.png', 'NRL': 'lg-rugby-league.png', 'AFL': 'lg-afl.png', 'Cricket': 'lg-cricket.png',
+  'NBA': 'lg-basketball.png', 'NHL': 'lg-ice-hockey.png', 'MLB': 'lg-baseball.png', 'NFL': 'lg-american-football.png',
+  'Formula 1': 'lg-open-wheel-racing.png', 'F1': 'lg-open-wheel-racing.png', 'IndyCar': 'lg-open-wheel-racing.png', 'MotoGP': 'lg-motor-racing.png', 'NASCAR': 'lg-motor-racing.png',
+  'ATP Tour': 'lg-tennis.png', 'WTA Tour': 'lg-tennis.png', 'PGA Tour': 'lg-golf.png', 'European Tour': 'lg-golf.png', 'UFC': 'lg-mma.png', 'Boxing': 'lg-boxing.png'
+};
 const LG_SLUG = c => LG_OWN[c] || 'lg-' + String(c).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.png';   /* a league shows an icon only if its own file exists */
 const LG_OK = new Set();
 let LG_PROBED = false;
@@ -3666,7 +3711,12 @@ function homeLives() {
     if (!DATA || !(FD.list.length || F1.list.length)) return [];
     if (!EVENTS) { ensureEventsAsync(); return []; }   /* builds in the background without blocking; renderHome() re-runs when ready */
     const now = nowMs(), order = chipsList(), rk = ev => { const k = order.indexOf(ev.comp); return k < 0 ? 99 : k; };
-    return (EVENTS || []).filter(ev => ev.fixture && evState(ev, now) === 0).sort((a, b) => rk(a) - rk(b) || a.kick - b.kick);
+    /* A fixture can be genuinely live (status correct) with zero channels actually matched to it --
+       the guide/channel-matching found nothing, not the same failure as the status being wrong. Either
+       way, showing it in the Sports Hub promises something the app then can't deliver on tap (the
+       owner's own report: "Live Now: Lens vs Paris", opened it, no channel had it). Being live is
+       necessary but not sufficient to belong here -- it also has to be actually watchable. */
+    return (EVENTS || []).filter(ev => ev.fixture && evState(ev, now) === 0 && ev.chans && ev.chans.length).sort((a, b) => rk(a) - rk(b) || a.kick - b.kick);
   } catch (e) { return []; }
 }
 /* games being replayed on a channel right now (shown when nothing is live) */
@@ -3688,15 +3738,26 @@ function homeUpcoming() {
     return (EVENTS || []).filter(ev => ev.fixture && evState(ev, now) === 1 && ev.kick - now < 48 * 3600e3).sort((a, b) => a.kick - b.kick).slice(0, 6);
   } catch (e) { return []; }
 }
-const homeShown = () => { const l = homeLives(); return l.length ? l : homeUpcoming(); };
+/* "auto" picks the first non-empty list in this order: a replay you can watch right now is more
+   actionable than a game that's merely scheduled, so it outranks "upcoming" even though it's a weaker
+   signal than something genuinely live. Picking a tab explicitly bypasses this and pins to just that
+   list, including when it's empty -- the owner's own choice shouldn't silently fall back to auto. */
+function homeSportsList(mode) {
+  if (mode === 'live') return {list: homeLives(), kind: 'live'};
+  if (mode === 'replay') return {list: homeReplays(), kind: 'replay'};
+  if (mode === 'upcoming') return {list: homeUpcoming(), kind: 'upcoming'};
+  const lives = homeLives(); if (lives.length) return {list: lives, kind: 'live'};
+  const reps = homeReplays(); if (reps.length) return {list: reps, kind: 'replay'};
+  return {list: homeUpcoming(), kind: 'upcoming'};
+}
+const homeShown = () => homeSportsList(HOME.mode).list;
 function homeBanner() {
-  const lives = homeLives(), shown = lives.length ? lives : homeUpcoming(), out = {title: 'Live sports', cards: [], n: shown.length};
-  if (shown.length) out.cards.push({type: 'game', ev: shown[HOME.liveIdx % shown.length], live: !!lives.length, upcoming: !lives.length});
-  /* Nothing live or upcoming: use the same hero slot to surface the most recent in-progress movie/
-     series instead of leaving it idle -- tapping it opens the full Continue watching tiles page
-     (homeOpenContinue), this is just a one-item teaser. Sports takes priority over this whenever
-     there's actually a game on, same reasoning as homeLives() over homeUpcoming(). */
-  else { const cw = continueWatchingList(); if (cw.length) { out.title = 'Continue watching'; out.n = 1; out.cards.push({type: 'cont', it: cw[0]}); } }
+  const sel = homeSportsList(HOME.mode), shown = sel.list, out = {title: 'Sports Hub', cards: [], n: shown.length, kind: sel.kind};
+  if (shown.length) out.cards.push({type: 'game', ev: shown[HOME.liveIdx % shown.length], kind: sel.kind});
+  /* Nothing live, replaying or upcoming (and no tab pinned): use the same hero slot to surface the
+     most recent in-progress movie/series instead of leaving it idle -- tapping it opens the full
+     Continue watching tiles page (homeOpenContinue), this is just a one-item teaser. */
+  else if (HOME.mode === 'auto') { const cw = continueWatchingList(); if (cw.length) { out.title = 'Continue watching'; out.n = 1; out.cards.push({type: 'cont', it: cw[0]}); } }
   chipsList().filter(id => LG_OK.has(id)).forEach(id => out.cards.push({type: 'chip', id}));
   return out;
 }
@@ -3708,7 +3769,7 @@ setInterval(() => {
 },3000);
 function renderHome() {
   const d = new Date(nowMs());
-  $('home').classList.toggle('stripfocus', HOME.zone === 'strip');
+  $('home').classList.toggle('stripfocus', HOME.zone === 'strip' || HOME.zone === 'hbtab');
   $('h-theme').classList.toggle('focus', HOME.zone === 'theme');
   $('h-theme').querySelector('.th-sun').classList.toggle('on', !!ui.light);
   $('h-theme').querySelector('.th-moon').classList.toggle('on', !ui.light);
@@ -3731,6 +3792,7 @@ function renderHome() {
   HOME.cards = hb.cards; HOME.cardKind = 'banner';
   HOME.card = Math.min(HOME.card, Math.max(0, hb.cards.length - 1));
   $('h-strip-title').textContent = hb.title;
+  $('h-strip-tabs').innerHTML = HB_TABS.map((t, i) => '<div class="hbtab' + (HOME.mode === t[0] ? ' on' : '') + (HOME.zone === 'hbtab' && HOME.tab === i ? ' focus' : '') + '" data-tab="' + i + '">' + esc(t[1]) + '</div>').join('');
   $('h-strip-wrap').classList.toggle('nolive', !hb.n);
   const foc = i => HOME.zone === 'strip' && HOME.card === i ? ' focus' : '';
   /* An empty banner used to just be a blank hero picture with no explanation — indistinguishable from
@@ -3742,10 +3804,11 @@ function renderHome() {
   hb.cards.forEach((c, i) => {
     if (c.type === 'game') {
       const ev = c.ev, nowT = nowMs();
-      const chans = ev.chans.slice().sort((a, b) => a.lang - b.lang), when = c.upcoming ? ((dayWord(ev.kick) || 'Today ') + clockStr(new Date(ev.kick))).trim() : '';
+      const chans = ev.chans.slice().sort((a, b) => a.lang - b.lang), when = c.kind === 'upcoming' ? ((dayWord(ev.kick) || 'Today ') + clockStr(new Date(ev.kick))).trim() : '';
       const ch = chans.length ? (chans[0].kind === 'name' ? feedTitle(chans[0].g) : disp(chans[0].g)) + (chans.length > 1 ? ' +' + (chans.length - 1) : '') : '';
-      b += '<div class="hb-game' + foc(i) + (HOME.fade ? ' fade' : '') + '" data-i="' + i + '"><div class="hb-top">' + (c.upcoming ? '<span class="hb-pill next">UPCOMING</span>' : '<span class="hb-pill">● LIVE NOW</span>') + '' + (hb.n > 1 ? '<span class="hb-count">' + (HOME.liveIdx % hb.n + 1) + ' / ' + hb.n + '</span>' : '') + '</div>' +
-        '<div class="hb-title' + (ev.label.length > 31 ? ' xlong' : ev.label.length > 26 ? ' long' : '') + '">' + esc(ev.label.replace(/ v /, ' vs ')) + '</div><div class="hb-sub">' + esc([ev.comp, when, ch].filter(Boolean).join('  ·  ')) + '</div></div>';
+      const pill = c.kind === 'upcoming' ? '<span class="hb-pill next">UPCOMING</span>' : c.kind === 'replay' ? '<span class="hb-pill rep">● REPLAY</span>' : '<span class="hb-pill">● LIVE NOW</span>';
+      b += '<div class="hb-game' + foc(i) + (HOME.fade ? ' fade' : '') + '" data-i="' + i + '"><div class="hb-top">' + pill + (hb.n > 1 ? '<span class="hb-count">' + (HOME.liveIdx % hb.n + 1) + ' / ' + hb.n + '</span>' : '') + '</div>' +
+        '<div class="hb-title' + (ev.label.length > 31 ? ' xlong' : ev.label.length > 26 ? ' long' : '') + '">' + esc(ev.label.replace(/ v /, ' vs ')) + '</div><div class="hb-sub">' + esc([compLabel(ev.comp), when, ch].filter(Boolean).join('  ·  ')) + '</div></div>';
     } else if (c.type === 'cont') {
       const it = c.it, sub = [it.sub, it.pct ? Math.round(it.pct) + '% watched' : ''].filter(Boolean).join('  ·  ');
       b += '<div class="hb-game' + foc(i) + (HOME.fade ? ' fade' : '') + '" data-i="' + i + '"><div class="hb-top"><span class="hb-pill rep">RESUME</span></div>' +
@@ -3790,7 +3853,7 @@ function homeKey(k) {
   if (HOME.zone === 'tiles') {
     if (k === KEY.LEFT) HOME.tile = (HOME.tile + n - 1) % n;
     else if (k === KEY.RIGHT) HOME.tile = (HOME.tile + 1) % n;
-    else if (k === KEY.DOWN && HOME.cards.length) HOME.zone = 'strip';
+    else if (k === KEY.DOWN) HOME.zone = 'hbtab';
     else if (k === KEY.UP) HOME.zone = 'theme';
     else if (k === KEY.ENTER) { homeOpenTile(HOME.tile); return; }
     else if (k === KEY.BACK) { exitPrompt(); return; }
@@ -3799,10 +3862,17 @@ function homeKey(k) {
     if (k === KEY.ENTER) toggleTheme();
     else if (k === KEY.DOWN || k === KEY.BACK) HOME.zone = 'tiles';
     else return;
+  } else if (HOME.zone === 'hbtab') {
+    if (k === KEY.LEFT) HOME.tab = (HOME.tab + HB_TABS.length - 1) % HB_TABS.length;
+    else if (k === KEY.RIGHT) HOME.tab = (HOME.tab + 1) % HB_TABS.length;
+    else if (k === KEY.ENTER) { HOME.mode = HB_TABS[HOME.tab][0]; HOME.liveIdx = 0; }
+    else if (k === KEY.DOWN && HOME.cards.length) HOME.zone = 'strip';
+    else if (k === KEY.UP || k === KEY.BACK) HOME.zone = 'tiles';
+    else return;
   } else {
     if (k === KEY.LEFT && HOME.card > 0) HOME.card--;
     else if (k === KEY.RIGHT && HOME.card < HOME.cards.length - 1) HOME.card++;
-    else if (k === KEY.UP || k === KEY.BACK) HOME.zone = 'tiles';
+    else if (k === KEY.UP || k === KEY.BACK) HOME.zone = 'hbtab';
     else if (k === KEY.ENTER) { homeOpenCard(HOME.card); return; }
     else return;
   }
@@ -3815,6 +3885,10 @@ $('h-tiles').addEventListener('click', e => {
   if (el.classList.contains('s0')) homeOpenTile(i); else { HOME.zone = 'tiles'; HOME.tile = i; renderHome(); }
 });
 $('h-strip-wrap').addEventListener('click', e => { const el = e.target.closest('[data-i]'); if (el) homeOpenCard(Number(el.dataset.i)); });
+$('h-strip-tabs').addEventListener('click', e => {
+  const el = e.target.closest('.hbtab'); if (!el) return;
+  const i = Number(el.dataset.tab); HOME.tab = i; HOME.mode = HB_TABS[i][0]; HOME.zone = 'hbtab'; HOME.liveIdx = 0; renderHome();
+});
 if (PC) {
   $('h-strip-wrap').addEventListener('mousemove', e => { const el = e.target.closest('[data-i]'); if (!el) return; const i = Number(el.dataset.i); if (HOME.zone !== 'strip' || HOME.card !== i) { HOME.zone = 'strip'; HOME.card = i; renderHome(); } });
 }
@@ -5311,7 +5385,7 @@ function resultList() {
   const ak = gk + '|' + Q.filter + '|' + Q.ver;
   if (ak !== Q.akey) {
     Q.akey = ak;
-    const none = !Q.games.length && compOf(Q.text) ? [{hdr: 'No ' + compOf(Q.text) + ' games found in the TV guide · Settings → Check the TV guide'}] : [];
+    const none = !Q.games.length && compOf(Q.text) ? [{hdr: 'No ' + compLabel(compOf(Q.text)) + ' games found in the TV guide · Settings → Check the TV guide'}] : [];
     Q.alist = Q.filter === 'games' ? withHeads(Q.games)
       : none.concat(withHeads(Q.games.slice(0, 20)), Q.games.length && Q.all.length ? [{hdr: 'Channels, movies and series'}] : [], Q.all);
   }
@@ -5458,7 +5532,7 @@ function fixtureTile(x, i, now) {
   const pill = s === 0 ? (x.liveEvent ? '<span class="ft-pill live">LIVE</span>' : '<span class="ft-pill on">ON NOW</span>')
     : s === 2 ? '<span class="ft-pill rep">' + (x.status === 'POSTPONED' ? 'POSTPONED' : repNow ? 'REPLAY' : 'FULL TIME') + '</span>' : '';
   const n = x.fixture ? collapseFeeds(x.chans.filter(c => c.kind !== 'slot')).length : x.chans.length;
-  return '<div class="ftile" data-i="' + i + '"><div class="ft-top"><span class="ft-comp">' + lgImg(x.comp, '') + esc(x.comp || '') + '</span>' + pill + '</div>' +
+  return '<div class="ftile" data-i="' + i + '"><div class="ft-top"><span class="ft-comp">' + lgImg(x.comp, '') + esc(compLabel(x.comp) || '') + '</span>' + pill + '</div>' +
     '<div class="ft-names">' + esc(x.label.replace(/ v /, ' vs ')) + '</div>' +
     '<div class="ft-bot"><span class="ft-time' + (s === 2 ? ' ft-played' : '') + '">' + (s === 2 ? '<small class="ft-day">Played</small>' + esc(((dayWord(x.kick) || 'Today ') + clockStr(new Date(x.kick))).trim()) : esc(clockStr(new Date(x.kick)))) + '</span><span class="ft-right">' + fixtureCd(x, s, reps, repNow, now) + '<span class="ft-n">' + (n && s !== 2 ? n + (n === 1 ? ' channel' : ' channels') : s === 2 ? 'replays and catch-up' : '') + '</span></span></div></div>';
 }
@@ -6069,7 +6143,7 @@ function settingsAction(i) {
   else if (a === 'fdkey') askText('Fixtures key', 'Paste the free key emailed to you by football-data.org. It fetches the real Premier League and Champions League fixtures. Leave it empty to remove it.', ui.fdKey || '', v => { ui.fdKey = v.trim(); save('sp_ui', ui); FD.list = []; FD.ts = 0; FD.err = ''; renderMain(); if (ui.fdKey) loadFixtures(true).then(() => renderMain()); });
   else if (a === 'lookup') askText('Online game lookup', 'Optional. Paste an Anthropic API key (from console.anthropic.com). When you open a game, the app asks Claude to search the web for which channels show it in your chosen countries, then matches the answer to your own channels. Only the team names, competition and date are sent. Set a monthly spending limit on the key. Leave it empty to turn this off.', ui.aiKey || '', v => { ui.aiKey = v.trim(); save('sp_ui', ui); LK.err = ''; renderMain(); });
   else if (a === 'lkco') askText('Countries to look up', 'The countries to look up for each game, separated by commas, for example: United Kingdom, United States, Australia, South Africa, Singapore. More countries means a slightly longer lookup.', lkCountries().join(', '), v => { const l = v.split(',').map(x => x.trim()).filter(Boolean).slice(0, 8); ui.lkCountries = l.length ? l : null; save('sp_ui', ui); renderMain(); });
-  else if (a === 'pins') askText('Pinned channels', PIN_COMPS.map(c => c + ': ' + (pinnedChannels(c).map(g => disp(g)).join(', ') || 'none')).join('\n') + '\n\nTo pin a channel, highlight it in Live TV, Search or on a game page, press M (the ≡ button on a remote) and choose Pin. The same menu unpins it.\n\nPress OK or Back to close.', '', () => {}, true);
+  else if (a === 'pins') askText('Pinned channels', PIN_COMPS.map(c => compLabel(c) + ': ' + (pinnedChannels(c).map(g => disp(g)).join(', ') || 'none')).join('\n') + '\n\nTo pin a channel, highlight it in Live TV, Search or on a game page, press M (the ≡ button on a remote) and choose Pin. The same menu unpins it.\n\nPress OK or Back to close.', '', () => {}, true);
   else if (a === 'tsdbkey') askText('TheSportsDB key', 'Optional. A paid TheSportsDB key lets the app read their TV listings, which name the channels showing each match. Leave it empty to remove it.', ui.tsdbKey || '', v => { ui.tsdbKey = v.trim(); save('sp_ui', ui); TSDB.list = []; TSDB.ts = 0; TSDB.err = ''; renderMain(); if (ui.tsdbKey) loadTsdb(true).then(() => renderMain()); });
   else if (a === 'region') { const i = REGION_ORDER.indexOf(ui.region || 'UK & Ireland'); ui.region = REGION_ORDER[(i + 1) % (REGION_ORDER.length - 1)]; save('sp_ui', ui); renderMain(); }
   else if (a === 'teams') askShortcuts();
@@ -6910,7 +6984,7 @@ function optItems() {
   if (sc === 'game') it.push({l: 'Search channels for this game', a: doGameSearch});
   if (sc === 'game' && ui.aiKey && GS.ev && GS.ev.fixture) it.push({l: 'Look this game up online again', a: () => runLookup(GS.ev, true)});
   const pt = pinTarget();
-  if (pt) PIN_COMPS.forEach(c => it.push({l: (isPinned(c, pt) ? 'Unpin ' : 'Pin ') + disp(pt) + (isPinned(c, pt) ? ' from ' : ' to ') + c, a: () => { togglePin(c, pt); if (S.screen === 'game') { GS.list = gameList(GS.ev); gChansView.reset(); renderGame(); } else renderMain(); }}));
+  if (pt) PIN_COMPS.forEach(c => it.push({l: (isPinned(c, pt) ? 'Unpin ' : 'Pin ') + disp(pt) + (isPinned(c, pt) ? ' from ' : ' to ') + compLabel(c), a: () => { togglePin(c, pt); if (S.screen === 'game') { GS.list = gameList(GS.ev); gChansView.reset(); renderGame(); } else renderMain(); }}));
   if (sc === 'main' || sc === 'movie' || sc === 'series') it.push({l: 'Settings', a: () => { if (S.screen !== 'main') show('main'); S.zone = 'set'; showPage('settings'); }});
   return it;
 }
