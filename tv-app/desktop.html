@@ -52,9 +52,16 @@ input{width:100%;background:var(--panel);border:.2rem solid var(--line);border-r
 
 /* rail */
 #main{--railw:23.5rem}
-#main.slim{--railw:7.6rem}
+/* 8.6rem = 2.1rem padding + 4.4rem icon + 2.1rem padding (see #main.slim .ri below) -- chosen so the icon
+   sits exactly centred with >=24px clear on each side, landing close to 100px wide at 1080p (~99px at
+   this build's clamp(9px,0.6vw,13px) font-size). */
+#main.slim{--railw:8.6rem}
 #rail{position:absolute;left:0;top:0;bottom:5rem;width:var(--railw);overflow:hidden;display:flex;flex-direction:column;padding:3rem 0 2.4rem 2rem;background:linear-gradient(180deg,rgba(110,15,26,.35),rgba(10,17,26,0) 55%)}
 #rail::after{content:'';position:absolute;top:0;bottom:0;right:0;width:.15rem;background:linear-gradient(180deg,rgba(231,185,111,.75),rgba(231,185,111,.08) 75%)}
+/* Slim rail (icon-only): a thin, dim, flat divider instead of the glowing gradient above -- the
+   gradient belongs to the full labelled rail, where it has room to breathe; here it was crowding the
+   icons. */
+#main.slim #rail::after{width:.08rem;background:rgba(231,185,111,.4)}
 #series{background:linear-gradient(180deg,rgba(8,13,20,.86),rgba(8,13,20,.94)),url(home-bg-wide.jpg) center/cover no-repeat,var(--bg)}
 #main{background:linear-gradient(180deg,rgba(8,13,20,.86),rgba(8,13,20,.94)),url(home-bg-wide.jpg) center/cover no-repeat,var(--bg)}
 #rail .brand{font-size:2.4rem;line-height:1.05;font-weight:700;color:var(--amber);margin:0 0 3.2rem 2rem}
@@ -66,16 +73,23 @@ input{width:100%;background:var(--panel);border:.2rem solid var(--line);border-r
 .ri .ic img{opacity:.7;transition:opacity .15s}
 .ri.active .ic img,.ri.focus .ic img{opacity:1;filter:drop-shadow(0 0 .7rem rgba(231,185,111,.5))}
 #main.slim .ri .lbl{display:none}
-#main.slim .ri{margin-right:1rem;padding:1.1rem 1.2rem 1.1rem 1.8rem}
-#main.slim #rail-logo{width:4.8rem;margin-left:.4rem}
-#main.slim #clock{font-size:1.45rem;padding-left:0;width:calc(100% - 1rem);text-align:center;white-space:nowrap}
-#main.slim #rail{padding-left:1rem}
+/* Equal 2.1rem padding both sides of the icon (not the old 1.8rem/1.2rem split) is what actually
+   centres it -- #main.slim #rail below drops its own left padding so this is the only padding in play,
+   and --railw above is sized to match these two paddings + the icon exactly. The active-item bar moves
+   to an absolutely-positioned ::before (border-left used to do this, but a real border adds to the box
+   width unevenly and throws off the centring). */
+#main.slim .ri{position:relative;margin:.2rem 0;padding:1.1rem 2.1rem;border-left:none}
+#main.slim .ri::before{content:'';position:absolute;left:0;top:.5rem;bottom:.5rem;width:.35rem;border-radius:0 .2rem .2rem 0}
+#main.slim .ri.active::before,#main.slim .ri.focus::before{background:var(--amber)}
+#main.slim #rail-logo{width:4.8rem;margin:-1rem auto 2rem}
+#main.slim #clock{font-size:1.45rem;padding-left:0;width:100%;text-align:center;white-space:nowrap}
+#main.slim #rail{padding-left:0}
 #clock{margin-top:auto;padding-left:2rem;font-size:2.6rem;color:var(--amber)}
 
 /* pages */
 .page{position:absolute;left:var(--railw);right:0;top:0;bottom:5rem;padding:2.4rem 4rem 0 3rem}
 #page-browse{display:flex;gap:2.4rem}
-#cats{width:28rem;flex:none;margin-top:5.8rem}
+#cats{width:23.4rem;flex:none;margin-top:5.8rem}   /* was 28rem -- narrowed so rows get more width for tiles */
 #cats .row{gap:1rem}
 #cats .bd{margin-left:0;flex:none}
 .content{flex:1;min-width:0;display:flex;flex-direction:column}
@@ -86,6 +100,38 @@ h2{font-size:3rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overfl
 .head .right{margin-left:auto;display:flex;align-items:center;gap:2.8rem;color:var(--muted);font-size:1.8rem;flex:none}
 .list{flex:1;min-height:0;overflow:hidden}
 .empty{padding:3rem 1.6rem;color:var(--muted);max-width:64rem}
+
+/* "Categories" toggle (Movies/Series only): a discoverable alternative to pressing Left/Back for mouse
+   users, since the sidebar collapses out of width for these pages when browsing items -- see
+   #page-browse.rowsfocus below. D-pad Left/Back still does the same thing; this doesn't replace that. */
+.catbtn{display:flex;align-items:center;gap:.8rem;padding:.9rem 1.8rem;border-radius:999px;border:.15rem solid var(--line);background:var(--panel);color:var(--text);font-size:1.6rem;cursor:pointer}
+.catbtn svg{width:1.8rem;height:1.8rem;flex:none}
+.catbtn.focus,.catbtn:hover{border-color:var(--amber);color:var(--amber)}
+#page-browse.rowsfocus #cats{display:none}
+
+/* Hero: the currently-focused title, big -- driven by renderHero(), called whenever row/item focus
+   changes. Backdrop reuses the poster image itself (blurred + darkened) rather than fetching a separate
+   fanart image per focus change: this provider's category listings don't supply one, and it keeps this
+   at zero extra network cost per keypress, same reasoning as everywhere else lean data gets reused
+   instead of fetched. The synopsis only shows if already known (e.g. this title's detail page was
+   opened earlier this session) -- deliberately never triggers its own fetch on focus, for the same
+   reason: arrowing quickly through a row must never fire a burst of network requests. */
+.hero{position:relative;border-radius:1.2rem;overflow:hidden;margin-bottom:2.8rem;min-height:30rem;display:flex;align-items:flex-end;background:var(--panel)}
+.hero-bg{position:absolute;inset:0;background-size:cover;background-position:center 20%;filter:blur(.4rem) brightness(.5) saturate(1.15);transform:scale(1.08)}
+.hero::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgba(8,13,20,.95) 0%,rgba(8,13,20,.8) 32%,rgba(8,13,20,.3) 62%,rgba(8,13,20,.1) 100%),linear-gradient(0deg,rgba(8,13,20,.92) 0%,rgba(8,13,20,0) 45%)}
+.hero-info{position:relative;z-index:1;padding:3.2rem 3.6rem;max-width:62rem}
+#hero-title{font-size:4.2rem;font-weight:800;line-height:1.08;margin:0 0 1.1rem;text-shadow:0 .3rem 1.2rem rgba(0,0,0,.65);text-wrap:balance}
+.hero-meta{display:flex;align-items:center;gap:1.1rem;font-size:1.6rem;color:#fff;margin-bottom:1.3rem}
+.hero-meta .bd{font-size:1.4rem;color:#fff;border-color:rgba(255,255,255,.4)}
+.hero-plot{font-size:1.7rem;line-height:1.4;color:#EDE4D6;max-width:68ch;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:0 0 2.1rem}
+.hero-plot:empty{display:none;margin:0}
+.hero-actions{display:flex;gap:1.4rem}
+.hero-play{display:flex;align-items:center;gap:.9rem;padding:1.2rem 2.8rem;border-radius:.6rem;border:.25rem solid transparent;background:#C41E2D;color:#fff;font-size:1.8rem;font-weight:700;cursor:pointer}
+.hero-play svg{width:2rem;height:2rem;flex:none}
+.hero-play.focus,.hero-play:hover{background:#E0354A;border-color:rgba(255,255,255,.4)}
+.hero-versions{padding:1.2rem 2.8rem;border-radius:.6rem;border:.2rem solid rgba(255,255,255,.5);background:rgba(255,255,255,.08);color:#fff;font-size:1.8rem;font-weight:600;cursor:pointer}
+.hero-versions.focus,.hero-versions:hover{border-color:var(--amber);color:var(--amber)}
+.hero-versions.hidden{display:none}
 
 .row{height:6.8rem;display:flex;align-items:center;gap:1.6rem;padding:0 1.6rem;border-left:.4rem solid transparent;border-radius:0 .6rem .6rem 0;white-space:nowrap;cursor:pointer}
 .row:hover{background:var(--panel)}
@@ -316,8 +362,19 @@ html.phone .hwrap{bottom:0;padding:2rem 3rem 0}
 .ph{position:absolute;left:1rem;right:1rem;bottom:1rem;font-size:1.7rem;line-height:1.25;color:var(--muted);max-height:11rem;overflow:hidden}
 .pfav{position:absolute;top:.5rem;right:.8rem;color:var(--amber);font-size:2.4rem;text-shadow:0 0 .6rem #000}
 .pp{position:absolute;left:0;bottom:0;height:.6rem;background:var(--amber)}
-.card.focus .poster{border-color:var(--amber);box-shadow:0 1rem 2.4rem rgba(160,28,42,.45);transform:scale(1.04);transition:transform .12s}
+.card.focus .poster{border-color:var(--amber);box-shadow:0 1rem 2.4rem rgba(160,28,42,.45),0 0 3rem rgba(231,185,111,.5);transform:scale(1.08);transition:transform .12s}
 .card.current .poster{border-color:var(--line)}
+/* Fixed card width: this is load-bearing, not cosmetic -- without it the caption's own text decides the
+   flex item's width (a block with white-space:nowrap has no overflow to truncate against until something
+   constrains it), so cards end up different widths depending on how long their title is. That in turn
+   breaks every row-track position calculation downstream (uneven gaps, a card sliver left visible at the
+   row's edge, dead space at the end) -- confirmed by measuring real rendered card widths varying by over
+   12px with the old unconstrained rule. .row-track overrides this with a measured, screen-width-aware
+   value (--cw, set in renderRows()) so "6 tiles + a peek" holds at any resolution; plain width:15rem is
+   just the fallback for the older flat grid (Favourites/Continue watching), which never needed to change. */
+.card{width:15rem}
+.row-track .card{width:var(--cw,15rem);flex:none}
+.row-track .poster{width:var(--cw,15rem);height:calc(var(--cw,15rem) * 1.5)}
 .ct{margin-top:.7rem;font-size:1.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card.focus .ct{color:#fff}
 .cm{display:flex;gap:1.2rem;font-size:1.5rem;color:var(--muted);white-space:nowrap;overflow:hidden}
@@ -326,11 +383,10 @@ html.phone .hwrap{bottom:0;padding:2rem 3rem 0}
    instead of one dense grid -- see catRows()/renderRows() in the script. Reuses .card/.poster above
    (just bigger, see those rules) so there is one card look everywhere, not a second style to maintain. */
 .rows-wrap{display:flex;flex-direction:column;gap:3.2rem;overflow:hidden;padding-bottom:2rem}
-.row-sec{min-width:0}
+.row-sec{min-width:0;overflow:hidden;scroll-margin-top:1rem}
 .row-head{margin:0 0 1.2rem .2rem;font-size:2rem;font-weight:600;color:#B8A383;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row-sec.focus .row-head{color:var(--amber)}
-.row-track{display:flex;gap:1.6rem;overflow:hidden;transition:transform .22s ease}
-.row-track .card{flex:none}
+.row-track{display:flex;gap:var(--rg,1.6rem);overflow:hidden}
 .srchrow{display:flex;align-items:center;gap:1.2rem;height:5.6rem;padding:0 2.2rem;margin-bottom:2rem;border-radius:.8rem;background:var(--panel);border:.2rem solid var(--line);color:var(--muted);font-size:1.9rem;cursor:pointer;width:fit-content}
 .srchrow svg{width:2.3rem;height:2.3rem;flex:none}
 .srchrow.focus{border-color:var(--amber);color:#fff;box-shadow:0 0 1.6rem rgba(231,185,111,.35)}
@@ -706,6 +762,11 @@ html.light .ri{color:#3A1D18}
 html.light .ri.active{color:#3A1D18}
 html.light .ri.focus{color:#3A1D18}
 html.light .head h2{color:#8A5A1C}
+html.light .hero::after{background:linear-gradient(90deg,rgba(252,248,238,0.95) 0%,rgba(252,248,238,0.80) 32%,rgba(252,248,238,0.30) 62%,rgba(252,248,238,0.10) 100%),linear-gradient(0deg,rgba(252,248,238,0.92) 0%,rgba(252,248,238,0.00) 45%)}
+html.light .hero-meta{color:#3A1D18}
+html.light .hero-meta .bd{color:#3A1D18}
+html.light .hero-plot{color:#3A1D18}
+html.light .hero-versions{color:#3A1D18}
 html.light .nowp b.nl{color:#3A1D18}
 html.light .row.focus{color:#3A1D18}
 html.light .row.focus .bd{color:#3A1D18}
@@ -851,7 +912,19 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
   <section id="page-browse" class="page hidden">
     <div id="cats" class="list"></div>
     <div class="content">
-      <div class="head"><h2 id="b-title"></h2><span id="b-badge"></span><div class="right"><span id="b-sort"></span><span id="b-count" class="count"></span></div></div>
+      <div class="head"><h2 id="b-title"></h2><span id="b-badge"></span><div class="right"><button id="b-catbtn" class="catbtn hidden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>Categories</button><span id="b-sort"></span><span id="b-count" class="count"></span></div></div>
+      <div id="b-hero" class="hero hidden">
+        <div class="hero-bg" id="hero-bg"></div>
+        <div class="hero-info">
+          <h1 id="hero-title"></h1>
+          <div class="hero-meta" id="hero-meta"></div>
+          <p class="hero-plot" id="hero-plot"></p>
+          <div class="hero-actions">
+            <button id="hero-play" class="hero-play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Play</button>
+            <button id="hero-versions" class="hero-versions hidden">Versions</button>
+          </div>
+        </div>
+      </div>
       <div id="list" class="list"></div>
       <div id="grid" class="list"></div>
       <div id="tiles" class="list hidden"></div>
@@ -3519,6 +3592,21 @@ function guideCheck() {
   lines.push('On now (first 12): ' + (sample.length ? '\n' + sample.join('\n') : 'nothing'));
   askText('TV guide check', lines.join('\n') + '\n\nPress OK or Back to close.', '', () => {}, true);
 }
+/* For reorganising the Movies/Series category list (brand grouping etc.): d.cats is always loaded
+   eagerly and cheaply at login regardless of catalog size (see ensureTitlesGrouped's own comments on
+   this), so unlike the catalog items this never needs Movies/Series to have been opened first, and
+   never risks the full-catalog cost that's crashed this app before. */
+function catList() {
+  const lines = [];
+  for (const t of ['vod', 'series']) {
+    const d = DATA && DATA[t];
+    const label = t === 'vod' ? 'Movies' : 'Series';
+    if (!d || !d.cats || !d.cats.length) { lines.push(label + ': not available yet.'); continue; }
+    lines.push(label + ' (' + d.cats.length + ' categories):');
+    d.cats.forEach(c => lines.push('  ' + c.name));
+  }
+  askText('Category list', lines.join('\n') + '\n\nSelect all and copy, then send it. Press OK or Back to close.', '', () => {}, true);
+}
 /* ================= start screen ================= */
 const HOME = {zone: 'tiles', tile: 2, card: 0, cards: [], cardKind: '', liveIdx: 0, fade: false};
 const HOME_TILES = [['settings', 'Settings'], ['search', 'Search'], ['live', 'Live TV'], ['vod', 'Movies'], ['series', 'TV Series'], ['favs', 'Favourites']];
@@ -4375,10 +4463,20 @@ function gridCols() {
   if (g.style.gridTemplateColumns !== tpl) g.style.gridTemplateColumns = tpl;
   return nc;
 }
-/* Card width (15rem, see .poster) + .row-track's gap (1.6rem) -- the horizontal step between two
-   cards in a Movies/Series row, same number gridCols() above uses for the old flat grid (Favourites/
-   Continue watching still use that one; rows use this). */
-const ROWSTRIDE = 16.6;
+/* Movies/Series rows: card width is measured, not assumed -- see renderRows(). A fixed rem guess (the
+   original approach here) can't satisfy "6 full tiles + a peek of the 7th, the same at 1280 as at 1920"
+   on its own, because html.pc's font-size (clamp(9px,0.6vw,13px)) hits its 9px floor for any window
+   under ~1500px wide: below that, rem stops scaling with the window at all, so a rem-sized card would
+   render at an identical pixel size from a phone-width window up to 1499px, silently breaking the tile
+   count well before 1280px. Computing from the row's actual measured clientWidth sidesteps that
+   entirely and holds the same tile count at any width, by construction, not by coincidence. */
+const ROW_TILES_TARGET = 6.3;   /* 6 full tiles + a clearly-visible peek of the 7th */
+const ROW_PERPAGE = 6;
+function rowMetrics() {
+  const r = remPx(), avail = Math.max(1, $('grid').clientWidth - 0.8 * r);
+  const stride = avail / ROW_TILES_TARGET, gap = stride * 0.08, cardW = stride - gap;
+  return {avail, stride, gap, cardW};
+}
 
 /* ================= favourites / history ================= */
 const isFav = x => !!(x && favs[x.t] && favs[x.t].includes(x.id));
@@ -4624,10 +4722,16 @@ function catRows(t) {
 /* Renders only a window of cards around the focused one -- same reasoning as VView's windowing above,
    just horizontal: a category can hold a few thousand titles, and putting all of them in the DOM at
    once (even as lightweight cards) is real cost on a weak Fire Stick CPU this app has paid for before. */
+/* Which tiles are visible, and from where: focus normally sits in the 2nd visible slot (offset =
+   focus-1), but clamped to [0, items.length-ROW_PERPAGE] so the window never scrolls past either end --
+   that clamp is what makes the LAST page land with its final tile flush against the right edge instead
+   of leaving the trailing "peek" width empty once there's nothing left to peek at, and what keeps the
+   first rendered tile always a whole tile (never a sliver) at the start. The window itself renders
+   ROW_PERPAGE+1 items from that offset (the +1 is the peek of the next tile) -- nothing before it, so
+   no transform is needed to hide a lead buffer the way the old LEAD-based version needed. */
 function rowWindow(items, focus) {
-  const LEAD = 2, SIZE = 14;
-  const start = Math.max(0, Math.min(focus - LEAD, Math.max(0, items.length - SIZE)));
-  return {start, list: items.slice(start, start + SIZE)};
+  const offset = Math.max(0, Math.min(focus - 1, Math.max(0, items.length - ROW_PERPAGE)));
+  return {start: offset, list: items.slice(offset, offset + ROW_PERPAGE + 1)};
 }
 const sortable = c => c && !['__fav', '__recent', '__cont', '__new', '__newrel', '__top', '__langs', '__prov', 'up', '__all', '__pl', '__cl'].includes(c.id) && !String(c.id).startsWith('__c:') && !String(c.id).startsWith('f:') || (c && c.id === '__all' && S.page === 'live');
 function itemsFor(t, c) {
@@ -4927,6 +5031,8 @@ function renderBrowse() {
   $('page-browse').classList.toggle('collapsed', isLive && !tm && S.zone === 'items');
   $('page-browse').classList.toggle('tiles', tm);
   $('page-browse').classList.toggle('tcoll', tm && S.zone === 'items');
+  $('page-browse').classList.toggle('rowsfocus', useRows && S.zone === 'items');
+  $('b-catbtn').classList.toggle('hidden', !useRows);
   let crumbs = c ? [disp(c)] : [];
   if (isLive && ui.liveLayout !== 'provider' && b.lv === 1 && c) crumbs = [S.zone === 'items' ? b.cc : (CNAME[b.cc] || b.cc), c.kind === 'up' ? 'All channels' : c.name];
   $('b-title').innerHTML = crumbs.map(esc).join('<span class="sep">›</span>');
@@ -4949,6 +5055,13 @@ function renderBrowse() {
     else if (c.id === '__recent') empty = 'Channels you watch will show up here.';
     else if (c.id === '__cont') empty = t === 'vod' ? 'Movies you start will show up here so you can pick up where you left off.' : 'Series you open will show up here.';
     else if (t === 'cont') empty = 'Nothing to resume yet. Movies and series you start will show up here, newest first.';
+    /* A category just highlighted in the sidebar (not yet opened) has no items loaded -- selectCat()
+       reads whatever's already fetched, which for a category never opened this session is nothing,
+       same shape as a genuinely empty one. Without this check that reads as "this category has
+       nothing in it" when it actually just hasn't been asked for yet (the owner's own report). Only
+       say that for real: once DATA[t].catItems actually has this id, n===0 here means it truly is
+       empty. */
+    else if (useRows && S.zone === 'cats' && !(DATA[t].catItems && DATA[t].catItems.has(c.id))) empty = 'Press OK to see titles.';
     else empty = 'This category is empty.';
   }
   $('b-empty').textContent = empty;
@@ -4957,6 +5070,7 @@ function renderBrowse() {
   $('grid').classList.toggle('hidden', isLive || !!empty);
   $('grid').classList.toggle('rows', useRows);
   $('tiles').classList.toggle('hidden', !tm || !!empty);
+  if (empty) $('b-hero').classList.add('hidden');
   if (!empty) {
     if (useRows) {
       renderRows(t);
@@ -4972,19 +5086,50 @@ function renderBrowse() {
 /* Movies/Series content: a "Search movies/series" button, then the category's rows (New releases/
    Top rated/All, see catRows()) stacked vertically, each one scrolling horizontally on its own. b.row
    is 0 for the search button, 1..rows.length for the content rows (see rowsKey() for navigation). */
+/* The one item currently driving #b-hero -- set by renderHero(), read by the hero's Play/Versions
+   click handlers (see below), since those buttons act on "whatever's focused right now" rather than
+   carrying their own item reference. */
+let HERO_IT = null;
+function renderHero(t, rows, focRow) {
+  let it = null;
+  if (focRow > 0 && rows[focRow - 1]) {
+    const ri = focRow - 1, items = rows[ri].items;
+    it = items[Math.min(B[t].rpos[ri] || 0, Math.max(0, items.length - 1))];
+  } else if (rows[0] && rows[0].items.length) {
+    it = rows[0].items[0];
+  }
+  HERO_IT = it;
+  const hero = $('b-hero');
+  if (!it) { hero.classList.add('hidden'); return; }
+  hero.classList.remove('hidden');
+  $('hero-bg').style.backgroundImage = it.icon ? "url('" + it.icon.replace(/'/g, '%27') + "')" : 'none';
+  $('hero-title').textContent = disp(it);
+  const nv = it.vers ? it.vers.length : 1;
+  const meta = [it.year, it.rating ? it.rating.toFixed(1) + ' / 10' : '', nv > 1 ? nv + ' versions' : ''].filter(Boolean);
+  $('hero-meta').innerHTML = meta.map(x => '<span class="bd">' + esc(x) + '</span>').join('');
+  /* Never fetched here -- see the .hero CSS comment. Only shows if this item's detail page already
+     populated it earlier this session (openMovie/openSeries cache the full item back into place). */
+  $('hero-plot').textContent = it.plot || it.description || '';
+  $('hero-versions').classList.toggle('hidden', nv <= 1);
+}
 function renderRows(t) {
   const b = B[t], rows = catRows(t);
   b.rows = rows;
   const focRow = S.zone === 'items' ? b.row : -1;
+  renderHero(t, rows, focRow);
+  const m = rowMetrics();
+  $('grid').style.setProperty('--cw', m.cardW + 'px');
+  $('grid').style.setProperty('--rg', m.gap + 'px');
   const srch = '<div class="srchrow' + (focRow === 0 ? ' focus' : '') + '" id="b-srch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg><span>Search ' + (t === 'vod' ? 'movies' : 'series') + '</span></div>';
   const body = rows.map((r, ri) => {
     const pos = Math.min(b.rpos[ri] || 0, Math.max(0, r.items.length - 1));
     const win = rowWindow(r.items, pos);
+    /* window starts exactly at the first visible tile (see rowWindow) -- no lead buffer, so no
+       transform is needed to hide one; the DOM window itself IS the scroll position. */
     const cards = win.list.map((it, wi) => cardHtml(it, win.start + wi)).join('');
-    const off = pos - win.start;
     return '<div class="row-sec' + (focRow === ri + 1 ? ' focus' : '') + '" data-r="' + ri + '">' +
       '<div class="row-head">' + esc(r.label) + '</div>' +
-      '<div class="row-track" style="transform:translateX(-' + (off * ROWSTRIDE) + 'rem)">' + cards + '</div></div>';
+      '<div class="row-track">' + cards + '</div></div>';
   }).join('');
   $('grid').innerHTML = srch + '<div class="rows-wrap">' + body + '</div>';
   let focEl = focRow === 0 ? $('b-srch') : null;
@@ -4993,7 +5138,21 @@ function renderRows(t) {
     const el = $('grid').querySelector('.row-sec[data-r="' + (focRow - 1) + '"] [data-i="' + pos + '"]');
     if (el) { el.classList.add('focus'); focEl = el; }
   }
-  if (focEl) focEl.scrollIntoView({block: 'nearest'});
+  /* scroll the whole row-sec (heading included), not just the focused card -- scrolling only the card
+     can leave its row's own heading clipped above the fold, since block:'nearest' only accounts for the
+     element it's called on. */
+  if (focEl) {
+    const target = (focEl.closest && focEl.closest('.row-sec')) || focEl;
+    /* scrollIntoView({block:'nearest'}) scrolls the MINIMUM distance that satisfies the target alone --
+       with the hero now taking real height above #grid, that minimum can leave a sliver of the
+       previous row's caption trailing in at the very top edge instead of a clean cut. Scrolling by the
+       exact viewport-relative delta between the target and #grid's own edge (not offsetTop, which is
+       relative to whatever positioned ancestor happens to own this subtree, not to #grid) puts the
+       target's top flush with #grid's top every time; the browser clamps scrollTop to the valid range
+       on its own, so this is also safe at the very start/end of the scrollable area. */
+    const g = $('grid'), gr = g.getBoundingClientRect(), tr = target.getBoundingClientRect();
+    g.scrollTop += (tr.top - gr.top) - 0.5 * remPx();
+  }
 }
 
 function renderHints() {
@@ -5841,7 +6000,7 @@ function runSearch() {
    TheSportsDB server-side for every competition it covers, a per-device key is a hidden developer
    override, not something a normal user needs to find or set. The setting itself (ui.tsdbKey/loadTsdb)
    is untouched, just no longer surfaced in Settings. */
-const SETS = HAS_MPV ? ['refresh', 'fdkey', 'pins', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'pcplayer', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'rcsguide', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'] : ['refresh', 'fdkey', 'pins', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'rcsguide', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'];
+const SETS = HAS_MPV ? ['refresh', 'catlist', 'fdkey', 'pins', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'pcplayer', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'rcsguide', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'] : ['refresh', 'catlist', 'fdkey', 'pins', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'rcsguide', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'];
 function renderSettings() {
   const u = userInfo || {};
   const exp = Number(u.exp_date) ? new Date(Number(u.exp_date) * 1000).toLocaleDateString() : 'No expiry date given';
@@ -5868,6 +6027,7 @@ function renderSettings() {
   ].concat(CLOCK.skew ? [['Device clock', 'Off by ' + Math.round(Math.abs(CLOCK.skew) / 60000) + ' minutes; the app corrects for it']] : []);
   const V_ = {
     refresh: ['Update lists now', 'Last updated ' + upd + (GUIDE && GUIDE.ts ? ' · guide ' + clockStr(new Date(GUIDE.ts)) : '')], guidecheck: ['Check the TV guide', 'See what the guide contains'],
+    catlist: ['Copy category list', 'Movies/Series category names, for reorganising them'],
     fdkey: ['Fixtures key (football-data.org)', !ui.fdKey ? 'Not set' : FD.err ? 'Problem: ' + FD.err.replace('Fixtures couldn’t be updated: ', '') : FD.ts ? FD.list.length + ' games · updated ' + clockStr(new Date(FD.ts)) : 'Saved'],
     lookup: ['Online game lookup', !ui.aiKey ? 'Off (needs a key)' : LK.err ? 'Problem: ' + LK.err.replace('Online lookup failed: ', '') : 'On'],
     lkco: ['Countries to look up', lkCountries().join(', ')],
@@ -5904,6 +6064,7 @@ function settingsAction(i) {
   const a = SETS[i];
   if (a === 'refresh') refreshAll(true).then(() => { toast('Lists updated'); if (isM3u()) loadXmltv(true); }).catch(err => toast(err.message));
   else if (a === 'guidecheck') guideCheck();
+  else if (a === 'catlist') catList();
   else if (a === 'xgsky') { ui.xgSky = ui.xgSky === false; save('sp_ui', ui); renderMain(); toast('Updating the TV guide in the background…'); loadGuide(true); }
   else if (a === 'xguide') { ui.xgOff = !ui.xgOff; save('sp_ui', ui); renderMain(); toast('Updating the TV guide in the background…'); loadGuide(true); }
   else if (a === 'fdkey') askText('Fixtures key', 'Paste the free key emailed to you by football-data.org. It fetches the real Premier League and Champions League fixtures. Leave it empty to remove it.', ui.fdKey || '', v => { ui.fdKey = v.trim(); save('sp_ui', ui); FD.list = []; FD.ts = 0; FD.err = ''; renderMain(); if (ui.fdKey) loadFixtures(true).then(() => renderMain()); });
@@ -7200,6 +7361,14 @@ $('grid').addEventListener('click', e => {
   }
   const i = idxOf(e); if (i < 0) return; b.item = i; S.zone = 'items'; openItem(b.items[i], b.items);
 });
+/* Hero Play/Versions: both just open HERO_IT (whatever's currently focused drives the hero, see
+   renderHero) -- Versions doesn't need its own picker here, the movie/series detail page it opens
+   into already has one (MV/SER version UI), no reason to duplicate it. */
+$('hero-play').addEventListener('click', () => { if (HERO_IT) openItem(HERO_IT, []); });
+$('hero-versions').addEventListener('click', () => { if (HERO_IT) openItem(HERO_IT, []); });
+/* "Categories" button: a mouse/PC-discoverable way to do what D-pad Left/Back already does on these
+   pages (open the sidebar) -- see #page-browse.rowsfocus, which is what collapses it out of the way. */
+$('b-catbtn').addEventListener('click', () => { S.zone = 'cats'; renderMain(); });
 $('rlist').addEventListener('click', e => { const i = idxOf(e); if (i < 0 || !selectable(resultList()[i])) return; Q.item = i; S.zone = 'results'; openResult(resultList()[i]); });
 $('chips').addEventListener('click', e => { const i = idxOf(e); if (i < 0) return; const c = searchChips()[i]; if (e.target.classList && e.target.classList.contains('cx')) { removeChip(c); return; } if (e.target.classList && e.target.classList.contains('lf')) { Q.chip = i; moveChip(Number(e.target.getAttribute('data-lf'))); return; } Q.chip = i; S.zone = 'chips'; Q.lift = false; pickChip(c); });
 /* drag a tab to a new place with the mouse: drop it on the tab whose spot you want */
