@@ -5836,7 +5836,11 @@ function runSearch() {
   }
 }
 /* ================= settings ================= */
-const SETS = HAS_MPV ? ['refresh', 'fdkey', 'pins', 'tsdbkey', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'pcplayer', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'rcsguide', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'] : ['refresh', 'fdkey', 'pins', 'tsdbkey', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'rcsguide', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'];
+/* tsdbkey: deliberately not in this list any more -- now that guide-v2 (see loadGuideV2 above) resolves
+   TheSportsDB server-side for every competition it covers, a per-device key is a hidden developer
+   override, not something a normal user needs to find or set. The setting itself (ui.tsdbKey/loadTsdb)
+   is untouched, just no longer surfaced in Settings. */
+const SETS = HAS_MPV ? ['refresh', 'fdkey', 'pins', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'pcplayer', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'rcsguide', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'] : ['refresh', 'fdkey', 'pins', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'rcsguide', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'];
 function renderSettings() {
   const u = userInfo || {};
   const exp = Number(u.exp_date) ? new Date(Number(u.exp_date) * 1000).toLocaleDateString() : 'No expiry date given';
