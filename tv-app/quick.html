@@ -1027,7 +1027,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.20.2';
+const APP_VERSION = '3.20.3';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 const PC = !!window.RCSPC || !!window.RCS_DESKTOP;   /* Windows app, or the no-install desktop version */
 const PHONE = FIRE && navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) < 700;   /* Android phone */
@@ -3413,7 +3413,22 @@ function* buildEventsG() {
   const v2 = v2Events(), v2Comps = new Set((GUIDE_V2 && GUIDE_V2.competitions) || []);
   if (FD.list.length) {
     /* with real fixtures, football guide entries for those competitions are replaced by the fixtures themselves */
-    const fx = fixtureEvents().filter(ev => !v2Comps.has(ev.comp)), covered = ev => ev.teams && fx.some(f => Math.abs(f.kick - ev.kick) < 20 * 3600e3 && ev.teams.some(t => f.teams.map(norm).includes(norm(t))));
+    const fxAll = fixtureEvents(), fx = fxAll.filter(ev => !v2Comps.has(ev.comp)), covered = ev => ev.teams && fx.some(f => Math.abs(f.kick - ev.kick) < 20 * 3600e3 && ev.teams.some(t => f.teams.map(norm).includes(norm(t))));
+    /* guide-v2 only confirms a channel when TheSportsDB's own TV listings happen to cover that match --
+       real coverage gap, confirmed live (a Ligue 1 match with a genuinely matching, correctly-named
+       provider channel, that TheSportsDB simply had no listing for at all). For the football leagues
+       fixtureEvents() also covers (fx, filtered out just above because v2 normally takes priority), fall
+       back to its own channel matches -- same team-name verification, independent data source -- rather
+       than leaving a v2 event stuck at zero channels when a second signal already found some. */
+    if (fxAll.length) {
+      const fxById = new Map(fxAll.map(f => [String(f.key).replace(/^fx:/, ''), f]));
+      v2.forEach(v => {
+        if (v.chans.length) return;
+        const fid = (String(v.key).match(/:(\d+)$/) || [])[1];
+        const match = fid && fxById.get(fid);
+        if (match && match.chans.length) v.chans = match.chans;
+      });
+    }
     EVENTS = v2.concat(fx, f1.filter(ev => !v2Comps.has(ev.comp)), out.filter(ev => !FD_NAMES.has(ev.comp) && !v2Comps.has(ev.comp) && !(f1.length && ev.comp === 'Formula 1') && !covered(ev)));
   } else EVENTS = v2.concat(f1.filter(ev => !v2Comps.has(ev.comp)), out.filter(ev => !v2Comps.has(ev.comp) && !(f1.length && ev.comp === 'Formula 1')));
 }
