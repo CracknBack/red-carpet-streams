@@ -58,7 +58,7 @@ input{width:100%;background:var(--panel);border:.2rem solid var(--line);border-r
 #series{background:linear-gradient(180deg,rgba(8,13,20,.86),rgba(8,13,20,.94)),url(home-bg-wide.jpg) center/cover no-repeat,var(--bg)}
 #main{background:linear-gradient(180deg,rgba(8,13,20,.86),rgba(8,13,20,.94)),url(home-bg-wide.jpg) center/cover no-repeat,var(--bg)}
 #rail .brand{font-size:2.4rem;line-height:1.05;font-weight:700;color:var(--amber);margin:0 0 3.2rem 2rem}
-.ri{display:flex;align-items:center;gap:1.6rem;white-space:nowrap;padding:1.1rem 1.4rem;margin:.2rem 2rem .2rem 0;font-size:2.2rem;color:#B8A383;border-left:.4rem solid transparent;border-radius:0 .6rem .6rem 0;cursor:pointer}
+.ri{display:flex;align-items:center;gap:1.6rem;white-space:nowrap;padding:1.1rem 1.4rem 1.1rem 2.2rem;margin:.2rem 2rem .2rem 0;font-size:2.2rem;color:#B8A383;border-left:.4rem solid transparent;border-radius:0 .6rem .6rem 0;cursor:pointer}
 .ri.active{color:#fff;border-left-color:var(--amber)}
 .ri.focus{background:var(--focus-bg);color:#fff}
 .ri .ic{width:4.4rem;height:4.4rem;flex:none;display:block}
@@ -66,7 +66,7 @@ input{width:100%;background:var(--panel);border:.2rem solid var(--line);border-r
 .ri .ic img{opacity:.7;transition:opacity .15s}
 .ri.active .ic img,.ri.focus .ic img{opacity:1;filter:drop-shadow(0 0 .7rem rgba(231,185,111,.5))}
 #main.slim .ri .lbl{display:none}
-#main.slim .ri{margin-right:1rem;padding:1.1rem 1.2rem}
+#main.slim .ri{margin-right:1rem;padding:1.1rem 1.2rem 1.1rem 1.8rem}
 #main.slim #rail-logo{width:4.8rem;margin-left:.4rem}
 #main.slim #clock{font-size:1.45rem;padding-left:0;width:calc(100% - 1rem);text-align:center;white-space:nowrap}
 #main.slim #rail{padding-left:1rem}
@@ -127,7 +127,8 @@ h2{font-size:3rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overfl
 .dotkey.red{background:var(--red)} .dotkey.yellow{background:var(--yellow)}
 
 /* poster grid */
-#grid{display:grid;column-gap:1.2rem;grid-auto-rows:21rem;align-content:start;padding-left:.8rem}
+#grid{display:grid;column-gap:1.6rem;grid-auto-rows:27rem;align-content:start;padding-left:.8rem}
+#grid.rows{display:block;overflow-y:auto;overflow-x:hidden}   /* Movies/Series rows (see renderRows()) are plain stacked blocks, not grid cells -- the grid-template-columns gridCols() sets for the old flat grid would otherwise squeeze them into one narrow column. Three full rows don't fit one screen (same as Netflix) so this -- unlike the old grid, which was windowed to always fit exactly -- needs to actually scroll; renderRows() scrolls the focused row into view on every keypress. */
 .card{cursor:pointer;min-width:0;padding-top:.4rem}
 /* start screen */
 #home{background:linear-gradient(180deg,rgba(8,13,20,.15),rgba(8,13,20,.55) 55%,rgba(8,13,20,.8)),url(home-bg-wide.jpg) center/cover no-repeat,var(--bg)}
@@ -219,11 +220,11 @@ html.phone .hb-find{font-size:3.4rem;padding:0 2rem}
 .fhead:first-child,.chead:first-child{margin-top:.6rem}
 .chead span{font-family:'Barlow',sans-serif;font-weight:400;letter-spacing:0;text-transform:none;color:var(--muted);font-size:1.6rem}
 .chip .tabi{height:2.8rem;width:auto;vertical-align:middle;margin-right:.9rem}
-.fsec{display:grid;grid-template-columns:repeat(3,1fr);gap:1.8rem}
+.fsec{display:grid;grid-template-columns:repeat(2,1fr);gap:1.8rem}
 .ftile,.ctile{position:relative;min-width:0;border-radius:1.8rem;cursor:pointer;background:linear-gradient(180deg,rgba(20,29,42,.94),rgba(10,16,25,.97));border:.25rem solid #8A6A45;
   box-shadow:inset 0 0 0 .4rem #0B121B,inset 0 0 0 .5rem rgba(150,20,36,.8);transition:transform .12s}
 .ftile.focus,.ctile.focus{border-color:#F4C97E;box-shadow:inset 0 0 0 .4rem #0B121B,inset 0 0 0 .5rem rgba(170,24,40,.95),0 0 4rem rgba(231,185,111,.4);transform:scale(1.03);z-index:2}
-.ftile{height:16.5rem;padding:1.4rem 2.2rem;display:flex;flex-direction:column;justify-content:space-between}
+.ftile{min-height:16.5rem;padding:1.4rem 2.2rem;display:flex;flex-direction:column;justify-content:space-between;gap:1rem}
 .ft-top{display:flex;align-items:center;justify-content:space-between;gap:1rem;min-height:2.8rem}
 .ft-comp{display:flex;align-items:center;gap:1rem;font-size:1.5rem;color:#B8A383;letter-spacing:.06em;text-transform:uppercase;min-width:0;white-space:nowrap;overflow:hidden}
 .ft-comp img{height:2.8rem;width:auto}
@@ -231,7 +232,7 @@ html.phone .hb-find{font-size:3.4rem;padding:0 2rem}
 .ft-pill.live{background:#C41E2D;color:#fff}
 .ft-pill.on{border:.15rem solid var(--amber);color:var(--amber)}
 .ft-pill.rep{border:.15rem solid #B8A383;color:#B8A383}
-.ft-names{font-size:3rem;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ft-names{font-size:3rem;font-weight:600;color:#fff;line-height:1.15;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .ft-bot{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem}
 .ft-time{font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-size:4.2rem;font-weight:700;color:var(--amber);line-height:1}
 .ft-n{font-size:1.5rem;color:var(--muted)}
@@ -310,16 +311,29 @@ html.phone .hwrap{bottom:0;padding:2rem 3rem 0}
 #page-browse.tiles #pvinfo{display:none}
 #page-browse.tiles .pvbox{position:fixed;z-index:3;background:transparent;border:0;border-radius:.6rem;pointer-events:none}
 #page-browse.tiles .pvmsg{font-size:1.5rem;align-items:flex-end;padding:1rem}
-.poster{position:relative;width:9.8rem;height:14.7rem;border-radius:.6rem;overflow:hidden;background:var(--panel);border:.25rem solid transparent}
+.poster{position:relative;width:15rem;height:22.5rem;border-radius:.8rem;overflow:hidden;background:var(--panel);border:.25rem solid transparent}
 .poster img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover}
-.ph{position:absolute;left:.8rem;right:.8rem;bottom:.8rem;font-size:1.5rem;line-height:1.2;color:var(--muted);max-height:7.2rem;overflow:hidden}
-.pfav{position:absolute;top:.3rem;right:.6rem;color:var(--amber);font-size:2rem;text-shadow:0 0 .6rem #000}
-.pp{position:absolute;left:0;bottom:0;height:.5rem;background:var(--amber)}
+.ph{position:absolute;left:1rem;right:1rem;bottom:1rem;font-size:1.7rem;line-height:1.25;color:var(--muted);max-height:11rem;overflow:hidden}
+.pfav{position:absolute;top:.5rem;right:.8rem;color:var(--amber);font-size:2.4rem;text-shadow:0 0 .6rem #000}
+.pp{position:absolute;left:0;bottom:0;height:.6rem;background:var(--amber)}
 .card.focus .poster{border-color:var(--amber);box-shadow:0 1rem 2.4rem rgba(160,28,42,.45);transform:scale(1.04);transition:transform .12s}
 .card.current .poster{border-color:var(--line)}
-.ct{margin-top:.6rem;font-size:1.7rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ct{margin-top:.7rem;font-size:1.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card.focus .ct{color:#fff}
-.cm{display:flex;gap:1.2rem;font-size:1.4rem;color:var(--muted);white-space:nowrap;overflow:hidden}
+.cm{display:flex;gap:1.2rem;font-size:1.5rem;color:var(--muted);white-space:nowrap;overflow:hidden}
+
+/* Netflix-style rows for Movies/Series: three fixed, differently-sorted horizontally-scrolling rows
+   instead of one dense grid -- see catRows()/renderRows() in the script. Reuses .card/.poster above
+   (just bigger, see those rules) so there is one card look everywhere, not a second style to maintain. */
+.rows-wrap{display:flex;flex-direction:column;gap:3.2rem;overflow:hidden;padding-bottom:2rem}
+.row-sec{min-width:0}
+.row-head{margin:0 0 1.2rem .2rem;font-size:2rem;font-weight:600;color:#B8A383;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row-sec.focus .row-head{color:var(--amber)}
+.row-track{display:flex;gap:1.6rem;overflow:hidden;transition:transform .22s ease}
+.row-track .card{flex:none}
+.srchrow{display:flex;align-items:center;gap:1.2rem;height:5.6rem;padding:0 2.2rem;margin-bottom:2rem;border-radius:.8rem;background:var(--panel);border:.2rem solid var(--line);color:var(--muted);font-size:1.9rem;cursor:pointer;width:fit-content}
+.srchrow svg{width:2.3rem;height:2.3rem;flex:none}
+.srchrow.focus{border-color:var(--amber);color:#fff;box-shadow:0 0 1.6rem rgba(231,185,111,.35)}
 
 /* search */
 #page-search{display:grid;grid-template-columns:35.4rem 1fr;grid-template-rows:7rem 1fr;column-gap:3rem;row-gap:2rem}
@@ -724,6 +738,8 @@ html.light .tnum{background:rgba(252,248,238,0.85)}
 html.light .tlive{color:#3A1D18}
 html.light .tile.focus .tname{color:#3A1D18}
 html.light .card.focus .ct{color:#3A1D18}
+html.light .row-head{color:#3A1D18}
+html.light .srchrow.focus{color:#3A1D18}
 html.light .k.focus{color:#3A1D18}
 html.light .chip.on{color:#3A1D18}
 html.light .chip .cx:hover{color:#8A5A1C}
@@ -1011,7 +1027,7 @@ function reloadAccountData() {
   Object.assign(recent, {live: [], series: []}, load(acctKey('sp_recent'), {}));
   prog = load(acctKey('sp_prog'), {}); recentQ = load(acctKey('sp_rq'), []);
 }
-const ui = Object.assign({fdKey: 'REDACTED-OLD-FOOTBALLDATA-KEY', orig: false, liveLayout: 'country', lang: 'en', sort: {live: 0, vod: 1, series: 1}}, load('sp_ui', {}));
+const ui = Object.assign({fdKey: 'REDACTED-OLD-FOOTBALLDATA-KEY', orig: false, liveLayout: 'country', lang: 'en', sort: {live: 0, vod: 1, series: 1}, vol: 1, muted: false}, load('sp_ui', {}));
 if (FIRE && ui.gpvOff === undefined) ui.gpvOff = true;     /* inside the Android app the game-page preview starts off: weak TV sticks play better without it (Settings can turn it on) */
 document.documentElement.classList.toggle('light', !!ui.light);
 const favs = Object.assign({live: [], vod: [], series: []}, load(acctKey('sp_favs'), {}));
@@ -1676,7 +1692,20 @@ class VView {
 /* ================= app state ================= */
 const PAGES = [{id: 'search', label: 'Search'}, {id: 'favs', label: 'Favourites'}, {id: 'live', label: 'Live TV'}, {id: 'vod', label: 'Movies'}, {id: 'series', label: 'Series'}, {id: 'settings', label: 'Settings'}];
 const S = {screen: '', page: 'live', rail: 1, zone: 'cats', setIdx: 0};
-const B = {favs: {cats: [], cat: 0, catId: null, items: [], item: 0}, live: {cats: [], cat: 0, catId: null, items: [], item: 0, lv: 0, cc: null}, vod: {cats: [], cat: 0, catId: null, items: [], item: 0, lv: 0, fold: ''}, series: {cats: [], cat: 0, catId: null, items: [], item: 0, lv: 0, fold: ''}};
+const B = {favs: {cats: [], cat: 0, catId: null, items: [], item: 0}, live: {cats: [], cat: 0, catId: null, items: [], item: 0, lv: 0, cc: null},
+  /* row/rpos/rows: Movies/Series show the current category as stacked horizontally-scrolling rows
+     (New releases/Top rated/All) instead of one dense grid -- row is which row has focus (0 = the
+     "Search movies/series" button above them, 1..rows.length = the content rows), rpos is each
+     content row's own remembered horizontal position, rows is the last-rendered row data itself
+     (rowsKey() reads it so it doesn't have to recompute catRows() on every keypress). See catRows()/
+     renderRows()/rowsKey() further down. */
+  vod: {cats: [], cat: 0, catId: null, items: [], item: 0, lv: 0, fold: '', row: 1, rpos: [0, 0, 0], rows: []}, series: {cats: [], cat: 0, catId: null, items: [], item: 0, lv: 0, fold: '', row: 1, rpos: [0, 0, 0], rows: []},
+  /* Home screen's "Continue watching" destination. A single fixed category (no provider fetch, no
+     sidebar choice needed) whose one entry never changes, so ensureCats() never calls buildCats('cont')
+     -- that function has no branch for an unknown page and assumes DATA[t] exists. showPage() instead
+     force-refreshes b.items on every visit via its own explicit selectCat() call, same reason favs
+     clears b.cats on every visit: the list of what's in progress changes between visits. */
+  cont: {cats: [{id: '__all', name: 'Continue watching'}], cat: 0, catId: '__all', items: [], item: 0}};
 const SORTS = {live: ['A to Z', 'Channel number'], vod: ['Provider order', 'Newest added', 'A to Z', 'Top rated'], series: ['Provider order', 'Newest added', 'A to Z', 'Top rated']};
 const TYPE_LABEL = {live: 'Live TV', vod: 'Movie', series: 'Series'};
 /* What a page is showing: the Favourites page shows channels, movies or series depending on the section picked. */
@@ -2485,6 +2514,21 @@ function askShortcuts() {
       ui.chips = out.length ? out.slice(0, 14) : DEFAULT_CHIPS.slice();
       save('sp_ui', ui); Q.chip = 0; Q.sport = ui.chips[0]; Q.skey = ''; resView.reset(); renderMain();
     });
+}
+/* "+ Add" on the tab row itself: a free-text box here used to invite typing anything, but only the
+   leagues/sports COMPS actually knows how to match fixtures for (compOf()) will ever show games on a
+   tab -- anything else just sits empty with no explanation. Pick from that same list instead, so every
+   choice here is guaranteed to work. Team shortcuts (which can't be listed exhaustively) stay available
+   as a fallback option here, and via Settings > Edit search shortcuts either way. */
+function addChip(id) {
+  if (chipsList().indexOf(id) < 0) { ui.chips = chipsList().concat([id]).slice(0, 14); save('sp_ui', ui); probeIcons(); }
+  Q.chip = chipsList().indexOf(id); Q.sport = id; Q.skey = ''; resView.reset(); renderMain();
+}
+function askAddChip() {
+  const have = new Set(chipsList());
+  const items = COMPS.map(([c]) => c).filter(c => !have.has(c)).map(c => ({l: c, a: () => addChip(c)}));
+  items.push({l: 'A team instead…', a: askShortcuts});
+  openMenu(items);
 }
 function moveChip(dir) {
   const list = chipsList().slice(), c = searchChips()[Q.chip];
@@ -3474,6 +3518,11 @@ const homeShown = () => { const l = homeLives(); return l.length ? l : homeUpcom
 function homeBanner() {
   const lives = homeLives(), shown = lives.length ? lives : homeUpcoming(), out = {title: 'Live sports', cards: [], n: shown.length};
   if (shown.length) out.cards.push({type: 'game', ev: shown[HOME.liveIdx % shown.length], live: !!lives.length, upcoming: !lives.length});
+  /* Nothing live or upcoming: use the same hero slot to surface the most recent in-progress movie/
+     series instead of leaving it idle -- tapping it opens the full Continue watching tiles page
+     (homeOpenContinue), this is just a one-item teaser. Sports takes priority over this whenever
+     there's actually a game on, same reasoning as homeLives() over homeUpcoming(). */
+  else { const cw = continueWatchingList(); if (cw.length) { out.title = 'Continue watching'; out.n = 1; out.cards.push({type: 'cont', it: cw[0]}); } }
   chipsList().filter(id => LG_OK.has(id)).forEach(id => out.cards.push({type: 'chip', id}));
   return out;
 }
@@ -3523,6 +3572,10 @@ function renderHome() {
       const ch = chans.length ? (chans[0].kind === 'name' ? feedTitle(chans[0].g) : disp(chans[0].g)) + (chans.length > 1 ? ' +' + (chans.length - 1) : '') : '';
       b += '<div class="hb-game' + foc(i) + (HOME.fade ? ' fade' : '') + '" data-i="' + i + '"><div class="hb-top">' + (c.upcoming ? '<span class="hb-pill next">UPCOMING</span>' : '<span class="hb-pill">● LIVE NOW</span>') + '' + (hb.n > 1 ? '<span class="hb-count">' + (HOME.liveIdx % hb.n + 1) + ' / ' + hb.n + '</span>' : '') + '</div>' +
         '<div class="hb-title' + (ev.label.length > 31 ? ' xlong' : ev.label.length > 26 ? ' long' : '') + '">' + esc(ev.label.replace(/ v /, ' vs ')) + '</div><div class="hb-sub">' + esc([ev.comp, when, ch].filter(Boolean).join('  ·  ')) + '</div></div>';
+    } else if (c.type === 'cont') {
+      const it = c.it, sub = [it.sub, it.pct ? Math.round(it.pct) + '% watched' : ''].filter(Boolean).join('  ·  ');
+      b += '<div class="hb-game' + foc(i) + (HOME.fade ? ' fade' : '') + '" data-i="' + i + '"><div class="hb-top"><span class="hb-pill rep">RESUME</span></div>' +
+        '<div class="hb-title' + (it.name.length > 31 ? ' xlong' : it.name.length > 26 ? ' long' : '') + '">' + esc(it.name) + '</div><div class="hb-sub">' + esc(sub) + '</div></div>';
     } else chipHtml += '<div class="hb-chip' + foc(i) + '" data-i="' + i + '"><div class="hb-logo">' + lgImg(c.id, 'hb-lg') + '</div><div class="hb-cl">' + esc(chipLabel(c.id)) + '</div></div>';
   });
   $('h-strip').innerHTML = b;
@@ -3546,7 +3599,11 @@ function homeOpenCard(i) {
   if (!c) return;
   P.back = 'home';
   if (c.type === 'game') { openGame(c.ev, true); return; }
+  if (c.type === 'cont') { homeOpenContinue(); return; }
   homeOpenSearch(c.type === 'chip' ? c.id : '');
+}
+function homeOpenContinue() {
+  show('main'); S.zone = 'items'; showPage('cont');
 }
 function toggleTheme() {
   ui.light = !ui.light; save('sp_ui', ui);
@@ -4226,11 +4283,15 @@ function movieKey(k) {
 
 function gridCols() {
   const g = $('grid'), r = remPx();
-  const nc = Math.max(1, Math.floor((g.clientWidth - 0.8 * r + 1.2 * r) / (11 * r)));
-  const tpl = 'repeat(' + nc + ',9.8rem)';
+  const nc = Math.max(1, Math.floor((g.clientWidth - 0.8 * r + 1.6 * r) / (16.6 * r)));
+  const tpl = 'repeat(' + nc + ',15rem)';
   if (g.style.gridTemplateColumns !== tpl) g.style.gridTemplateColumns = tpl;
   return nc;
 }
+/* Card width (15rem, see .poster) + .row-track's gap (1.6rem) -- the horizontal step between two
+   cards in a Movies/Series row, same number gridCols() above uses for the old flat grid (Favourites/
+   Continue watching still use that one; rows use this). */
+const ROWSTRIDE = 16.6;
 
 /* ================= favourites / history ================= */
 const isFav = x => !!(x && favs[x.t] && favs[x.t].includes(x.id));
@@ -4250,6 +4311,38 @@ function pushRecent(t, id) {
 }
 const pk = x => (x.t === 'vod' ? 'v' : 'e') + x.id;
 function progPct(x) { const p = prog[pk(x)]; return p && p.d ? Math.min(100, p.t / p.d * 100) : 0; }
+/* What the Home screen's "Continue watching" card needs to show a tile without the full catalog: a
+   title, poster and (for an episode) which series/season/episode -- saved onto the progress record
+   itself at the moment it's written, since that's the one time the playing item's full fields are
+   already in memory for free. `cat` is the provider category id, carried along so a tap can hydrate
+   the real item via ensureCategoryItems() the same lean way Search already does (see openItem's `lite`
+   handling) -- never the full-catalog fetch/group pass that's OOM-crashed this app before. */
+function progMeta(it) {
+  return it.t === 'ep' ? {name: it.sname || '', sub: 'Season ' + it.season + ', episode ' + it.n, icon: it.icon || '', ext: it.ext || 'mp4', cat: it.cat || '', sid: it.sid || '', url: it.url || ''}
+    : {name: disp(it) || '', sub: '', icon: it.icon || '', ext: it.ext || 'mp4', cat: it.cat || '', url: it.url || ''};
+}
+/* The merged Home-screen "Continue watching" list: just reads prog (already capped at 300 entries,
+   see saveProgress/saveMpvProgress) -- no DATA.vod/DATA.series lookup, so this is safe to call on every
+   Home render even before Movies/Series has ever been opened this session. Several episodes of the same
+   series each get their own prog entry (one per episode you actually watched into); collapse those to
+   one tile for the series, keeping only the most recent. */
+function continueWatchingList() {
+  const rows = [];
+  Object.keys(prog).forEach(k => {
+    const p = prog[k];
+    if (!p.name) return;   /* a progress record saved before this feature existed -- no metadata to show */
+    const isEp = k[0] === 'e';
+    rows.push({t: isEp ? 'series' : 'vod', lite: 1, id: isEp ? p.sid : k.slice(1), progKey: k, name: p.name, icon: p.icon, cat: p.cat, ext: p.ext, url: p.url, sub: p.sub, pct: p.d ? Math.min(100, p.t / p.d * 100) : 0, ts: p.ts});
+  });
+  rows.sort((a, b) => b.ts - a.ts);
+  const seen = new Set(), out = [];
+  rows.forEach(r => {
+    const dk = r.t === 'series' ? 'series:' + r.name : 'vod:' + r.id;
+    if (seen.has(dk) || !r.id) return;
+    seen.add(dk); out.push(r);
+  });
+  return out;
+}
 
 /* ================= categories ================= */
 function buildCats(t) {
@@ -4378,6 +4471,7 @@ function buildProviderCats(t) {
   return v;
 }
 function specialList(t, id) {
+  if (t === 'cont') return continueWatchingList();
   /* d.byId/d.verToTitle don't exist yet for vod/series until ensureTitlesGrouped has actually run for
      that type (grouping is deferred until Movies/Series is opened) -- treat that as "nothing resolves
      yet" rather than crashing. This used to be safe to assume always-present, back when applyData()
@@ -4420,6 +4514,33 @@ function sortItems(t, list) {
   if (m === 2) return list.slice().sort((a, b) => a.name.localeCompare(b.name));
   if (m === 3) return list.slice().sort((a, b) => b.rating - a.rating);
   return list;
+}
+/* Netflix-style rows for Movies/Series: three fixed, differently-sorted views of the SAME already-
+   fetched category items (b.items) -- no new fetch, no catalog-wide pass. That catalog-wide version
+   of this exact idea (New releases/Top rated across everything, see buildLibCats/libIndex above) was
+   actually built once already and still OOM-crashed this device even capped at 60,000 items -- it's
+   "left intact but unused" for exactly that reason. This is the safe version of it: a provider category
+   here tops out at a few thousand titles, the same array the old single grid already sorted via
+   sortItems() on every Sort-button press, so three sorts of it cost nothing new. */
+function catRows(t) {
+  const b = B[t], all = b.items, noun = t === 'vod' ? 'movies' : 'series';
+  if (!all.length) return [];
+  const added = all.slice().sort((a, c) => (c.added || 0) - (a.added || 0));
+  const top = all.filter(x => x.rating > 0).sort((a, c) => c.rating - a.rating);
+  const browse = sortItems(t, all);
+  const rows = [];
+  if (added.length > 1) rows.push({label: 'New releases', items: added});
+  if (top.length > 1) rows.push({label: 'Top rated', items: top});
+  rows.push({label: 'All ' + noun + ' – ' + SORTS[t][ui.sort[t]], items: browse});
+  return rows;
+}
+/* Renders only a window of cards around the focused one -- same reasoning as VView's windowing above,
+   just horizontal: a category can hold a few thousand titles, and putting all of them in the DOM at
+   once (even as lightweight cards) is real cost on a weak Fire Stick CPU this app has paid for before. */
+function rowWindow(items, focus) {
+  const LEAD = 2, SIZE = 14;
+  const start = Math.max(0, Math.min(focus - LEAD, Math.max(0, items.length - SIZE)));
+  return {start, list: items.slice(start, start + SIZE)};
 }
 const sortable = c => c && !['__fav', '__recent', '__cont', '__new', '__newrel', '__top', '__langs', '__prov', 'up', '__all', '__pl', '__cl'].includes(c.id) && !String(c.id).startsWith('__c:') && !String(c.id).startsWith('f:') || (c && c.id === '__all' && S.page === 'live');
 function itemsFor(t, c) {
@@ -4464,6 +4585,7 @@ function selectCat(t, i, keepItem) {
   b.items = itemsFor(t, c);
   b.item = 0;
   if (prevId) { const j = b.items.findIndex(x => x.id === prevId); if (j >= 0) b.item = j; }
+  if (t === 'vod' || t === 'series') { b.row = 1; b.rpos = [0, 0, 0]; }
   (kindOf(t) === 'live' ? listView : gridView).reset(); tileView.reset();
 }
 function refreshSpecial(t) {
@@ -4698,9 +4820,12 @@ function fillNow(sel, getItem) {
   });
 }
 function cardHtml(it, i) {
-  const tp = it.t === 'vod' && it.vers ? titleProg(it) : null, p = tp && tp.p.d ? Math.min(100, tp.p.t / tp.p.d * 100) : 0;
+  /* it.pct/it.sub: set directly on the lean Continue-watching tiles (continueWatchingList()), which have
+     no .vers to run titleProg() against -- an explicit override here, never set on a normal catalog
+     item, so this changes nothing for any other tile. */
+  const tp = it.t === 'vod' && it.vers ? titleProg(it) : null, p = it.pct != null ? it.pct : (tp && tp.p.d ? Math.min(100, tp.p.t / tp.p.d * 100) : 0);
   const nv = it.vers ? it.vers.length : 1;
-  const meta = [it.year, it.rating ? it.rating.toFixed(1) + ' / 10' : '', nv > 1 ? nv + ' versions' : ''].filter(Boolean).map(x => '<span>' + esc(x) + '</span>').join('');
+  const meta = [it.year, it.rating ? it.rating.toFixed(1) + ' / 10' : '', nv > 1 ? nv + ' versions' : '', it.sub].filter(Boolean).map(x => '<span>' + esc(x) + '</span>').join('');
   return '<div class="card" data-i="' + i + '"><div class="poster"><span class="ph">' + esc(disp(it)) + '</span>' +
     (it.icon ? '<img src="' + esc(it.icon) + '" loading="lazy" decoding="async" onerror="this.remove()">' : '') +
     (it.ql ? '<span class="qb">' + esc(it.ql) + '</span>' : '') + (isFav(it) ? '<span class="pfav">★</span>' : '') + (p ? '<i class="pp" style="width:' + p.toFixed(1) + '%"></i>' : '') +
@@ -4709,6 +4834,7 @@ function cardHtml(it, i) {
 
 function renderBrowse() {
   const t = S.page, b = B[t], c = b.cats[b.cat], kind = kindOf(t), isLive = kind === 'live';
+  const useRows = t === 'vod' || t === 'series';   /* Movies/Series: rows (see renderRows); everything else keeps the flat grid/list */
   catView.update(b.cats, b.cat, S.zone === 'cats', 'c' + t + V + ui.orig);
   const tm = t === 'favs' && isLive;   /* favourite channels show as big tiles */
   $('page-browse').classList.toggle('collapsed', isLive && !tm && S.zone === 'items');
@@ -4720,7 +4846,7 @@ function renderBrowse() {
   $('b-badge').innerHTML = c && c.co && !ui.orig ? '<span class="bd co">' + esc(c.co) + '</span>' : '';
   $('b-sort').innerHTML = sortable(c) ? '<i class="dotkey yellow"></i>' + esc(SORTS[t][ui.sort[t]]) : '';
   const n = b.items.length;
-  $('b-count').textContent = !n || S.zone !== 'items' ? '' : (b.item + 1) + ' of ' + n;
+  $('b-count').textContent = !n || S.zone !== 'items' || useRows ? '' : (b.item + 1) + ' of ' + n;
   let empty = '';
   if (c && !n) {
     const noun = isLive ? 'channel' : kind === 'vod' ? 'movie' : 'series';
@@ -4735,20 +4861,52 @@ function renderBrowse() {
     else if (c.id === '__fav') empty = 'No favourites yet. Press the red button on any ' + noun + ' to add it here.';
     else if (c.id === '__recent') empty = 'Channels you watch will show up here.';
     else if (c.id === '__cont') empty = t === 'vod' ? 'Movies you start will show up here so you can pick up where you left off.' : 'Series you open will show up here.';
+    else if (t === 'cont') empty = 'Nothing to resume yet. Movies and series you start will show up here, newest first.';
     else empty = 'This category is empty.';
   }
   $('b-empty').textContent = empty;
   $('b-empty').classList.toggle('hidden', !empty);
   $('list').classList.toggle('hidden', !isLive || tm || !!empty);
   $('grid').classList.toggle('hidden', isLive || !!empty);
+  $('grid').classList.toggle('rows', useRows);
   $('tiles').classList.toggle('hidden', !tm || !!empty);
   if (!empty) {
-    const key = t + '|' + b.catId + '|' + ui.sort[t] + '|' + V + '|' + ui.orig;
-    (tm ? tileView : isLive ? listView : gridView).update(b.items, b.item, S.zone === 'items', key);
-    if (isLive && !tm) fillNow('#list', i => b.items[i]);
-    if (tm) fillTileCaps();
+    if (useRows) {
+      renderRows(t);
+    } else {
+      const key = t + '|' + b.catId + '|' + ui.sort[t] + '|' + V + '|' + ui.orig;
+      (tm ? tileView : isLive ? listView : gridView).update(b.items, b.item, S.zone === 'items', key);
+      if (isLive && !tm) fillNow('#list', i => b.items[i]);
+      if (tm) fillTileCaps();
+    }
   }
   positionTilePreview();
+}
+/* Movies/Series content: a "Search movies/series" button, then the category's rows (New releases/
+   Top rated/All, see catRows()) stacked vertically, each one scrolling horizontally on its own. b.row
+   is 0 for the search button, 1..rows.length for the content rows (see rowsKey() for navigation). */
+function renderRows(t) {
+  const b = B[t], rows = catRows(t);
+  b.rows = rows;
+  const focRow = S.zone === 'items' ? b.row : -1;
+  const srch = '<div class="srchrow' + (focRow === 0 ? ' focus' : '') + '" id="b-srch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg><span>Search ' + (t === 'vod' ? 'movies' : 'series') + '</span></div>';
+  const body = rows.map((r, ri) => {
+    const pos = Math.min(b.rpos[ri] || 0, Math.max(0, r.items.length - 1));
+    const win = rowWindow(r.items, pos);
+    const cards = win.list.map((it, wi) => cardHtml(it, win.start + wi)).join('');
+    const off = pos - win.start;
+    return '<div class="row-sec' + (focRow === ri + 1 ? ' focus' : '') + '" data-r="' + ri + '">' +
+      '<div class="row-head">' + esc(r.label) + '</div>' +
+      '<div class="row-track" style="transform:translateX(-' + (off * ROWSTRIDE) + 'rem)">' + cards + '</div></div>';
+  }).join('');
+  $('grid').innerHTML = srch + '<div class="rows-wrap">' + body + '</div>';
+  let focEl = focRow === 0 ? $('b-srch') : null;
+  if (focRow > 0 && rows[focRow - 1]) {
+    const pos = Math.min(b.rpos[focRow - 1] || 0, Math.max(0, rows[focRow - 1].items.length - 1));
+    const el = $('grid').querySelector('.row-sec[data-r="' + (focRow - 1) + '"] [data-i="' + pos + '"]');
+    if (el) { el.classList.add('focus'); focEl = el; }
+  }
+  if (focEl) focEl.scrollIntoView({block: 'nearest'});
 }
 
 function renderHints() {
@@ -4774,7 +4932,7 @@ async function showPage(p) {
   S.page = p;
   S.rail = PAGES.findIndex(x => x.id === p);
   $('main').classList.toggle('sport', p === 'search' || p === 'favs');
-  const browse = p === 'live' || p === 'vod' || p === 'series' || p === 'favs';
+  const browse = p === 'live' || p === 'vod' || p === 'series' || p === 'favs' || p === 'cont';
   if (p === 'favs') B.favs.cats = [];   /* rebuilt each visit so the counts are current */
   $('page-browse').classList.toggle('hidden', !browse);
   $('page-search').classList.toggle('hidden', p !== 'search');
@@ -4817,6 +4975,10 @@ async function showPage(p) {
         renderMain();
       });
     }
+    /* 'cont's single category never changes, so ensureCats() above was a no-op after the first visit --
+       re-select every time (cheap: specialList('cont', ...) just reads the in-memory prog map) so a
+       newly-started or newly-finished item is reflected immediately, same as favs clearing b.cats. */
+    if (p === 'cont') selectCat('cont', 0, true);
   }
   if (p === 'search') resView.reset();
   renderMain();
@@ -5054,8 +5216,9 @@ function fixtureTile(x, i, now) {
     '<div class="ft-names">' + esc(x.label.replace(/ v /, ' vs ')) + '</div>' +
     '<div class="ft-bot"><span class="ft-time' + (s === 2 ? ' ft-played' : '') + '">' + (s === 2 ? '<small class="ft-day">Played</small>' + esc(((dayWord(x.kick) || 'Today ') + clockStr(new Date(x.kick))).trim()) : esc(clockStr(new Date(x.kick)))) + '</span><span class="ft-right">' + fixtureCd(x, s, reps, repNow, now) + '<span class="ft-n">' + (n && s !== 2 ? n + (n === 1 ? ' channel' : ' channels') : s === 2 ? 'replays and catch-up' : '') + '</span></span></div></div>';
 }
-/* three columns of game tiles, or two when the window is narrow */
-const fcols = () => (!PHONE && innerWidth < 960 ? 2 : 3);
+/* two columns of game tiles -- wider tiles so both team names fit without truncating (used to be three
+   across, which cut off longer team names; see .ft-names) */
+const fcols = () => 2;
 function renderFixtureTiles(list) {
   const el = $('rlist'), now = nowMs(), FC = fcols();
   el.style.setProperty('--fc', FC);
@@ -5110,7 +5273,7 @@ async function openItem(x, list) {
 }
 function pickChip(c) {
   if (!c) { renderMain(); return; }
-  if (c.id === 'add') { askShortcuts(); return; }
+  if (c.id === 'add') { askAddChip(); return; }
   if (Q.text) { Q.filter = c.id; applyFilter(); }
   else { Q.sport = c.id; Q.item = 0; resView.reset(); renderMain(); }
 }
@@ -5168,7 +5331,7 @@ function searchKey(k, e) {
     else if (k === KEY.RIGHT && Q.chip < chips.length - 1) { Q.chip++; pickChip(chips[Q.chip]); return; }
     else if (k === KEY.UP || k === KEY.BACK) S.zone = 'qbox';
     else if (k === KEY.DOWN) { const l = resultList(); if (l.length) { S.zone = 'results'; Q.item = Math.max(0, stepRes(l, -1, 1)); } else return; }
-    else if (k === KEY.ENTER) { if (chips[Q.chip] && chips[Q.chip].id === 'add') { askShortcuts(); return; } if (!Q.text) { Q.lift = true; renderMain(); return; } if (resultList().length) S.zone = 'results'; }
+    else if (k === KEY.ENTER) { if (chips[Q.chip] && chips[Q.chip].id === 'add') { askAddChip(); return; } if (!Q.text) { Q.lift = true; renderMain(); return; } if (resultList().length) S.zone = 'results'; }
     else if ((k === 46 || k === KEY.BKSP) && !Q.text) { removeChip(chips[Q.chip]); return; }
     else return;
     renderMain(); return;
@@ -5732,7 +5895,7 @@ function browseKey(k) {
     else if (k === KEY.DOWN) { if (b.cat < n - 1) selectCat(t, b.cat + 1); else return; }
     else if (k === KEY.CH_UP) selectCat(t, b.cat - catView.page());
     else if (k === KEY.CH_DOWN) selectCat(t, b.cat + catView.page());
-    else if (k === KEY.LEFT || k === KEY.BACK) S.zone = 'rail';
+    else if (k === KEY.LEFT || k === KEY.BACK) { if (t === 'cont') { openHome(); return; } S.zone = 'rail'; }
     else if (k === KEY.RIGHT || k === KEY.ENTER) {
       const c = b.cats[b.cat];
       /* vod/series: a regular category may not be loaded yet — fetch it first (ensureCategoryReady
@@ -5753,6 +5916,7 @@ function browseKey(k) {
     else return;
     renderMain(); return;
   }
+  if (t === 'vod' || t === 'series') { rowsKey(t, k); return; }
   const tm = t === 'favs' && isLive, v = tm ? tileView : isLive ? listView : gridView, n = b.items.length, nc = tm || !isLive ? v.nc : 1, col = b.item % nc;
   if (k === KEY.UP) { if (b.item - nc >= 0) b.item -= nc; else return; }
   else if (k === KEY.DOWN) { if (b.item + nc < n) b.item += nc; else if (Math.floor(b.item / nc) < Math.floor((n - 1) / nc)) b.item = n - 1; else return; }
@@ -5765,6 +5929,41 @@ function browseKey(k) {
   else if (k === KEY.RED) { toggleFav(b.items[b.item]); refreshSpecial(t); }
   else return;
   renderMain();
+}
+/* Movies/Series items-zone navigation: up/down moves between the search button (row 0) and the rows
+   (1..rows.length); left/right moves within whichever row has focus, same "left off the first item
+   goes back to the sidebar" convention as the old flat grid (browseKey above). */
+function rowsKey(t, k) {
+  const b = B[t], rows = b.rows || catRows(t);
+  if (k === KEY.UP) { if (b.row > 0) b.row--; else return; }
+  else if (k === KEY.DOWN) { if (b.row < rows.length) b.row++; else return; }
+  else if (k === KEY.LEFT) {
+    if (b.row === 0) S.zone = 'cats';
+    else { const ri = b.row - 1; if ((b.rpos[ri] || 0) > 0) b.rpos[ri]--; else S.zone = 'cats'; }
+  } else if (k === KEY.RIGHT) {
+    if (b.row === 0) return;
+    const ri = b.row - 1, items = rows[ri] ? rows[ri].items : [];
+    if ((b.rpos[ri] || 0) < items.length - 1) b.rpos[ri]++; else return;
+  } else if (k === KEY.BACK) S.zone = 'cats';
+  else if (k === KEY.ENTER) {
+    if (b.row === 0) { openTypeSearch(t); return; }
+    const r = rows[b.row - 1]; if (!r) return;
+    const it = r.items[b.rpos[b.row - 1] || 0]; if (it) openItem(it, r.items);
+    return;
+  } else if (k === KEY.RED) {
+    if (b.row > 0) { const r = rows[b.row - 1], it = r && r.items[b.rpos[b.row - 1] || 0]; if (it) { toggleFav(it); refreshSpecial(t); } }
+  } else return;
+  renderMain();
+}
+/* The "Search movies"/"Search series" button atop Movies/Series: jumps into the existing Search page
+   (same lean SRCHIDX used by the magnifying-glass search, see ensureSearchCatalog) pre-filtered to this
+   type, instead of building a second search UI -- there is already an on-screen keyboard and results
+   list there, no reason to duplicate either. */
+function openTypeSearch(t) {
+  Q.text = ''; Q.filter = t; Q.item = 0; resView.reset();
+  Q.kb = !PC; S.zone = PC ? 'qbox' : 'kb';
+  show('main'); showPage('search');
+  if (PC) { const q = $('q'); q.readOnly = false; q.focus(); }
 }
 
 function mainKey(k, e) {
@@ -5830,7 +6029,7 @@ async function openSeries(g, vi = 0, keepZone) {
     SER.seasons = keys;
     keys.forEach(k => {
       SER.eps[k] = arr(E[k]).map(e => ({t: 'ep', id: String(e.id), n: Number(e.episode_num) || 0, name: epTitle(e.title, e.episode_num),
-        ext: e.container_extension || 'mp4', dur: (e.info && e.info.duration) || '', sname: it.name, season: k, url: e.url}));
+        ext: e.container_extension || 'mp4', dur: (e.info && e.info.duration) || '', sname: it.name, season: k, url: e.url, sid: it.id, icon: it.icon, cat: it.cat}));
     });
     SER.info = (r && r.info) || {};
     let best = null;
@@ -5905,6 +6104,27 @@ const video = FIRE ? NV : $('video');
 const P = {list: [], idx: 0, hls: null, att: [], tries: 0, stallT: 0, oT: 0, epg: null, resume: 0, back: 'main', saveT: 0};
 const cur = () => P.list[P.idx];
 function pmsg(t) { $('pmsg').textContent = t; $('pmsg').classList.toggle('hidden', !t); }
+/* Volume: the app's own UI never had any -- Fire TV and LG remotes have physical volume keys that
+   bypass the app entirely (straight to the TV/soundbar), which is why this was never missed there.
+   Windows has no such hardware, and the native <video> element defaults to full volume with nothing to
+   change it: confirmed there was genuinely no way to turn it down from inside the app. FIRE still uses
+   its native player (NV, not a real <video> element) for volume, same as before -- this only applies
+   where `video` is the actual HTML5 element, i.e. PC and LG webOS both. */
+let volT = 0;
+function applyVolume() { if (FIRE) return; try { video.volume = ui.vol; video.muted = ui.muted; } catch (e) {} }
+function volMsg() {
+  if (SCAN.dir) return;   /* don't stomp the scan-speed message if a seek-hold is in progress */
+  pmsg((ui.muted || ui.vol <= 0 ? '🔇 Muted' : '🔊 Volume ' + Math.round(ui.vol * 100) + '%'));
+  clearTimeout(volT); volT = setTimeout(() => pmsg(''), 1400);
+}
+function setVolume(delta) {
+  if (FIRE) return;
+  ui.muted = false;
+  ui.vol = Math.max(0, Math.min(1, +(ui.vol + delta).toFixed(2)));
+  applyVolume(); save('sp_ui', ui); volMsg();
+}
+function toggleMute() { if (FIRE) return; ui.muted = !ui.muted; applyVolume(); save('sp_ui', ui); volMsg(); }
+applyVolume();
 
 function stopGuideDownload() { if (GUIDE_BUSY && GUIDE_AC) GUIDE_AC.abort(); }
 function play(list, idx, fromStart, alts, startAt) {
@@ -5948,6 +6168,7 @@ function urlsForOne0(it) {
 function startStream() {
   const it = cur(); if (!it) return;
   P.att = urlsFor(it); P.tries = 0; P.epg = null; P.resume = 0; P.saveT = Date.now(); P.speed = 1; try { video.playbackRate = 1; } catch (e) { }
+  applyVolume();
   if (it.t === 'live') { loadEpg(it); pushRecent('live', it.id); }
   else {
     const p = prog[pk(it)];
@@ -6011,7 +6232,7 @@ function saveMpvProgress() {
   if (!it || it.t === 'live' || !d || d < 60) return;
   const k = pk(it);
   if (t / d > 0.95) delete prog[k];
-  else if (t > 30) prog[k] = {t, d, ts: Date.now()};
+  else if (t > 30) prog[k] = Object.assign({t, d, ts: Date.now()}, progMeta(it));
   else return;
   save(acctKey('sp_prog'), prog); P.saveT = Date.now(); V++;
 }
@@ -6212,7 +6433,7 @@ function saveProgress() {
   const d = video.duration, t = video.currentTime, k = pk(it);
   if (!isFinite(d) || d < 60) return;
   if (t / d > 0.95) delete prog[k];
-  else if (t > 30) prog[k] = {t, d, ts: Date.now()};
+  else if (t > 30) prog[k] = Object.assign({t, d, ts: Date.now()}, progMeta(it));
   else return;
   const keys = Object.keys(prog);
   if (keys.length > 300) keys.sort((a, b) => prog[a].ts - prog[b].ts).slice(0, keys.length - 300).forEach(x => delete prog[x]);
@@ -6362,8 +6583,25 @@ const OPT = {open: false, items: [], i: 0};
 function favLabel(x) { return isFav(x) ? 'Remove from favourites' : 'Add to favourites'; }
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 function setSpeed(r) { P.speed = r; try { video.playbackRate = r; } catch (e) { } toast('Playback speed ' + r + '×'); }
-/* audio and subtitle tracks in the stream that is playing (the Android player reports them) */
-function trackInfo() { if (!FIRE || !window.RCS.getTracks) return null; try { return JSON.parse(window.RCS.getTracks() || 'null'); } catch (e) { return null; } }
+/* audio and subtitle tracks in the stream that is playing. On Fire TV the Android player reports them;
+   on Windows/LG this option simply never showed at all, because it was only ever wired up for FIRE --
+   confirmed there was no Windows path here, not just a hidden/limited one. hls.js (used for HLS streams
+   on PC and LG, see Streamer.next()) exposes the same kind of information for the cases where there's
+   anything to switch between; mpegts.js and a plain <video src> (the other two playback paths) don't
+   expose multiple tracks through any JS API, so those stay without this option, same as today. */
+function trackInfo() {
+  if (FIRE) { if (!window.RCS.getTracks) return null; try { return JSON.parse(window.RCS.getTracks() || 'null'); } catch (e) { return null; } }
+  const h = main.hls; if (!h) return null;
+  try {
+    return {
+      audio: (h.audioTracks || []).map((t, i) => ({i, l: t.name || t.lang || ('Track ' + (i + 1)), sel: i === h.audioTrack})),
+      text: (h.subtitleTracks || []).map((t, i) => ({i, l: t.name || t.lang || ('Track ' + (i + 1)), sel: i === h.subtitleTrack})),
+      textOn: h.subtitleTrack >= 0 && !!h.subtitleDisplay
+    };
+  } catch (e) { return null; }
+}
+function setAudioTrack(i) { if (FIRE) window.RCS.setAudio(i); else if (main.hls) { try { main.hls.audioTrack = i; } catch (e) { } } }
+function setTextTrack(i) { if (FIRE) window.RCS.setText(i); else if (main.hls) { try { main.hls.subtitleTrack = i; main.hls.subtitleDisplay = i >= 0; } catch (e) { } } }
 function optItems() {
   const it = [], sc = S.screen;
   if (sc === 'main' && ['live', 'vod', 'series', 'favs'].includes(S.page)) {
@@ -6375,17 +6613,20 @@ function optItems() {
   if (sc === 'movie' && MV.g) it.push({l: favLabel(MV.g), k: KEY.RED});
   if (sc === 'series' && (SER.g || SER.it)) it.push({l: favLabel(SER.g || SER.it), k: KEY.RED});
   if (sc === 'player' && cur() && cur().t !== 'ep') it.push({l: favLabel(cur()), k: KEY.RED});
+  if (sc === 'player' && cur() && !FIRE && !MPV.on) it.push({l: 'Volume: ' + (ui.muted ? 'Muted' : Math.round(ui.vol * 100) + '%') + ' (change)',
+    a: () => openMenu([{l: (ui.muted ? '✓ ' : '') + 'Muted', a: () => { if (!ui.muted) toggleMute(); renderMain(); }}]
+      .concat([0.25, 0.5, 0.75, 1].map(v => ({l: (!ui.muted && ui.vol === v ? '✓ ' : '') + Math.round(v * 100) + '%', a: () => { ui.muted = false; ui.vol = v; applyVolume(); save('sp_ui', ui); renderMain(); }}))))});
   if (sc === 'player' && cur() && cur().t !== 'live' && !MPV.on) it.push({l: 'Playback speed: ' + (P.speed || 1) + '× (change)', a: () => setSpeed(SPEEDS[(SPEEDS.indexOf(P.speed || 1) + 1) % SPEEDS.length])});
-  if (sc === 'player' && cur() && FIRE) {
+  if (sc === 'player' && cur()) {
     const tr = trackInfo();
     if (tr && tr.audio && tr.audio.length > 1) {
       const a = tr.audio.find(x => x.sel);
-      it.push({l: 'Audio: ' + (a ? a.l : 'automatic') + ' (change)', a: () => openMenu(tr.audio.map(x => ({l: (x.sel ? '✓ ' : '') + x.l, a: () => { window.RCS.setAudio(x.i); toast('Audio: ' + x.l); }})))});
+      it.push({l: 'Audio: ' + (a ? a.l : 'automatic') + ' (change)', a: () => openMenu(tr.audio.map(x => ({l: (x.sel ? '✓ ' : '') + x.l, a: () => { setAudioTrack(x.i); toast('Audio: ' + x.l); }})))});
     }
     if (tr && tr.text && tr.text.length) {
       const t = tr.text.find(x => x.sel);
-      it.push({l: 'Subtitles: ' + (tr.textOn && t ? t.l : 'Off') + ' (change)', a: () => openMenu([{l: (tr.textOn ? '' : '✓ ') + 'Off', a: () => { window.RCS.setText(-1); toast('Subtitles off'); }}]
-        .concat(tr.text.map(x => ({l: (tr.textOn && x.sel ? '✓ ' : '') + x.l, a: () => { window.RCS.setText(x.i); toast('Subtitles: ' + x.l); }}))))});
+      it.push({l: 'Subtitles: ' + (tr.textOn && t ? t.l : 'Off') + ' (change)', a: () => openMenu([{l: (tr.textOn ? '' : '✓ ') + 'Off', a: () => { setTextTrack(-1); toast('Subtitles off'); }}]
+        .concat(tr.text.map(x => ({l: (tr.textOn && x.sel ? '✓ ' : '') + x.l, a: () => { setTextTrack(x.i); toast('Subtitles: ' + x.l); }}))))});
     }
   }
   if (sc === 'player' && cur() && cur().t === 'vod') {
@@ -6610,7 +6851,7 @@ async function switchEpisodeCopy(v) {
     const r = v.eps ? {episodes: v.eps} : await api('get_series_info', '&series_id=' + encodeURIComponent(v.id));
     const E = (r && r.episodes) || {}, k = String(c.season), list = arr(E[k]);
     if (!list.length) { toast('That copy has no season ' + k + '.'); return; }
-    const eps = list.map(e => ({t: 'ep', id: String(e.id), n: Number(e.episode_num) || 0, name: epTitle(e.title, e.episode_num), ext: e.container_extension || 'mp4', dur: (e.info && e.info.duration) || '', sname: v.name, season: k, url: e.url}));
+    const eps = list.map(e => ({t: 'ep', id: String(e.id), n: Number(e.episode_num) || 0, name: epTitle(e.title, e.episode_num), ext: e.container_extension || 'mp4', dur: (e.info && e.info.duration) || '', sname: v.name, season: k, url: e.url, sid: v.id, icon: v.icon || (SER.g && SER.g.icon) || '', cat: v.cat || (SER.g && SER.g.cat) || ''}));
     const idx = eps.findIndex(e => e.n === c.n);
     if (idx < 0) { toast('That copy doesn’t have this episode.'); return; }
     if (SER.g) rememberPick(SER.g, v);
@@ -6802,6 +7043,11 @@ function handleKey(k, e) {
     else if (k === 70 || k === 122) { e.preventDefault(); toggleFS(); return; }   /* F or F11 */
     else if (k === 32 && S.screen === 'player') k = KEY.PLAYPAUSE;
     else if (k === 191 && S.screen === 'main') { e.preventDefault(); S.zone = 'kb'; showPage('search'); return; }   /* / opens search */
+    /* Volume: 173/174/175 are the dedicated mute/down/up keys a keyboard with media keys sends; -/= are
+       the fallback for a keyboard without them. Player screen only -- nothing else plays audio. */
+    else if (S.screen === 'player' && (k === 174 || k === 189)) { e.preventDefault(); setVolume(-0.1); return; }
+    else if (S.screen === 'player' && (k === 175 || k === 187)) { e.preventDefault(); setVolume(0.1); return; }
+    else if (S.screen === 'player' && k === 173) { e.preventDefault(); toggleMute(); return; }
   }
   if (k === KEY.MENU) { openOpts(); return; }
   if (!$('loading').classList.contains('hidden')) { e.preventDefault(); return; }
@@ -6850,7 +7096,18 @@ $('cats').addEventListener('click', e => {
 $('pv').addEventListener('click', () => { const b = B[S.page]; if (b.items[b.item]) openItem(b.items[b.item], b.items); });
 $('list').addEventListener('click', e => { const i = idxOf(e); if (i < 0) return; const b = B[S.page]; b.item = i; S.zone = 'items'; openItem(b.items[i], b.items); });
 $('tiles').addEventListener('click', e => { const i = idxOf(e); if (i < 0) return; const b = B.favs; b.item = i; S.zone = 'items'; openItem(b.items[i], b.items); });
-$('grid').addEventListener('click', e => { const i = idxOf(e); if (i < 0) return; const b = B[S.page]; b.item = i; S.zone = 'items'; openItem(b.items[i], b.items); });
+$('grid').addEventListener('click', e => {
+  const b = B[S.page];
+  if (S.page === 'vod' || S.page === 'series') {
+    if (e.target.closest('.srchrow')) { openTypeSearch(S.page); return; }
+    const card = e.target.closest('.card'), sec = card && card.closest('.row-sec'); if (!card || !sec) return;
+    const ri = Number(sec.getAttribute('data-r')), i = Number(card.getAttribute('data-i')), row = (b.rows || [])[ri];
+    if (!row || !row.items[i]) return;
+    b.row = ri + 1; b.rpos[ri] = i; S.zone = 'items'; openItem(row.items[i], row.items);
+    return;
+  }
+  const i = idxOf(e); if (i < 0) return; b.item = i; S.zone = 'items'; openItem(b.items[i], b.items);
+});
 $('rlist').addEventListener('click', e => { const i = idxOf(e); if (i < 0 || !selectable(resultList()[i])) return; Q.item = i; S.zone = 'results'; openResult(resultList()[i]); });
 $('chips').addEventListener('click', e => { const i = idxOf(e); if (i < 0) return; const c = searchChips()[i]; if (e.target.classList && e.target.classList.contains('cx')) { removeChip(c); return; } if (e.target.classList && e.target.classList.contains('lf')) { Q.chip = i; moveChip(Number(e.target.getAttribute('data-lf'))); return; } Q.chip = i; S.zone = 'chips'; Q.lift = false; pickChip(c); });
 /* drag a tab to a new place with the mouse: drop it on the tab whose spot you want */
@@ -6882,7 +7139,13 @@ if (PC) {
   const hover = (el, fn) => el.addEventListener('mousemove', e => { const i = idxOf(e); if (i >= 0) fn(i); });
   hover($('list'), i => { const b = B[S.page]; if (S.zone !== 'items' || b.item !== i) { S.zone = 'items'; b.item = i; renderMain(); } });
   hover($('tiles'), i => { const b = B.favs; if (S.zone !== 'items' || b.item !== i) { S.zone = 'items'; b.item = i; renderMain(); } });
-  hover($('grid'), i => { const b = B[S.page]; if (b && (S.zone !== 'items' || b.item !== i)) { S.zone = 'items'; b.item = i; renderMain(); } });
+  hover($('grid'), i => { const b = B[S.page]; if (S.page === 'vod' || S.page === 'series') return; if (b && (S.zone !== 'items' || b.item !== i)) { S.zone = 'items'; b.item = i; renderMain(); } });
+  $('grid').addEventListener('mousemove', e => {
+    if (S.page !== 'vod' && S.page !== 'series') return;
+    const card = e.target.closest('.card'), sec = card && card.closest('.row-sec'); if (!card || !sec) return;
+    const ri = Number(sec.getAttribute('data-r')), i = Number(card.getAttribute('data-i')), b = B[S.page];
+    if (b.row !== ri + 1 || (b.rpos[ri] || 0) !== i) { b.row = ri + 1; b.rpos[ri] = i; S.zone = 'items'; renderMain(); }
+  });
   hover($('g-chans'), i => { if (GS.list[i] && !GS.list[i].hdr && GS.ch !== i) { GS.ch = i; GS.moved = true; renderGame(); } });
   hover($('rlist'), i => { if (selectable(resultList()[i]) && (S.zone !== 'results' || Q.item !== i)) { S.zone = 'results'; Q.item = i; renderMain(); } });
   hover($('eps'), i => { if (SER.zone !== 'eps' || SER.e !== i) { SER.zone = 'eps'; SER.e = i; renderSeries(); } });
@@ -6892,6 +7155,9 @@ if (PC) {
   document.addEventListener('mousemove', () => { clearTimeout(hintT); document.querySelectorAll('.hints').forEach(h => h.classList.add('idle')); });
   $('q').readOnly = false;
   $('player').addEventListener('dblclick', toggleFS);
+  /* scroll to change volume -- the standard desktop convention (mpv itself does the same by default),
+     so it feels consistent whether a stream plays in the built-in player or hands off to mpv */
+  $('player').addEventListener('wheel', e => { e.preventDefault(); setVolume(e.deltaY < 0 ? 0.05 : -0.05); }, {passive: false});
 }
 function swipe(el, fn, rowRem) {
   let y0 = null, moved = false;
@@ -6908,7 +7174,11 @@ function wheel(el, fn, rowRem) { swipe(el, fn, rowRem); el.addEventListener('whe
 wheel($('cats'), d => { S.zone = 'cats'; selectCat(S.page, B[S.page].cat + d); renderMain(); });
 wheel($('list'), d => { const b = B[S.page]; S.zone = 'items'; b.item = Math.max(0, Math.min(b.items.length - 1, b.item + d)); renderMain(); });
 wheel($('tiles'), d => { const b = B.favs; S.zone = 'items'; b.item = Math.max(0, Math.min(b.items.length - 1, b.item + d * tileView.nc)); renderMain(); }, 27);
-wheel($('grid'), d => { const b = B[S.page]; S.zone = 'items'; b.item = Math.max(0, Math.min(b.items.length - 1, b.item + d * gridView.nc)); renderMain(); }, 21);
+wheel($('grid'), d => {
+  const b = B[S.page];
+  if (S.page === 'vod' || S.page === 'series') { const rows = b.rows || []; S.zone = 'items'; b.row = Math.max(0, Math.min(rows.length, b.row + d)); renderMain(); return; }
+  S.zone = 'items'; b.item = Math.max(0, Math.min(b.items.length - 1, b.item + d * gridView.nc)); renderMain();
+}, 21);
 $('gm-search').addEventListener('click', () => doGameSearch());
 $('g-chans').addEventListener('click', e => { const i = idxOf(e); if (i >= 0 && GS.ev && i === GS.list.length) { GS.showMaybe = !GS.showMaybe; GS.ch = i; GS.moved = true; renderGame(); return; } if (i < 0 || !GS.ev || !GS.list[i] || GS.list[i].hdr) return; GS.ch = i; playEvent(GS.ev, i, GS.list); });
 wheel($('rlist'), d => { S.zone = 'results'; Q.item = Math.max(0, Math.min(resultList().length - 1, Q.item + d)); renderMain(); }, 7.4);
