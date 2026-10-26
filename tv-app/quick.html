@@ -1758,6 +1758,65 @@ const tileView = new VView($('tiles'), {rowH: 27, render: tileHtml, cols: tileCo
 let GUIDE = null, EVENTS = null, GUIDE_BUSY = false, GUIDE_MSG = '', GUIDE_AC = null, GUIDE_RETRY = false;
 let serverInfo = {};
 
+/* ================= guide-v2 (resolved server-side, see Plan-New-Guide.md) =================
+   One small published file instead of the app merging and guessing across a dozen-plus TV guides
+   itself -- see rcs-guide's resolve_v2.py for how it's built (football-data.org + TheSportsDB,
+   resolved once, server-side, published to the same Pages site as the existing guide). GUIDE_V2.events
+   already carry their own channel list (plain text names + country), resolved and timed; v2Events()
+   below just maps those channel names onto the owner's own provider channels the same way a free
+   guide's listings already do (tsdbGroups -- same kind of input, so no new matching logic needed) and
+   shapes the result exactly like fixtureEvents()'s output so it slots into the one place both get
+   merged (buildEventsG). Every guide-v2 channel is "likely" confidence, never "confirmed" -- server-
+   side resolution is still one source per claim; the app's own tap-time check (claimDoubt/EPGCHK)
+   is what actually confirms it, same as everything else. */
+const GUIDE_V2_URL = 'https://cracknback.github.io/rcs-guide/guide-v2.json';
+let GUIDE_V2 = null, GUIDE_V2_BUSY = false;
+async function loadGuideV2(force) {
+  if (GUIDE_V2_BUSY) return;
+  const key = 'guidev2:' + GUIDE_V2_URL;
+  if (!force && !GUIDE_V2) { const c = await idb.get(key); if (c) GUIDE_V2 = c.data; }
+  if (!force && GUIDE_V2 && GUIDE_V2._ts && Date.now() - GUIDE_V2._ts < 20 * 60e3) return;
+  GUIDE_V2_BUSY = true;
+  try {
+    const r = await fetch(GUIDE_V2_URL + '?t=' + Date.now());
+    if (!r.ok) throw new Error('error ' + r.status);
+    const j = await r.json();
+    const changed = JSON.stringify(j) !== JSON.stringify(GUIDE_V2 && Object.assign({}, GUIDE_V2, {_ts: undefined}));
+    j._ts = Date.now();
+    GUIDE_V2 = j;
+    await idb.set(key, {data: j});
+    if (changed) EVENTS = null;
+  } catch (e) { /* guide-v2 is additive -- a failed fetch just leaves whatever was cached (or nothing) in place, never breaks the rest of the guide */ }
+  GUIDE_V2_BUSY = false;
+  if (S.screen === 'home') renderHome();
+  if (S.screen === 'main' && S.page === 'search') { Q.skey = ''; Q.gkey = ''; renderMain(); }
+}
+setInterval(() => { if (S.screen !== 'player') loadGuideV2(false); }, 20 * 60000);
+/* Shapes guide-v2's pre-resolved events exactly like fixtureEvents()'s output so both merge into
+   EVENTS through the same path in buildEventsG, with no separate display/matching logic to drift out
+   of sync with it. */
+function v2Events() {
+  if (!GUIDE_V2 || !GUIDE_V2.events || !GUIDE_V2.events.length) return [];
+  const out = [];
+  for (const e of GUIDE_V2.events) {
+    const kick = Date.parse(e.kick); if (!kick) continue;
+    const stop = kick + 2.25 * 3600e3, chans = new Map(), reps = [], pres = [];
+    (e.channels || []).forEach(c => {
+      const start = Date.parse(c.start) || kick;
+      tsdbGroups(c.channel, c.country).forEach(g => {
+        const row = {g, epg: '', start, kick, stop: Math.max(stop, start + 2 * 3600e3), lang: chLang(g), region: regionOf(g), source: 'v2', confidence: c.confidence};
+        if (c.kind === 'LIVE') { const old = chans.get(g.id); if (!old || start < old.start) chans.set(g.id, Object.assign(row, {kind: 'live'})); }
+        else if (c.kind === 'REPLAY') reps.push(Object.assign(row, {kind: 'replay', hl: 0}));
+        else pres.push(Object.assign(row, {kind: 'preview'}));
+      });
+    });
+    out.push({key: 'v2:' + e.id, fixture: true, status: e.status, label: e.label || ((e.home || '') + ' v ' + (e.away || '')),
+      comp: e.comp, teams: e.home && e.away ? [e.home, e.away] : null, liveEvent: true, isEvent: true,
+      text: ' ' + norm((e.label || '') + ' ' + e.comp) + ' ', kick, start: kick, stop, chans: [...chans.values()], reps, pres});
+  }
+  return out;
+}
+
 /* ================= real fixtures (football-data.org) =================
    With a free key, Premier League and UEFA Champions League fixtures come from football-data.org.
    They decide what's on and when, and LIVE comes only from them. The TV guides are then used
@@ -2071,7 +2130,12 @@ function ukBlackout(ev) {
 }
 function fxState(ev, now) {
   const s = ev.status;
-  if (s === 'IN_PLAY' || s === 'PAUSED' || s === 'EXTRA_TIME' || s === 'PENALTY_SHOOTOUT') return 0;
+  /* A provider's IN_PLAY/PAUSED/etc. status is trusted, but only within a bounded window after kickoff --
+     the free fixtures plan is documented as having delayed updates, and a status that never got updated to
+     FINISHED must not keep a game "live" forever. This branch used to have no time check at all, which is
+     the actual "finished game still shown as LIVE 12+ hours later" bug: a stale IN_PLAY now falls through
+     to the ordinary time-window check below instead, which already resolves to finished past ev.stop. */
+  if ((s === 'IN_PLAY' || s === 'PAUSED' || s === 'EXTRA_TIME' || s === 'PENALTY_SHOOTOUT') && now - ev.kick < 4 * 3600e3) return 0;
   if (s === 'FINISHED' || s === 'AWARDED') return 2;
   if (s === 'POSTPONED' || s === 'CANCELLED' || s === 'SUSPENDED') return ev.kick > now ? 1 : 2;
   return now < ev.kick ? 1 : now < ev.stop ? 0 : 2;
@@ -2477,7 +2541,18 @@ const COMPS = [
   ['Premier League', 'premier league,english premier league,epl,super sunday,monday night football,match of the day,soccer saturday,the football show,premier league review'],
   ['Champions League', 'champions league,ucl'], ['Europa League', 'europa league,uel'], ['FA Cup', 'fa cup'], ['League Cup', 'carabao cup,league cup,efl cup'],
   ['Formula 1', 'formula 1,formula one,f1,grand prix,ted kravitz'], ['MotoGP', 'motogp,moto gp'], ['La Liga', 'la liga,laliga'], ['Serie A', 'serie a'], ['Ligue 1', 'ligue 1,ligue un'],
-  ['Bundesliga', 'bundesliga'], ['A-League', 'a league'], ['AFL', 'afl'], ['NRL', 'nrl'], ['Cricket', 'cricket,test match,the ashes,t20,odi'], ['Rugby', 'rugby']
+  ['Bundesliga', 'bundesliga'], ['A-League', 'a league'], ['AFL', 'afl'], ['NRL', 'nrl'], ['Cricket', 'cricket,test match,the ashes,t20,odi'], ['Rugby', 'rugby'],
+  /* resolved server-side (see guide-v2 above / rcs-guide's resolve_v2.py) -- these names must match
+     that script's LEAGUES comp names exactly, or v2Comps there won't recognise them as covered. */
+  ['NBA', 'nba,national basketball association,basketball'], ['NHL', 'nhl,national hockey league,ice hockey'],
+  ['MLB', 'mlb,major league baseball,baseball'], ['NFL', 'nfl,national football league,american football'],
+  ['Eredivisie', 'eredivisie,dutch league'], ['Primeira Liga', 'primeira liga,portuguese league'],
+  ['Belgian Pro League', 'belgian pro league,jupiler pro league,belgium league'], ['Scottish Premiership', 'scottish premiership,scottish league'],
+  ['League of Ireland', 'league of ireland,irish premier division'], ['Austrian Bundesliga', 'austrian bundesliga,austria league'],
+  ['Greek Super League', 'greek super league,greece league'], ['Turkish Super Lig', 'turkish super lig,super lig,turkey league'],
+  ['Swiss Super League', 'swiss super league,switzerland league'], ['IndyCar', 'indycar,indy car,indy 500'], ['NASCAR', 'nascar,nascar cup'],
+  ['ATP Tour', 'atp,atp tour,mens tennis'], ['WTA Tour', 'wta,wta tour,womens tennis'], ['PGA Tour', 'pga,pga tour,golf'],
+  ['European Tour', 'european tour,dp world tour'], ['UFC', 'ufc,mma,mixed martial arts'], ['Boxing', 'boxing,heavyweight,boxing match']
 ].map(([c, w]) => [c, w.split(',')]);
 /* look-alikes: women's and youth competitions, lower divisions and same-named leagues in other countries */
 const COMP_NOT = {
@@ -3193,11 +3268,17 @@ function* buildEventsG() {
   learnBroadcasters(out);
   yield* addNameEvents(out);
   const f1 = f1Events();
+  /* guide-v2 (see above) is resolved server-side for whichever competitions rcs-guide covers -- those
+     take priority over this app's own client-side guide-merge/fixture-matching for the SAME
+     competitions, so the two never show conflicting answers for one game. Everything guide-v2 doesn't
+     cover (Champions League, Europa League, AFL, NRL, Cricket, Rugby, A-League...) still runs through
+     the existing fx/f1/out path exactly as before. */
+  const v2 = v2Events(), v2Comps = new Set((GUIDE_V2 && GUIDE_V2.competitions) || []);
   if (FD.list.length) {
     /* with real fixtures, football guide entries for those competitions are replaced by the fixtures themselves */
-    const fx = fixtureEvents(), covered = ev => ev.teams && fx.some(f => Math.abs(f.kick - ev.kick) < 20 * 3600e3 && ev.teams.some(t => f.teams.map(norm).includes(norm(t))));
-    EVENTS = fx.concat(f1, out.filter(ev => !FD_NAMES.has(ev.comp) && !(f1.length && ev.comp === 'Formula 1') && !covered(ev)));
-  } else EVENTS = f1.concat(out.filter(ev => !(f1.length && ev.comp === 'Formula 1')));
+    const fx = fixtureEvents().filter(ev => !v2Comps.has(ev.comp)), covered = ev => ev.teams && fx.some(f => Math.abs(f.kick - ev.kick) < 20 * 3600e3 && ev.teams.some(t => f.teams.map(norm).includes(norm(t))));
+    EVENTS = v2.concat(fx, f1.filter(ev => !v2Comps.has(ev.comp)), out.filter(ev => !FD_NAMES.has(ev.comp) && !v2Comps.has(ev.comp) && !(f1.length && ev.comp === 'Formula 1') && !covered(ev)));
+  } else EVENTS = v2.concat(f1.filter(ev => !v2Comps.has(ev.comp)), out.filter(ev => !v2Comps.has(ev.comp) && !(f1.length && ev.comp === 'Formula 1')));
 }
 const buildEvents = () => runSync(buildEventsG());
 let EVENTS_BUILDING = false;
@@ -3233,8 +3314,13 @@ const EPGCHK = new Map();                 /* channel id -> {ts, list: that chann
 let EPGVER = 0, VER_T = 0;
 function contradicts(title, desc, ev) {
   if (!ev || !ev.teams) return false;
-  const p = parseEvent(title || '', desc || '', '');
-  return !!p.teams && !mentions((title || '') + ' ‖ ' + (desc || ''), ev);       /* it names two teams, and they are not this game's */
+  const text = (title || '') + ' ‖ ' + (desc || '');
+  if (mentions(text, ev)) return false;                           /* it does mention this game: no contradiction */
+  if (ev.comp && compOf(text) === ev.comp) return false;           /* names this competition (studio coverage, a preview show): not clearly wrong, don't veto */
+  return true;                                                      /* names a different match, or nothing recognisable at all -- a drama/news programme
+                                                                        used to pass here silently (parseEvent found no team names in it, so the old check
+                                                                        never fired) even though it plainly isn't this game either; that was the actual
+                                                                        "USA Network 'Confirmed' while showing The Rainmaker" bug. */
 }
 /* Does the channel's own live guide speak against this listing? Returns the programme that does, or null.
    - it names a different match at that moment, or
@@ -3462,6 +3548,7 @@ function homeCards() {
 }
 function openHome() {
   if (!LG_PROBED) probeIcons();
+  loadGuideV2(false);   /* no key needed -- it's a small published file, unlike the others below */
   if (ui.fdKey) loadFixtures(false);
   loadF1(false);
   if (ui.tsdbKey) loadTsdb(false);
@@ -4937,6 +5024,7 @@ async function showPage(p) {
   $('page-browse').classList.toggle('hidden', !browse);
   $('page-search').classList.toggle('hidden', p !== 'search');
   $('page-settings').classList.toggle('hidden', p !== 'settings');
+  if (p === 'search') loadGuideV2(false);
   if (p === 'search' && ui.fdKey) loadFixtures(false);
   if (p === 'search') loadF1(false);
   if (p === 'search' && ui.tsdbKey) loadTsdb(false);
