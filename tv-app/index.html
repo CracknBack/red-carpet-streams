@@ -1026,7 +1026,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.20.1';
+const APP_VERSION = '3.20.2';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 const PC = !!window.RCSPC || !!window.RCS_DESKTOP;   /* Windows app, or the no-install desktop version */
 const PHONE = FIRE && navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) < 700;   /* Android phone */
@@ -2027,13 +2027,26 @@ function teamMatch(a, b) {
 }
 const pairMatch = (t, h, a) => !!t && ((teamMatch(t[0], h) && teamMatch(t[1], a)) || (teamMatch(t[0], a) && teamMatch(t[1], h)));
 /* two team names out of text such as "AU (STAN 57) – Liverpool v Villarreal UEFA Champions League Matchday 3 (2026-10-21 …" */
+/* Some providers dynamically name PPV/exclusive event channels as dash-separated segments instead of
+   "Team v Team" -- e.g. "Live - PSG - Lyon - Ligue 1 - EXCLUSIVE - DE: DAZN PPV 8" (found live, a real
+   channel for a real match that nameTeams() previously couldn't parse at all -- it only ever recognised
+   the " v "/" vs " shape). Gated on a literal "Live" prefix, which is a strong, specific signal for this
+   naming convention (an ordinary channel's own name doesn't start with the word "Live -"): take the
+   first two dash-segments after it that aren't an obvious non-team word. */
+const NAME_SEG_META = /^(live|exclusive|ppv|hd|sd|fhd|uhd)$|^\d|^\d?[a-z]{1,2}k$|^[a-z]{2}:?$/i;
+function nameTeamsFromSegments(s0) {
+  if (!/^live\b/i.test(s0)) return null;
+  const segs = s0.split(/\s*[–-]\s*/).map(x => x.trim()).filter(Boolean).slice(1);
+  const cand = segs.filter(x => x.length >= 2 && x.length <= 40 && !NAME_SEG_META.test(x));
+  return cand.length >= 2 ? [cand[0], cand[1]] : null;
+}
 function nameTeams(raw) {
   const s0 = String(raw || '').replace(/\b\d{1,2}[:.h]\d{2}\b.*$/, '');
   const m = s0.match(/(?:^|[–:|-]\s*)([^–:|]{2,40}?)\s+(?:v|vs\.?|versus)\s+(.{2,70})$/i);
-  if (!m) return null;
+  if (!m) return nameTeamsFromSegments(s0);
   const a = m[1].replace(/^.*\)\s*/, '').trim();
   const b = m[2].replace(/\b(uefa|english|epl|champions league|premier league|europa league|conference league|matchday|md\d|exclusive|live\b|\d{4}[\/-]\d{2,4}|\(20\d\d).*$/i, '').replace(/[.;!].*$/, '').replace(/[\s–:|(-]+$/, '').trim();
-  return a && b ? [a, b] : null;
+  return a && b ? [a, b] : nameTeamsFromSegments(s0);
 }
 /* ---------- regions: English-language channels, grouped ---------- */
 const REGION_OF = {UK: 'UK & Ireland', IE: 'UK & Ireland', US: 'North America', CA: 'North America', ZA: 'Africa', NG: 'Africa', KE: 'Africa',
@@ -2182,7 +2195,10 @@ function fixtureEvents() {
     const ncCand = new Map();
     [home, away].forEach(tn => teamTokens(tn).concat([norm(canonTeam(tn))]).forEach(k => (nameChanIdx.get(k) || []).forEach(e => ncCand.set(e.g.id, e))));
     ncCand.forEach(({g, nt}) => {
-      if (!langOk(g, f.comp)) return;
+      /* No langOk() gate here on purpose -- see the nameChanIdx build above. The channel's own name
+         already named both teams (pairMatch, just below); that's independent of what language/country
+         the provider tagged it with. langOk still gates the weaker signals above (slot-only listings,
+         TheSportsDB) where there's no team-name confirmation to fall back on. */
       if (chans.has(g.id)) return;
       if (pairMatch(nt, home, away)) chans.set(g.id, {g, kind: 'name', start: kick, kick, stop: kick + 2.25 * 3600e3, lang: leagueLang(g, f.comp), region: regionOf(g), epg: ''});
     });
@@ -2614,7 +2630,17 @@ const TEAMS = [
   ['Real Madrid', 'real madrid'], ['Barcelona', 'barcelona,barca'], ['Atletico Madrid', 'atletico madrid,atletico,atleti'],
   ['Bayern Munich', 'bayern munich,bayern,fc bayern'], ['Borussia Dortmund', 'borussia dortmund,dortmund,bvb'],
   ['Paris Saint-Germain', 'paris saint germain,paris sg,psg'], ['Juventus', 'juventus,juve'], ['Inter Milan', 'inter milan,inter,internazionale'],
-  ['AC Milan', 'ac milan,milan'], ['Napoli', 'napoli'], ['Celtic', 'celtic'], ['Rangers', 'rangers']
+  ['AC Milan', 'ac milan,milan'], ['Napoli', 'napoli'], ['Celtic', 'celtic'], ['Rangers', 'rangers'],
+  /* Ligue 1 beyond PSG was entirely missing -- the real cause of two separate live bugs (last night's
+     "Lens vs Paris", tonight's "PSG vs Lyon"): without an alias entry a club's common short name
+     ("Lyon", "Lens") never connects to its full official name from football-data.org ("Olympique
+     Lyonnais", "Racing Club de Lens"), so even an exactly-right channel name fails teamMatch(). */
+  ['Olympique Lyonnais', 'lyon,ol,olympique lyonnais'], ['Olympique de Marseille', 'marseille,om,olympique de marseille'],
+  ['AS Monaco', 'monaco,as monaco,asm'], ['Lille OSC', 'lille,losc,lille osc'], ['Racing Club de Lens', 'lens,rc lens,racing club de lens'],
+  ['OGC Nice', 'nice,ogc nice'], ['Stade Rennais', 'rennes,stade rennais'], ['RC Strasbourg', 'strasbourg,rc strasbourg'],
+  ['Toulouse FC', 'toulouse,toulouse fc,tfc'], ['FC Nantes', 'nantes,fc nantes'], ['Stade Brestois', 'brest,stade brestois'],
+  ['Stade de Reims', 'reims,stade de reims'], ['Le Havre AC', 'le havre,le havre ac,hac'], ['Angers SCO', 'angers,angers sco'],
+  ['AJ Auxerre', 'auxerre,aj auxerre'], ['FC Metz', 'metz,fc metz'], ['Paris FC', 'paris fc']
 ];
 const TEAM_OF = new Map(), TEAM_ALIASES = new Map();
 TEAMS.forEach(([name, al]) => { const l = al.split(','); TEAM_ALIASES.set(name, l); l.forEach(a => TEAM_OF.set(a, name)); TEAM_OF.set(norm(name), name); });
