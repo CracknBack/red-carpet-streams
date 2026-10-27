@@ -1051,7 +1051,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.21.1';
+const APP_VERSION = '3.21.2';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 const PC = !!window.RCSPC || !!window.RCS_DESKTOP;   /* Windows app, or the no-install desktop version */
 const PHONE = FIRE && navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) < 700;   /* Android phone */
@@ -2622,10 +2622,19 @@ function genericCompChannels(comp) {
   const eventish = /\s(v|vs\.?)\s|\d{4}-\d{2}-\d{2}|\b\d{1,2}[:.]\d{2}\b|\bnext\b|exclusive|matchday|\bmd\d\b|zone:/i;
   const out = [];
   for (const g of DATA.live.items) {
-    if (eventish.test(g.raw + ' ' + g.name) || !englishChannel(g)) continue;
+    if (eventish.test(g.raw + ' ' + g.name)) continue;
     const t = ' ' + norm(g.raw + ' ' + g.name) + ' ';
+    const named = words.some(w => t.indexOf(w) >= 0);
+    /* A channel whose own name specifically names this competition is strong evidence on its own, in
+       any language -- "Sky Sport F1 Italy", "DAZN F1 Spain" and "Sky Sports F1" are all exactly as
+       reliable a source for Formula 1 as each other, just in different markets (same reasoning as
+       fixtureEvents()'s name-matching, same real bug: these used to be silently excluded here purely
+       for being tagged a non-English country). The weaker signals below -- a generic "football" mention,
+       just sitting in a Sports category -- aren't specific enough to bypass the English requirement the
+       same way, or "BF1"/"TF1"/"DF1" (none of which name Formula 1 at all) would start qualifying too. */
+    if (!named && !englishChannel(g)) continue;
     let sc = 0;
-    if (words.some(w => t.indexOf(w) >= 0)) sc += 5;
+    if (named) sc += 5;
     if (FOOTBALL_COMPS.has(comp) && / (football|soccer|futbol|fussball|calcio) /.test(t)) sc += 3;
     if (FOOTBALL_COMPS.has(comp) && EN_NETWORKS.test(g.raw + ' ' + g.name)) sc += 2;
     if (g.g === 'Sports') sc += 1;
