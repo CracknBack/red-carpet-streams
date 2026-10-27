@@ -233,14 +233,22 @@ h2{font-size:3rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overfl
    two separate bordered boxes side by side (a narrower "live sports" card plus a "Browse" chip column),
    merged into one so it reads as a single Sports Hub rather than two unrelated panels. */
 .hhub{display:flex;flex-direction:column;border-radius:2rem;border:.3rem solid #B98B55;background:linear-gradient(90deg,rgba(18,26,38,.95),rgba(10,16,25,.97));overflow:hidden;box-shadow:0 1rem 3rem rgba(0,0,0,.4)}
-.hhub-game{display:flex;align-items:stretch;height:17rem;flex:none}
+.hhub-game{display:flex;align-items:stretch;height:23rem;flex:none;transition:height .28s ease}
+.hhub.sports-open .hhub-game{height:17rem}
 .hhub-game .hb-game{flex:1}
-.hhub-sports{display:flex;align-items:flex-start;gap:1.6rem;padding:1.6rem 2.4rem;overflow-x:auto;border-top:.15rem solid rgba(231,185,111,.22);scrollbar-width:none}
+/* the sport-icon row stays in the DOM (so its own focus/scroll state survives) but collapses to zero
+   height behind the toggle tab -- the hero/game card above gets that space back until you ask for it. */
+.hsport-toggle-row{display:flex;justify-content:center;flex:none}
+.hsport-toggle{appearance:none;background:rgba(0,0,0,.25);border:.15rem solid rgba(231,185,111,.4);border-bottom:none;border-radius:.8rem .8rem 0 0;padding:.4rem 1.8rem .3rem;margin-top:-.15rem;color:#E9CBA0;font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:1.25rem;cursor:pointer;display:flex;align-items:center;gap:.6rem}
+.hsport-toggle.focus{outline:.2rem solid var(--amber);outline-offset:-.3rem}
+.hst-car{display:inline-block;transition:transform .25s ease;font-size:1.1rem}
+.hhub.sports-open .hst-car{transform:rotate(180deg)}
+.hhub-sports{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;max-height:0;padding:0 2.4rem;overflow:hidden;border-top:0 solid rgba(231,185,111,.22);transition:max-height .28s ease,padding .28s ease}
+.hhub.sports-open .hhub-sports{max-height:12rem;padding:1.6rem 2.4rem 1.8rem;overflow-x:auto;overflow-y:hidden;border-top-width:.15rem;scrollbar-width:none}
 .hhub-sports::-webkit-scrollbar{display:none}
-.hhub-sports .hb-chips{display:flex;gap:1.6rem}
-.hhub-sports .hb-chip{flex:none;width:8rem}
+.hhub-sports .hb-chip{flex:none;width:7.6rem}
 .hhub-sports .hb-logo{width:100%;height:5.4rem}
-.hhub-sports .hb-cl{font-size:1.2rem;max-width:none;white-space:normal;text-align:center;line-height:1.15}
+.hhub-sports .hb-cl{font-size:1.15rem;max-width:none;white-space:normal;text-align:center;line-height:1.15}
 .hb-game{position:relative;flex:2.5;min-width:0;padding:2rem 3rem;display:flex;flex-direction:column;justify-content:center;gap:.9rem;cursor:pointer;
   justify-content:flex-end;background:linear-gradient(90deg,rgba(8,13,20,.86) 0,rgba(8,13,20,.62) 38%,rgba(8,13,20,.12) 62%,rgba(8,13,20,0) 78%),url(hero-banner.jpg) 85% 40%/cover no-repeat}
 .hb-game .hb-title,.hb-game .hb-sub{text-shadow:0 .2rem 1rem rgba(0,0,0,.9)}
@@ -620,8 +628,18 @@ html.phone .gpv{display:none}
   .hs-beam.l{background:conic-gradient(from 104deg at 0% 0%,rgba(255,228,175,0) 0deg,rgba(255,228,175,.20) 9.5deg,rgba(255,228,175,0) 20deg,rgba(255,228,175,0) 360deg);-webkit-mask-image:radial-gradient(circle at 0 0,#000 0%,#000 48%,rgba(0,0,0,0) 90%);mask-image:radial-gradient(circle at 0 0,#000 0%,#000 48%,rgba(0,0,0,0) 90%)}
   .hs-beam.r{background:conic-gradient(from 233deg at 100% 0%,rgba(255,228,175,0) 0deg,rgba(255,228,175,.20) 9.5deg,rgba(255,228,175,0) 20deg,rgba(255,228,175,0) 360deg);-webkit-mask-image:radial-gradient(circle at 100% 0,#000 0%,#000 48%,rgba(0,0,0,0) 90%);mask-image:radial-gradient(circle at 100% 0,#000 0%,#000 48%,rgba(0,0,0,0) 90%)}
 }
-.hs-pool{position:absolute;left:50%;top:44%;width:52%;height:80%;transform:translate(-50%,-50%);background:radial-gradient(ellipse at 50% 50%,rgba(255,228,175,.20),rgba(255,228,175,.08) 42%,rgba(255,228,175,0) 70%);transition:opacity .4s}
-#home.stripfocus .hs-beam,#home.stripfocus .hs-pool,#home.stripfocus .hs-glow{opacity:.4}
+.hs-pool{position:absolute;left:50%;top:44%;width:52%;height:80%;transform:translate(-50%,-50%);background:radial-gradient(ellipse at 50% 50%,rgba(255,228,175,.20),rgba(255,228,175,.08) 42%,rgba(255,228,175,0) 70%);transition:opacity .4s,top .4s ease,width .4s ease,height .4s ease}
+#home.stripfocus .hs-glow{opacity:.3}
+/* focus anywhere in the Sports Hub (tabs, the game card, the sport-selector tab, the icon row) swings
+   both corner beams down to meet over that box instead of the tile row -- the same two spotlights, just
+   re-aimed, rather than a separate light source. transition is on opacity/position only: a conic-gradient
+   angle itself can't animate smoothly across browsers, so the re-aim is an instant swap softened by the
+   glow fading up around it. */
+#home.stripfocus .hs-pool{top:78%;width:70%;height:64%;opacity:.55}
+@supports (background:conic-gradient(red,blue)){
+  #home.stripfocus .hs-beam.l{opacity:.7;background:conic-gradient(from 133deg at 0% 0%,rgba(255,228,175,0) 0deg,rgba(255,228,175,.24) 11deg,rgba(255,228,175,0) 24deg,rgba(255,228,175,0) 360deg)}
+  #home.stripfocus .hs-beam.r{opacity:.7;background:conic-gradient(from 227deg at 100% 0%,rgba(255,228,175,0) 0deg,rgba(255,228,175,.24) 11deg,rgba(255,228,175,0) 24deg,rgba(255,228,175,0) 360deg)}
+}
 .gmnote{font-size:1.9rem;color:#E9CBA0;margin:.2rem 0 .8rem;max-width:104rem}
 
 
@@ -787,6 +805,7 @@ html.light .hslot .hd{color:#8A5A1C}
 html.light .hslot.s0.focus{box-shadow:inset 0 0 0 .5rem #FCF8EE,inset 0 0 0 .62rem rgba(170,24,40,.95),0 0 6rem rgba(231,185,111,.4),0 0 2rem rgba(231,185,111,.3)}
 html.light .hstrip .slabel{color:#8A5A1C}
 html.light .hhub{background:linear-gradient(90deg,rgba(252,248,238,0.95),rgba(252,248,238,0.97));box-shadow:0 1rem 3rem rgba(90,60,30,0.22)}
+html.light .hsport-toggle{background:rgba(252,248,238,0.25);color:#8A5A1C}
 html.light .hb-building{color:#8A5A1C}
 html.light .hb-find{color:#8A5A1C}
 html.light .hb-badge{color:#8A5A1C}
@@ -974,7 +993,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
   <div class="hwrap">
     <div class="hhead"><img src="logo.png" class="hlogo" alt=""><div class="hclock"><div id="h-time" class="htime"></div><div id="h-date" class="hdate"></div><div id="h-sub" class="hsub"></div></div><button id="h-theme" class="htheme" type="button" aria-label="Switch between light and dark"><span class="th-sun"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.3 5.3l1.9 1.9M16.8 16.8l1.9 1.9M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9"/></svg></span><span class="th-moon"><svg viewBox="0 0 24 24"><path d="M20.2 14.6A8.6 8.6 0 0 1 9.4 3.8a8.6 8.6 0 1 0 10.8 10.8z"/></svg></span></button></div>
     <div id="h-tiles" class="hcar"></div>
-    <div id="h-strip-wrap" class="hstrip"><div class="hhub-head"><div id="h-strip-title" class="slabel"></div><div id="h-strip-tabs" class="hbtabs"></div></div><div class="hhub"><div id="h-strip" class="hhub-game"></div><div id="h-find" class="hhub-sports"></div></div></div>
+    <div id="h-strip-wrap" class="hstrip"><div class="hhub-head"><div id="h-strip-title" class="slabel"></div><div id="h-strip-tabs" class="hbtabs"></div></div><div id="hhub" class="hhub"><div id="h-strip" class="hhub-game"></div><div class="hsport-toggle-row"><button id="h-sport-toggle" class="hsport-toggle" type="button"><span class="hst-car">▾</span>Sport Selector</button></div><div id="h-find" class="hhub-sports"></div></div></div>
   </div>
   <div id="h-ver" class="hver"></div>
   <footer id="hhints" class="hints"></footer>
@@ -1032,7 +1051,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.21.0';
+const APP_VERSION = '3.21.1';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 const PC = !!window.RCSPC || !!window.RCS_DESKTOP;   /* Windows app, or the no-install desktop version */
 const PHONE = FIRE && navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) < 700;   /* Android phone */
@@ -3710,7 +3729,7 @@ function catList() {
   askText('Category list', lines.join('\n') + '\n\nSelect all and copy, then send it. Press OK or Back to close.', '', () => {}, true);
 }
 /* ================= start screen ================= */
-const HOME = {zone: 'tiles', tile: 2, card: 0, cards: [], cardKind: '', liveIdx: 0, fade: false, mode: 'auto', tab: 0};
+const HOME = {zone: 'tiles', tile: 2, card: 0, cards: [], cardKind: '', liveIdx: 0, fade: false, mode: 'auto', tab: 0, sportsOpen: false, sportCard: 0};
 /* "auto" (the default) shows whichever of these has something, in this order; picking a tab pins to
    just that one -- even when it's empty, so the choice sticks instead of silently reverting to auto */
 const HB_TABS = [['live', 'Live Now'], ['replay', 'Replay'], ['upcoming', 'Upcoming']];
@@ -3836,7 +3855,6 @@ function homeBanner() {
      most recent in-progress movie/series instead of leaving it idle -- tapping it opens the full
      Continue watching tiles page (homeOpenContinue), this is just a one-item teaser. */
   else if (HOME.mode === 'auto') { const cw = continueWatchingList(); if (cw.length) { out.title = 'Continue watching'; out.n = 1; out.cards.push({type: 'cont', it: cw[0]}); } }
-  SPORT_GROUPS.forEach(g => out.cards.push({type: 'sport', id: g[0]}));
   return out;
 }
 /* with several games on, the banner moves through them every few seconds (and waits while you are on it) */
@@ -3847,7 +3865,7 @@ setInterval(() => {
 },3000);
 function renderHome() {
   const d = new Date(nowMs());
-  $('home').classList.toggle('stripfocus', HOME.zone === 'strip' || HOME.zone === 'hbtab');
+  $('home').classList.toggle('stripfocus', HOME.zone === 'strip' || HOME.zone === 'hbtab' || HOME.zone === 'hbtoggle' || HOME.zone === 'sports');
   $('h-theme').classList.toggle('focus', HOME.zone === 'theme');
   $('h-theme').querySelector('.th-sun').classList.toggle('on', !!ui.light);
   $('h-theme').querySelector('.th-moon').classList.toggle('on', !ui.light);
@@ -3878,7 +3896,7 @@ function renderHome() {
      (FD.busy/F1.busy, or neither has ever completed a load yet) — once both have finished at least
      once, an empty banner correctly means "checked, nothing on right now", not "still working". */
   const stillBuilding = !hb.n && (FD.busy || F1.busy || (!FD.ts && !F1.ts));
-  let b = hb.n ? '' : (stillBuilding ? '<div class="hb-game idle"><div class="hb-building"><span class="hbd"></span>Building your sports guide…</div></div>' : '<div class="hb-game idle"></div>'), chipHtml = '';      /* no live game: the same hero picture, nothing written on it */
+  let b = hb.n ? '' : (stillBuilding ? '<div class="hb-game idle"><div class="hb-building"><span class="hbd"></span>Building your sports guide…</div></div>' : '<div class="hb-game idle"></div>');      /* no live game: the same hero picture, nothing written on it */
   hb.cards.forEach((c, i) => {
     if (c.type === 'game') {
       const ev = c.ev, nowT = nowMs();
@@ -3891,14 +3909,16 @@ function renderHome() {
       const it = c.it, sub = [it.sub, it.pct ? Math.round(it.pct) + '% watched' : ''].filter(Boolean).join('  ·  ');
       b += '<div class="hb-game' + foc(i) + (HOME.fade ? ' fade' : '') + '" data-i="' + i + '"><div class="hb-top"><span class="hb-pill rep">RESUME</span></div>' +
         '<div class="hb-title' + (it.name.length > 31 ? ' xlong' : it.name.length > 26 ? ' long' : '') + '">' + esc(it.name) + '</div><div class="hb-sub">' + esc(sub) + '</div></div>';
-    } else if (c.type === 'sport') {
-      const g = SPORT_GROUPS.find(s => s[0] === c.id);
-      if (g) chipHtml += '<div class="hb-chip' + foc(i) + '" data-i="' + i + '"><div class="hb-logo"><img class="hb-lg" src="' + g[2] + '" alt=""></div><div class="hb-cl">' + esc(g[1]) + '</div></div>';
     }
   });
   $('h-strip').innerHTML = b;
-  $('h-find').innerHTML = chipHtml;
-  if (HOME.zone === 'strip') { const focEl = $('h-find').querySelector('.hb-chip.focus'); if (focEl) focEl.scrollIntoView({block: 'nearest', inline: 'nearest'}); }
+  /* the sport-icon row: collapsed by default behind the "Sport Selector" tab, so the hero/game card gets
+     the full height when you're not picking a sport -- its own focus index (HOME.sportCard), separate
+     from the game-card carousel above, since the two are independent now. */
+  $('h-sport-toggle').classList.toggle('focus', HOME.zone === 'hbtoggle');
+  $('hhub').classList.toggle('sports-open', HOME.sportsOpen);
+  $('h-find').innerHTML = SPORT_GROUPS.map((g, i) => '<div class="hb-chip' + (HOME.zone === 'sports' && HOME.sportCard === i ? ' focus' : '') + '" data-i="' + i + '"><div class="hb-logo"><img class="hb-lg" src="' + g[2] + '" alt=""></div><div class="hb-cl">' + esc(g[1]) + '</div></div>').join('');
+  if (HOME.zone === 'sports') { const focEl = $('h-find').querySelector('.hb-chip.focus'); if (focEl) focEl.scrollIntoView({block: 'nearest', inline: 'nearest'}); }
   HOME.fade = false;
   $('h-strip-wrap').classList.remove('hidden');
   $('hhints').innerHTML = hintsHtml([['OK', 'Open'], ['◀ ▶', 'Choose'], ['▲', 'Light / dark']]);
@@ -3921,7 +3941,6 @@ function homeOpenCard(i) {
   P.back = 'home';
   if (c.type === 'game') { openGame(c.ev, true); return; }
   if (c.type === 'cont') { homeOpenContinue(); return; }
-  if (c.type === 'sport') { homeOpenSportGroup(c.id); return; }
 }
 function homeOpenContinue() {
   show('main'); S.zone = 'items'; showPage('cont');
@@ -3950,16 +3969,28 @@ function homeKey(k) {
     if (k === KEY.LEFT) HOME.tab = (HOME.tab + HB_TABS.length - 1) % HB_TABS.length;
     else if (k === KEY.RIGHT) HOME.tab = (HOME.tab + 1) % HB_TABS.length;
     else if (k === KEY.ENTER) { HOME.mode = HB_TABS[HOME.tab][0]; HOME.liveIdx = 0; }
-    else if (k === KEY.DOWN && HOME.cards.length) HOME.zone = 'strip';
+    else if (k === KEY.DOWN) HOME.zone = HOME.cards.length ? 'strip' : 'hbtoggle';
     else if (k === KEY.UP || k === KEY.BACK) HOME.zone = 'tiles';
     else return;
-  } else {
+  } else if (HOME.zone === 'strip') {
     if (k === KEY.LEFT && HOME.card > 0) HOME.card--;
     else if (k === KEY.RIGHT && HOME.card < HOME.cards.length - 1) HOME.card++;
     else if (k === KEY.UP || k === KEY.BACK) HOME.zone = 'hbtab';
+    else if (k === KEY.DOWN) HOME.zone = 'hbtoggle';
     else if (k === KEY.ENTER) { homeOpenCard(HOME.card); return; }
     else return;
-  }
+  } else if (HOME.zone === 'hbtoggle') {
+    if (k === KEY.ENTER) { HOME.sportsOpen = !HOME.sportsOpen; }
+    else if (k === KEY.DOWN && HOME.sportsOpen) HOME.zone = 'sports';
+    else if (k === KEY.UP || k === KEY.BACK) HOME.zone = HOME.cards.length ? 'strip' : 'hbtab';
+    else return;
+  } else if (HOME.zone === 'sports') {
+    if (k === KEY.LEFT) HOME.sportCard = (HOME.sportCard + SPORT_GROUPS.length - 1) % SPORT_GROUPS.length;
+    else if (k === KEY.RIGHT) HOME.sportCard = (HOME.sportCard + 1) % SPORT_GROUPS.length;
+    else if (k === KEY.UP || k === KEY.BACK) HOME.zone = 'hbtoggle';
+    else if (k === KEY.ENTER) { homeOpenSportGroup(SPORT_GROUPS[HOME.sportCard][0]); return; }
+    else return;
+  } else return;
   renderHome();
 }
 $('h-tiles').addEventListener('click', e => {
@@ -3968,13 +3999,26 @@ $('h-tiles').addEventListener('click', e => {
   const i = Number(el.dataset.i);
   if (el.classList.contains('s0')) homeOpenTile(i); else { HOME.zone = 'tiles'; HOME.tile = i; renderHome(); }
 });
-$('h-strip-wrap').addEventListener('click', e => { const el = e.target.closest('[data-i]'); if (el) homeOpenCard(Number(el.dataset.i)); });
+$('h-strip-wrap').addEventListener('click', e => {
+  const sp = e.target.closest('#h-find [data-i]');
+  if (sp) { const g = SPORT_GROUPS[Number(sp.dataset.i)]; if (g) homeOpenSportGroup(g[0]); return; }
+  const el = e.target.closest('#h-strip [data-i]');
+  if (el) homeOpenCard(Number(el.dataset.i));
+});
+$('h-sport-toggle').addEventListener('click', () => { HOME.sportsOpen = !HOME.sportsOpen; HOME.zone = 'hbtoggle'; renderHome(); });
 $('h-strip-tabs').addEventListener('click', e => {
   const el = e.target.closest('.hbtab'); if (!el) return;
   const i = Number(el.dataset.tab); HOME.tab = i; HOME.mode = HB_TABS[i][0]; HOME.zone = 'hbtab'; HOME.liveIdx = 0; renderHome();
 });
 if (PC) {
-  $('h-strip-wrap').addEventListener('mousemove', e => { const el = e.target.closest('[data-i]'); if (!el) return; const i = Number(el.dataset.i); if (HOME.zone !== 'strip' || HOME.card !== i) { HOME.zone = 'strip'; HOME.card = i; renderHome(); } });
+  $('h-strip-wrap').addEventListener('mousemove', e => {
+    const sp = e.target.closest('#h-find [data-i]');
+    if (sp) { const i = Number(sp.dataset.i); if (HOME.zone !== 'sports' || HOME.sportCard !== i) { HOME.zone = 'sports'; HOME.sportCard = i; renderHome(); } return; }
+    const el = e.target.closest('#h-strip [data-i]');
+    if (!el) return;
+    const i = Number(el.dataset.i);
+    if (HOME.zone !== 'strip' || HOME.card !== i) { HOME.zone = 'strip'; HOME.card = i; renderHome(); }
+  });
 }
 
 function askTeams() { askShortcuts(); }
