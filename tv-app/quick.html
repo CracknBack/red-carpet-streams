@@ -1071,7 +1071,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.22.0';
+const APP_VERSION = '3.23.0';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 const PC = !!window.RCSPC || !!window.RCS_DESKTOP;   /* Windows app, or the no-install desktop version */
 const PHONE = FIRE && navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) < 700;   /* Android phone */
@@ -4496,7 +4496,23 @@ async function ensureCategoryItems(t, catId) {
 /* M3U has no separate category fetch, so a category tap there needs the whole playlist grouped first —
    same cost as Search/Favourites for M3U, unavoidable, but still only paid once per session. */
 async function ensureCategoryReady(t, c) {
-  if (isM3u()) { await ensureTitlesGrouped(t); await ensureCategoryItems(t, c.id); return; }
+  if (isM3u()) {
+    await ensureTitlesGrouped(t);
+    /* M3U's whole catalog is already grouped as one pass (ensureTitlesGrouped above) -- a group here is
+       just filtering d.items by which of its real categories each title belongs to, no per-category
+       fetch or merge pass needed the way the Xtream path below does. */
+    if (c.kind === 'group') {
+      const d = DATA[t];
+      if (!d.catItems) d.catItems = new Map();
+      if (!d.catItems.has(c.id)) {
+        const real = new Set(c.realCats);
+        d.catItems.set(c.id, (d.items || []).filter(it => it.cats ? [...it.cats].some(x => real.has(x)) : real.has(it.cat)));
+      }
+      return;
+    }
+    await ensureCategoryItems(t, c.id); return;
+  }
+  if (c.kind === 'group') { await ensureGroupCategoryItems(t, c); return; }
   if (!String(c.id).startsWith('__') && c.id !== 'up' && !c.kind) await ensureCategoryItems(t, c.id);
 }
 /* Opening a title from Browse only ever grouped the copies that live in the SAME provider category it
@@ -4836,7 +4852,101 @@ function buildVodCats(t) {
     const n = d.catItems && d.catItems.has(c.id) ? d.catItems.get(c.id).length : undefined;
     v.push({id: c.id, name: c.name, raw: c.raw, co: c.co, n});
   });
-  return v;
+  return t === 'series' ? groupSeriesCats(v) : v;
+}
+/* TV Series: the provider's own category list runs to ~200 entries on this account (confirmed on the
+   real device), almost entirely <region/language> x <platform-or-genre> combinations -- "Germany
+   Netflix", "Germany Showtime", "Germany 2026 series", "Br Disney+", "Nordic Kids 4K"... -- not ~200
+   genuinely different things, more like 20 regions split a dozen ways each. d.cats (the category LIST,
+   not its items) is the one thing always loaded eagerly regardless of catalog size, so grouping by name
+   here is free -- the real per-category item fetch (ensureCategoryItems) still only ever touches one
+   category's raw list at a time, same as it always has, just now for however many real categories a
+   group actually has rather than one. English-flagged groups sort first, per the owner's own request;
+   anything that doesn't match a known region stays exactly as it was, a plain standalone category --
+   this only ever reduces the list, never hides something by guessing wrong. */
+const SERIES_GROUPS = [
+  ['english', 'English', true, [/\benglish\b/i, /\busa?\b/i, /\bunited states\b/i, /\buk\b/i, /\bbritish\b/i, /\baustralia\b/i, /\bcanada\b/i, /\bireland\b/i]],
+  ['hindi', 'Hindi', false, [/\bhindi\b/i, /\bindian?\b/i, /\bbollywood\b/i]],
+  ['arabic', 'Arabic', false, [/\barabic\b/i, /عرب/, /مسلسل/]],
+  ['german', 'German', false, [/\bgerman(y)?\b/i, /\bdeutsch/i]],
+  ['french', 'French', false, [/\bfrench\b/i, /\bfrance\b/i, /\bfrancais/i]],
+  ['spanish', 'Spanish', false, [/\bspanish\b/i, /\bspain\b/i, /\bespanol/i]],
+  ['italian', 'Italian', false, [/\bitalian?\b/i, /\bitalia\b/i]],
+  ['portuguese', 'Portuguese', false, [/\bportugal\b/i, /\bportuguese\b/i]],
+  ['brazil', 'Brazilian', false, [/\bbr\b/i, /\bbrazil\b/i, /\bbrasil\b/i]],
+  ['latino', 'Latino', false, [/\blatino\b/i, /\blatin\b/i, /\blatinoamerica/i]],
+  ['turkish', 'Turkish', false, [/\bturk(ish|iye)?\b/i]],
+  ['dutch', 'Dutch', false, [/\bdutch\b/i, /\bnetherlands\b/i, /\bnederland/i]],
+  ['nordic', 'Nordic', false, [/\bnordic\b/i, /\bsweden\b/i, /\bswedish\b/i, /\bnorway\b/i, /\bnorwegian\b/i, /\bdenmark\b/i, /\bdanish\b/i, /\bfinland\b/i, /\bfinnish\b/i]],
+  ['iceland', 'Icelandic', false, [/\bicelandi?c?\b/i, /íslands/i, /\bislands\b/i]],
+  ['polish', 'Polish', false, [/\bpolish\b/i, /\bpoland\b/i]],
+  ['russian', 'Russian', false, [/\brussian?\b/i]],
+  ['greek', 'Greek', false, [/\bgreek\b/i, /\bgreece\b/i]],
+  ['romanian', 'Romanian', false, [/\bromania/i]],
+  ['balkan', 'Balkan', false, [/\bex-?yu\b/i, /\bserbia/i, /\bcroatia/i, /\bbosnia/i, /\balbania/i]],
+  ['philippines', 'Filipino', false, [/\bphilippin/i, /\bfilipino\b/i, /\btagalog\b/i]],
+  ['thai', 'Thai', false, [/\bthai(land)?\b/i]],
+  ['vietnamese', 'Vietnamese', false, [/\bvietnam/i]],
+  ['chinese', 'Chinese', false, [/\bchin(a|ese)\b/i, /\bmandarin\b/i, /\bcantonese\b/i]],
+  ['japanese', 'Japanese', false, [/\bjapan(ese)?\b/i]],
+  ['korean', 'Korean', false, [/\bkorean?\b/i]],
+  ['persian', 'Persian', false, [/\bpersian\b/i, /\bfarsi\b/i, /\biran\b/i]],
+  ['hebrew', 'Hebrew', false, [/\bhebrew\b/i, /\bisrael/i]],
+  ['african', 'African', false, [/\bafric/i, /\bnigeria/i, /\bnollywood\b/i]]
+];
+function classifySeriesCat(name) {
+  const n = ' ' + String(name) + ' ';
+  for (const [key, label, english, pats] of SERIES_GROUPS) if (pats.some(re => re.test(n))) return {key, label, english};
+  return null;
+}
+function groupSeriesCats(cats) {
+  const groups = new Map(), standalone = [];
+  cats.forEach(c => {
+    const g = classifySeriesCat(c.name);
+    if (!g) { standalone.push(c); return; }
+    let e = groups.get(g.key);
+    if (!e) { e = {key: g.key, label: g.label, english: g.english, members: []}; groups.set(g.key, e); }
+    e.members.push(c);
+  });
+  const out = [];
+  groups.forEach(e => {
+    /* a "group" that only ever matched one real category isn't reducing anything -- leave that one
+       exactly as it was, not wrapped in a group of one for no benefit. */
+    if (e.members.length === 1) { standalone.push(e.members[0]); return; }
+    const n = e.members.every(c => typeof c.n === 'number') ? e.members.reduce((s, c) => s + c.n, 0) : undefined;
+    out.push({id: 'grp:' + e.key, name: e.label, kind: 'group', english: e.english, realCats: e.members.map(c => c.id), n});
+  });
+  return [...out.filter(e => e.english), ...out.filter(e => !e.english), ...standalone];
+}
+/* Opens a grouped series category: fetches each of its real provider categories one at a time via the
+   normal, already memory-safe ensureCategoryItems (never more than one category's raw item list in
+   memory during any single fetch), then pools their already-grouped titles together -- reusing the
+   same cross-category title key crossCategoryVersions already built for finding one title's other
+   copies, just applied across a whole group at once. Modest concurrency (3 at a time) so a group with a
+   dozen members doesn't serialise into a long wait, without firing them all at this weak hardware/the
+   provider at once either. */
+async function ensureGroupCategoryItems(t, grp) {
+  const d = DATA[t];
+  if (!d.catItems) d.catItems = new Map();
+  if (d.catItems.has(grp.id)) return;
+  loading(true, 'Loading ' + grp.name + '…');
+  try {
+    const real = grp.realCats.slice(), CONC = 3;
+    for (let i = 0; i < real.length; i += CONC) await Promise.all(real.slice(i, i + CONC).map(id => ensureCategoryItems(t, id).catch(() => {})));
+    if (!d.verToTitle) d.verToTitle = new Map();
+    const byKey = new Map();
+    real.forEach(id => (d.catItems.get(id) || []).forEach(g => {
+      const k = crossCatKey(g.name) || g.id;
+      const ex = byKey.get(k);
+      if (!ex) { byKey.set(k, g); return; }
+      g.vers.forEach(v => { if (!ex.vers.some(ev => String(ev.id) === String(v.id))) ex.vers.push(v); });
+      if ((g.added || 0) > (ex.added || 0)) ex.added = g.added;
+      if ((g.rating || 0) > (ex.rating || 0)) ex.rating = g.rating;
+    }));
+    const items = [...byKey.values()];
+    items.forEach(g => { if (g.vers.length > 1) g.vers.sort(verCmp); g.vers.forEach(v => d.verToTitle.set(v.id, g)); });
+    d.catItems.set(grp.id, items);
+  } finally { loading(false); }
 }
 /* ---------- movies and series: a short menu instead of the provider's hundreds of categories ---------- */
 const LANG_LABEL = c => c === '' ? 'Other / not labelled' : c === 'multi' ? 'Multi-language' : c === 'vost' ? 'Original with subtitles' : (LANGS[c] || c.toUpperCase());
