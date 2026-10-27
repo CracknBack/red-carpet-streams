@@ -205,7 +205,7 @@ h2{font-size:3rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overfl
 .htile .hl{font-size:2.6rem;font-weight:700}
 .htile .hd{font-size:1.6rem;color:var(--muted)}
 .htile.focus{transform:scale(1.08)}
-.htile.focus .hico{box-shadow:0 0 4.4rem .8rem rgba(160,28,42,.5);filter:brightness(1.2)}
+.htile.focus .hico{box-shadow:0 0 2.2rem .4rem rgba(160,28,42,.35);filter:brightness(1.2)}
 .htile.focus .hl{color:var(--amber)}
 .htile.focus svg{color:var(--amber)}
 .htile.focus .hd{color:#F3D7A6}
@@ -226,12 +226,12 @@ h2{font-size:3rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overfl
 .hslot .hg img{max-width:50%;max-height:72%;object-fit:contain}
 .hslot .hl{text-transform:uppercase;letter-spacing:.06em;font-weight:300;margin-bottom:2rem}
 .hslot .hd{text-transform:uppercase;letter-spacing:.08em;font-size:2rem;margin:-1rem 0 2.2rem;color:#D9B98F}
-.hslot.s0{width:30rem;height:43rem;border-color:#E6B86F}
-.hslot.s0 .hl{font-size:4rem;margin-bottom:1.4rem}
-.hslot.s0.focus{border-color:#F4C97E;box-shadow:inset 0 0 0 .5rem #0B121B,inset 0 0 0 .62rem rgba(170,24,40,.95),0 0 6rem rgba(231,185,111,.4),0 0 2rem rgba(231,185,111,.3)}
-.hslot.s1{width:23rem;height:29.5rem}.hslot.s1 .hl{font-size:2.6rem}
-.hslot.s2{width:19.5rem;height:25rem;opacity:.85}.hslot.s2 .hl{font-size:2.3rem}
-.hslot.s3{width:17rem;height:21.5rem;opacity:.42}.hslot.s3 .hl{font-size:2rem}
+.hslot.s0{width:26rem;height:37rem;border-color:#E6B86F}
+.hslot.s0 .hl{font-size:3.5rem;margin-bottom:1.4rem}
+.hslot.s0.focus{border-color:#F4C97E;box-shadow:inset 0 0 0 .5rem #0B121B,inset 0 0 0 .62rem rgba(170,24,40,.95),0 0 3rem rgba(231,185,111,.28),0 0 1rem rgba(231,185,111,.22)}
+.hslot.s1{width:20rem;height:25.5rem}.hslot.s1 .hl{font-size:2.3rem}
+.hslot.s2{width:17rem;height:21.5rem;opacity:.85}.hslot.s2 .hl{font-size:2rem}
+.hslot.s3{width:14.5rem;height:18.5rem;opacity:.42}.hslot.s3 .hl{font-size:1.75rem}
 .hslot.ghost{visibility:hidden}
 .hslot.s1.L{transform:rotateY(10deg)}.hslot.s1.R{transform:rotateY(-10deg)}
 .hslot.s2.L{transform:rotateY(17deg)}.hslot.s2.R{transform:rotateY(-17deg)}
@@ -242,33 +242,57 @@ h2{font-size:3rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overfl
 /* one unified box: a wide hero game card on top, the full sport-icon row along the bottom -- used to be
    two separate bordered boxes side by side (a narrower "live sports" card plus a "Browse" chip column),
    merged into one so it reads as a single Sports Hub rather than two unrelated panels. */
-.hhub{display:flex;flex-direction:column;border-radius:2rem;border:.3rem solid #B98B55;background:linear-gradient(90deg,rgba(18,26,38,.95),rgba(10,16,25,.97));overflow:hidden;box-shadow:0 1rem 3rem rgba(0,0,0,.4)}
-.hhub-game{display:flex;align-items:stretch;height:23rem;flex:none;transition:height .28s ease}
-.hhub.sports-open .hhub-game{height:17rem}
+/* a contained banner the size/ratio of the owner's reference picture (roughly 4:1), not a full-bleed
+   strip across the whole screen -- it used to stretch edge to edge like the carousel above it, which
+   read as far too heavy under that carousel. Centred, not pinned to the carousel's own left edge, since
+   it's a distinct smaller element now, not a continuation of the same row. */
+.hhub{position:relative;display:flex;flex-direction:column;width:78rem;max-width:100%;margin:0 auto;border-radius:2rem;border:.3rem solid #B98B55;background:linear-gradient(90deg,rgba(18,26,38,.95),rgba(10,16,25,.97));overflow:hidden;box-shadow:0 1rem 3rem rgba(0,0,0,.4);transition:border-color .15s,box-shadow .15s}
+/* the box's own outer glow, for the 'brand' zone -- landing on the Sports Hub section highlights the
+   whole box (this), not just the one featured game; .hb-game.focus below is the narrower, separate
+   glow for once you've actually stepped inward onto the card itself. */
+.hhub.focus{border-color:#F4C97E;box-shadow:0 0 0 .3rem rgba(231,185,111,.4),0 0 3.5rem rgba(231,185,111,.3),0 1rem 3rem rgba(0,0,0,.4)}
+.hhub-game{display:flex;align-items:stretch;height:19.5rem;flex:none;transition:height .28s ease}
+/* sports-open used to drop straight to 15rem -- fine before the header/title text got bigger, but once
+   the badge/title/match-title grew (below) that cut was tight enough to crowd the header row against
+   the hero text the moment the sport-icon strip opened ("the sports icons squish everything up"). Keep
+   a bigger cushion now so opening the strip doesn't fight the enlarged text for room. */
+.hhub.sports-open .hhub-game{height:15.5rem}
 .hhub-game .hb-game{flex:1}
+/* the brand + Live/Replay/Upcoming tabs sit pinned over the top of the hero photo now (not a separate
+   header bar above the box) -- out of flow so it never pushes the bottom-anchored game text down. */
+.hhub-head{position:absolute;top:0;left:0;right:0;z-index:2;display:flex;align-items:center;justify-content:flex-start;gap:2rem;padding:1.7rem 2.6rem 0}
+/* a <button> now (was a plain div) -- lets you jump straight into the full Sports Hub browse page
+   (every sport, no single game picked) separately from pressing the hero card itself, which always
+   opens whichever one game is currently featured. Needs the usual native-button reset since nothing
+   about how it looks should change just because the tag did. */
+.hhub-brand{appearance:none;background:none;border:none;padding:0;margin:0;font:inherit;text-align:left;cursor:pointer;display:flex;align-items:center;gap:1.1rem;min-width:0;border-radius:.6rem}
+.hhub-brand.focus{box-shadow:0 0 0 .2rem var(--amber);outline:none}
+.hhub-sh{width:4.2rem;height:4.2rem;flex:none;filter:drop-shadow(0 .2rem .5rem rgba(0,0,0,.65))}
+.hhub-title{font-size:2.6rem;letter-spacing:.1em;color:#E9CBA0;text-transform:uppercase;font-weight:700;text-shadow:0 .2rem .8rem rgba(0,0,0,.9);white-space:nowrap}
 /* the sport-icon row stays in the DOM (so its own focus/scroll state survives) but collapses to zero
    height behind the toggle tab -- the hero/game card above gets that space back until you ask for it. */
 .hsport-toggle-row{display:flex;justify-content:center;flex:none}
-.hsport-toggle{appearance:none;background:rgba(0,0,0,.25);border:.15rem solid rgba(231,185,111,.4);border-bottom:none;border-radius:.8rem .8rem 0 0;padding:.4rem 1.8rem .3rem;margin-top:-.15rem;color:#E9CBA0;font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:1.25rem;cursor:pointer;display:flex;align-items:center;gap:.6rem}
+.hsport-toggle{appearance:none;background:rgba(0,0,0,.25);border:.15rem solid rgba(231,185,111,.4);border-bottom:none;border-radius:.8rem .8rem 0 0;padding:.5rem 2.2rem .4rem;margin-top:-.15rem;color:#E9CBA0;font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:1.4rem;cursor:pointer;display:flex;align-items:center;gap:.6rem}
 .hsport-toggle.focus{outline:.2rem solid var(--amber);outline-offset:-.3rem}
 .hst-car{display:inline-block;transition:transform .25s ease;font-size:1.1rem}
 .hhub.sports-open .hst-car{transform:rotate(180deg)}
-.hhub-sports{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;max-height:0;padding:0 2.4rem;overflow:hidden;border-top:0 solid rgba(231,185,111,.22);transition:max-height .28s ease,padding .28s ease}
-.hhub.sports-open .hhub-sports{max-height:12rem;padding:1.6rem 2.4rem 1.8rem;overflow-x:auto;overflow-y:hidden;border-top-width:.15rem;scrollbar-width:none}
+.hhub-sports{display:flex;align-items:flex-start;justify-content:space-between;gap:1.2rem;max-height:0;padding:0 2.6rem;overflow:hidden;border-top:0 solid rgba(231,185,111,.22);transition:max-height .28s ease,padding .28s ease}
+.hhub.sports-open .hhub-sports{max-height:13.5rem;padding:1.8rem 2.6rem 2rem;overflow-x:auto;overflow-y:hidden;border-top-width:.15rem;scrollbar-width:none}
 .hhub-sports::-webkit-scrollbar{display:none}
-.hhub-sports .hb-chip{flex:none;width:7.6rem}
-.hhub-sports .hb-logo{width:100%;height:5.4rem}
-.hhub-sports .hb-cl{font-size:1.15rem;max-width:none;white-space:normal;text-align:center;line-height:1.15}
-.hb-game{position:relative;flex:2.5;min-width:0;padding:2rem 3rem;display:flex;flex-direction:column;justify-content:center;gap:.9rem;cursor:pointer;
+.hhub-sports .hb-chip{flex:none;width:8.6rem}
+.hhub-sports .hb-logo{width:100%;height:6.2rem}
+.hhub-sports .hb-cl{font-size:1.3rem;max-width:none;white-space:normal;text-align:center;line-height:1.15}
+.hb-game{position:relative;flex:2.5;min-width:0;padding:1.4rem 2.4rem;display:flex;flex-direction:column;justify-content:center;gap:.6rem;cursor:pointer;
   justify-content:flex-end;background:linear-gradient(90deg,rgba(8,13,20,.86) 0,rgba(8,13,20,.62) 38%,rgba(8,13,20,.12) 62%,rgba(8,13,20,0) 78%),url(hero-banner.jpg) 85% 40%/cover no-repeat}
 .hb-game .hb-title,.hb-game .hb-sub{text-shadow:0 .2rem 1rem rgba(0,0,0,.9)}
 .hb-game.idle{cursor:default}
-.hb-building{text-shadow:0 .2rem 1rem rgba(0,0,0,.9);font-size:1.9rem;color:#E9CBA0}
-.hb-pill{align-self:flex-start;font-weight:800;letter-spacing:.1em;font-size:2.1rem;padding:.2rem 1.4rem;border-radius:.6rem;background:#C41E2D;color:#fff}
-.hb-pill.next{background:none;border:.2rem solid #E9CBA0;color:#E9CBA0}
-.hb-title{text-shadow:0 .2rem 1rem rgba(0,0,0,.8);font-size:3.2rem;font-weight:700;text-transform:uppercase;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.hb-title.long{font-size:2.6rem}
-.hb-sub{text-shadow:0 .2rem .8rem rgba(0,0,0,.8);font-size:1.9rem;color:#E9CBA0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hb-building{text-shadow:0 .2rem 1rem rgba(0,0,0,.9);font-size:1.6rem;color:#E9CBA0}
+.hb-pill{align-self:flex-start;font-weight:800;letter-spacing:.08em;font-size:1.5rem;padding:.2rem 1.3rem;border-radius:.6rem;background:#C41E2D;color:#fff}
+.hb-pill.next{background:none;border:.15rem solid #E9CBA0;color:#E9CBA0}
+.hb-title{text-shadow:0 .2rem 1rem rgba(0,0,0,.8);font-size:3.2rem;font-weight:800;text-transform:uppercase;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hb-title.long{font-size:2.7rem}
+.hb-vs{color:#E9B96E}
+.hb-sub{text-shadow:0 .2rem .8rem rgba(0,0,0,.8);font-size:1.5rem;color:#E9CBA0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hb-find{display:flex;align-items:center;padding:0 2.4rem;font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-size:4.8rem;font-weight:700;color:#E9B96E;text-transform:uppercase;cursor:pointer;white-space:nowrap}
 .hb-chips{display:flex;align-items:center;gap:1.6rem;padding:0 2.4rem 0 .6rem}
 .hb-chip{display:flex;flex-direction:column;align-items:center;gap:.6rem;cursor:pointer}
@@ -276,7 +300,7 @@ h2{font-size:3rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overfl
 .hb-cl{font-size:1.45rem;color:#E9CBA0;max-width:14rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hb-game.focus{box-shadow:inset 0 0 0 .4rem var(--amber)}
 .hb-find.focus{color:#fff;text-shadow:0 0 2rem rgba(231,185,111,.7)}
-.hb-chip.focus .hb-badge{border-color:var(--amber);box-shadow:0 0 2rem rgba(231,185,111,.55)}
+.hb-chip.focus .hb-badge{border-color:var(--amber);box-shadow:0 0 1.1rem rgba(231,185,111,.4)}
 html.phone .hslot.s2,html.phone .hslot.s3{display:none}
 html.phone .hb-chips{display:none}
 html.phone .hb-find{font-size:3.4rem;padding:0 2rem}
@@ -298,7 +322,7 @@ html.phone .hb-find{font-size:3.4rem;padding:0 2rem}
 .fsec{display:grid;grid-template-columns:repeat(2,1fr);gap:1.8rem}
 .ftile,.ctile{position:relative;min-width:0;border-radius:1.8rem;cursor:pointer;background:linear-gradient(180deg,rgba(20,29,42,.94),rgba(10,16,25,.97));border:.25rem solid #8A6A45;
   box-shadow:inset 0 0 0 .4rem #0B121B,inset 0 0 0 .5rem rgba(150,20,36,.8);transition:transform .12s}
-.ftile.focus,.ctile.focus{border-color:#F4C97E;box-shadow:inset 0 0 0 .4rem #0B121B,inset 0 0 0 .5rem rgba(170,24,40,.95),0 0 4rem rgba(231,185,111,.4);transform:scale(1.03);z-index:2}
+.ftile.focus,.ctile.focus{border-color:#F4C97E;box-shadow:inset 0 0 0 .4rem #0B121B,inset 0 0 0 .5rem rgba(170,24,40,.95),0 0 2rem rgba(231,185,111,.28);transform:scale(1.03);z-index:2}
 .ftile{min-height:16.5rem;padding:1.4rem 2.2rem;display:flex;flex-direction:column;justify-content:space-between;gap:1rem}
 .ft-top{display:flex;align-items:center;justify-content:space-between;gap:1rem;min-height:2.8rem}
 .ft-comp{display:flex;align-items:center;gap:1rem;font-size:1.5rem;color:#B8A383;letter-spacing:.06em;text-transform:uppercase;min-width:0;white-space:nowrap;overflow:hidden}
@@ -391,7 +415,7 @@ html.phone .hwrap{bottom:0;padding:2rem 3rem 0}
 .ph{position:absolute;left:1rem;right:1rem;bottom:1rem;font-size:1.7rem;line-height:1.25;color:var(--muted);max-height:11rem;overflow:hidden}
 .pfav{position:absolute;top:.5rem;right:.8rem;color:var(--amber);font-size:2.4rem;text-shadow:0 0 .6rem #000}
 .pp{position:absolute;left:0;bottom:0;height:.6rem;background:var(--amber)}
-.card.focus .poster{border-color:var(--amber);box-shadow:0 1rem 2.4rem rgba(160,28,42,.45),0 0 3rem rgba(231,185,111,.5);transform:scale(1.08);transition:transform .12s}
+.card.focus .poster{border-color:var(--amber);box-shadow:0 1rem 2.4rem rgba(160,28,42,.45),0 0 1.6rem rgba(231,185,111,.35);transform:scale(1.08);transition:transform .12s}
 /* Wide cards (row-track): the poster sits right next to the info panel now, not above a caption with
    room to spare -- scaling it up on focus (the flat-grid behaviour above) overlaps that panel's text
    instead of leaving it be, since a transform never reflows neighbours. The border+glow alone already
@@ -554,7 +578,7 @@ html.light .pbar{background:rgba(120,70,20,.18)}
 /* logo + splash */
 .logo img{display:block;width:100%;height:auto}
 #login-logo{grid-column:1;grid-row:1 / span 10;width:34rem;filter:drop-shadow(0 1.2rem 3rem rgba(160,28,42,.3))}
-#rail-logo{width:9rem;margin:-1rem 0 2rem 1.2rem}
+#rail-logo{width:9rem;margin:-1rem auto 2rem}
 /* live preview */
 #preview{display:none;width:38rem;flex:none;flex-direction:column;padding-top:.6rem}
 #page-browse.collapsed #cats{display:none}
@@ -610,11 +634,12 @@ h2 .sep{color:var(--muted);font-weight:500;margin:0 1.2rem}
 .warn{flex:none;font-size:1.4rem;color:#FFB4A8;border:.15rem solid rgba(229,72,63,.6);border-radius:.4rem;padding:.2rem .7rem}
 .best{flex:none;font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-size:1.4rem;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);border:.15rem solid rgba(231,185,111,.5);border-radius:.4rem;padding:.25rem .7rem}
 .qb{position:absolute;top:.4rem;left:.4rem;font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-size:1.3rem;font-weight:700;background:rgba(10,17,26,.85);color:var(--amber);padding:.1rem .5rem;border-radius:.3rem}
-.svers{display:flex;gap:1.2rem;overflow:hidden;flex:none;margin-bottom:1.2rem}
+.svers{display:flex;gap:1.2rem;overflow-x:auto;overflow-y:hidden;flex:none;margin-bottom:1.2rem;scrollbar-width:none}
+.svers::-webkit-scrollbar{display:none}
 .svers:empty{display:none}
 /* overlays */
 .overlay{position:fixed;top:0;left:0;right:0;bottom:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(6,12,16,.8)}
-.obox{min-width:56rem;max-height:80vh;display:flex;flex-direction:column;background:var(--panel);border:.15rem solid rgba(231,185,111,.45);border-radius:1.2rem;padding:1.6rem 2.4rem 2.4rem;box-shadow:0 2rem 6rem rgba(0,0,0,.6)}
+.obox{min-width:min(56rem, 92vw);max-height:80vh;display:flex;flex-direction:column;background:var(--panel);border:.15rem solid rgba(231,185,111,.45);border-radius:1.2rem;padding:1.6rem 2.4rem 2.4rem;box-shadow:0 2rem 6rem rgba(0,0,0,.6)}
 .obox .slabel{flex:none}
 #opts-list{overflow-y:auto;flex:1 1 auto;min-height:0}
 .obox .row{height:5.4rem;flex:none}
@@ -677,13 +702,13 @@ html.phone .gpv{display:none}
 .htheme span{width:5.4rem;height:5.4rem;border-radius:50%;display:flex;align-items:center;justify-content:center}
 .htheme span svg{width:3.2rem;height:3.2rem;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .htheme span.on{background:linear-gradient(135deg,#F0D7A6,#C79A63);color:#2A1710}
-.htheme.focus{border-color:#F4C97E;box-shadow:0 0 0 .3rem rgba(244,201,126,.55),0 0 3rem rgba(231,185,111,.5)}
+.htheme.focus{border-color:#F4C97E;box-shadow:0 0 0 .3rem rgba(244,201,126,.55),0 0 1.6rem rgba(231,185,111,.35)}
 html.phone .htheme span{width:4.4rem;height:4.4rem}
 
 
 
 /* the tile you are on: a gold face with dark text, easy to see from the sofa */
-.ftile.focus,.ctile.focus{background:linear-gradient(160deg,#F6DDA9 0%,#E3B56E 55%,#C98F45 100%);border-color:#FFF1CC;box-shadow:inset 0 0 0 .4rem rgba(255,243,210,.6),inset 0 0 0 .52rem rgba(130,18,34,.92),0 0 4.5rem rgba(240,196,110,.6),0 1.2rem 2.6rem rgba(0,0,0,.5)}
+.ftile.focus,.ctile.focus{background:linear-gradient(160deg,#F6DDA9 0%,#E3B56E 55%,#C98F45 100%);border-color:#FFF1CC;box-shadow:inset 0 0 0 .4rem rgba(255,243,210,.6),inset 0 0 0 .52rem rgba(130,18,34,.92),0 0 2rem rgba(240,196,110,.35),0 1.2rem 2.6rem rgba(0,0,0,.5)}
 .ftile.focus .ft-names,.ctile.focus .ct-name{color:#2A0F14}
 .ftile.focus .ft-time{color:#7A0F1E}
 .ftile.focus .ft-comp{color:#5A2A1E}
@@ -713,14 +738,16 @@ html.phone .htheme span{width:4.4rem;height:4.4rem}
 
 
 .ct-lang{font-size:1.45rem;color:#8FB4E8}
+.ct-region{font-size:1.45rem;color:#C79ADB}
 .ct-src{font-size:1.4rem;color:var(--muted)}
 .ctile.focus .ct-lang{color:#1D3F7A}
+.ctile.focus .ct-region{color:#5A2A7A}
 .ctile.focus .ct-src{color:#5A3A2A}
 
 
 .cmore{margin:2.4rem 0 1rem;padding:1.5rem 2.4rem;border:.25rem dashed #8A6A45;border-radius:1.6rem;color:#E9CBA0;font-size:2.1rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:2rem}
 .cmore small{font-size:1.6rem;color:var(--muted)}
-.cmore.focus{border-style:solid;border-color:#FFF1CC;background:linear-gradient(160deg,#F6DDA9 0%,#E3B56E 55%,#C98F45 100%);color:#2A0F14;box-shadow:0 0 4.5rem rgba(240,196,110,.6)}
+.cmore.focus{border-style:solid;border-color:#FFF1CC;background:linear-gradient(160deg,#F6DDA9 0%,#E3B56E 55%,#C98F45 100%);color:#2A0F14;box-shadow:0 0 2rem rgba(240,196,110,.35)}
 .cmore.focus small{color:#5A3A2A}
 
 
@@ -735,7 +762,7 @@ html.phone .htheme span{width:4.4rem;height:4.4rem}
 
 
 /* a tab that has been picked up to be moved */
-.chip.lift{transform:translateY(-.9rem) scale(1.04);position:relative;z-index:3;box-shadow:0 1.3rem 2.2rem rgba(0,0,0,.5),0 0 2.6rem rgba(231,185,111,.6)}
+.chip.lift{transform:translateY(-.9rem) scale(1.04);position:relative;z-index:3;box-shadow:0 1.3rem 2.2rem rgba(0,0,0,.5),0 0 1.4rem rgba(231,185,111,.4)}
 .chip .lf{font-size:1.5rem;margin:0 .35rem;color:var(--amber);cursor:pointer}
 
 
@@ -765,14 +792,20 @@ html:not(.phone) #g-chans .csec{grid-template-columns:repeat(var(--gc,4),1fr)}
 
 
 
-/* the home banner: one "Sports Hub" box, a wide hero game card with the sport-icon row along its bottom */
-.hhub-head{display:flex;align-items:baseline;justify-content:space-between;gap:1.2rem}
-.hbtabs{display:flex;gap:.7rem;margin-bottom:.8rem}
-.hbtab{font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:1.25rem;color:var(--muted);border:.15rem solid transparent;border-radius:.5rem;padding:.3rem 1.1rem;cursor:pointer;background:rgba(255,255,255,.04)}
-.hbtab.on{color:#E9CBA0;border-color:#B98B55}
+/* the home banner: one "Sports Hub" box, a wide hero game card with the sport-icon row along its bottom.
+   .hhub-head itself (position/layout) is defined up near .hhub -- this just styles the tab pills, which
+   now sit over the photo, so the "on" tab reads as a glowing red pill (like a live broadcast badge)
+   instead of the plain muted-outline tab this used to be when it sat on a flat panel above the box. */
+.hbtabs{display:flex;gap:.5rem}
+.hbtab{font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-weight:700;letter-spacing:.07em;text-transform:uppercase;font-size:1.3rem;color:#D9C7A8;border:.14rem solid rgba(255,255,255,.3);border-radius:999px;padding:.4rem 1.4rem;cursor:pointer;background:rgba(0,0,0,.35);text-shadow:0 .2rem .6rem rgba(0,0,0,.85)}
+.hbtab.on{color:#fff;border-color:#E0354A;background:rgba(196,30,45,.3);box-shadow:0 0 1rem rgba(196,30,45,.6)}
 .hbtab.focus{outline:.2rem solid var(--amber);outline-offset:.15rem}
-.hb-game{background:linear-gradient(90deg,rgba(8,13,20,.93) 0,rgba(8,13,20,.9) 34%,rgba(8,13,20,.52) 48%,rgba(8,13,20,.12) 62%,rgba(8,13,20,0) 80%),linear-gradient(90deg,#0a1019 0,rgba(10,16,25,0) 38%) right center/40.1rem 100% no-repeat,url(hero-banner.jpg) right center/auto 100% no-repeat,#0a1019}
-.hb-title.xlong{font-size:2.2rem}
+/* a touch brighter/more saturated than a straight photo crop -- closer to the owner's punchy reference
+   mock (example.jpg) without needing new illustrated art: less of the box buried under the dark wash,
+   plus a small saturate/brightness lift on the whole card (text already has a strong shadow, so this
+   doesn't cost legibility). */
+.hb-game{filter:saturate(1.12) brightness(1.06) contrast(1.03);background:linear-gradient(90deg,rgba(8,13,20,.92) 0%,rgba(8,13,20,.82) 28%,rgba(8,13,20,.52) 46%,rgba(8,13,20,.16) 64%,rgba(8,13,20,0) 84%),url(hero-banner.jpg) right center/cover no-repeat,#0a1019}
+.hb-title.xlong{font-size:2.3rem}
 
 
 
@@ -798,12 +831,17 @@ html:not(.phone) #g-chans .csec{grid-template-columns:repeat(var(--gc,4),1fr)}
 
 
 
-.pkbox{display:flex;align-items:center;gap:5rem;max-width:96rem}
+.pkbox{display:flex;flex-direction:row;align-items:center;gap:5rem;max-width:96rem}
 .pkcol{flex:1;min-width:0}
 #pk-qr{width:36rem;height:36rem;image-rendering:pixelated;border-radius:1.2rem;background:#fff;flex:none}
 .pkm{font-size:2.6rem;margin:1rem 0 2rem}
 .pkst{font-size:2.4rem;color:var(--amber)}
 .pku{font-size:1.4rem;color:var(--muted);word-break:break-all;margin-top:2rem;opacity:.8}
+/* Row layout (text beside the QR code) needs more width than a phone screen has -- stack instead, and
+   cap the QR code's size to the screen rather than its usual fixed 36rem, which on its own is wider
+   than many phones. */
+html.phone .pkbox{flex-direction:column;gap:2rem}
+html.phone #pk-qr{width:min(36rem, 70vw);height:min(36rem, 70vw)}
 .svl{align-self:center;margin-right:1.2rem;color:var(--muted);font-size:1.8rem}
 .osdh{font-size:1.7rem;opacity:.75;margin-top:.6rem}
 /*LIGHT-START*/
@@ -827,17 +865,20 @@ html.light .htime{color:#3A1D18}
 html.light .htile.focus .hd{color:#8A5A1C}
 html.light .hslot{color:#8A5A1C;background:linear-gradient(180deg,rgba(252,248,238,0.94),rgba(252,248,238,0.97));box-shadow:inset 0 0 0 .5rem #FCF8EE,inset 0 0 0 .62rem rgba(150,20,36,.85),0 1rem 3rem rgba(90,60,30,0.25)}
 html.light .hslot .hd{color:#8A5A1C}
-html.light .hslot.s0.focus{box-shadow:inset 0 0 0 .5rem #FCF8EE,inset 0 0 0 .62rem rgba(170,24,40,.95),0 0 6rem rgba(231,185,111,.4),0 0 2rem rgba(231,185,111,.3)}
+html.light .hslot.s0.focus{box-shadow:inset 0 0 0 .5rem #FCF8EE,inset 0 0 0 .62rem rgba(170,24,40,.95),0 0 3rem rgba(231,185,111,.28),0 0 1rem rgba(231,185,111,.22)}
 html.light .hstrip .slabel{color:#8A5A1C}
 html.light .hhub{background:linear-gradient(90deg,rgba(252,248,238,0.95),rgba(252,248,238,0.97));box-shadow:0 1rem 3rem rgba(90,60,30,0.22)}
+html.light .hhub.focus{box-shadow:0 0 0 .3rem rgba(231,185,111,.4),0 0 3.5rem rgba(231,185,111,.3),0 1rem 3rem rgba(90,60,30,0.22)}
+html.light .hhub-title{color:#8A5A1C}
 html.light .hsport-toggle{background:rgba(252,248,238,0.25);color:#8A5A1C}
 html.light .hb-building{color:#8A5A1C}
+html.light .hb-vs{color:#8A5A1C}
 html.light .hb-find{color:#8A5A1C}
 html.light .hb-badge{color:#8A5A1C}
 html.light .hb-cl{color:#8A5A1C}
 html.light .hb-find.focus{color:#3A1D18}
 html.light .ftile,html.light .ctile{background:linear-gradient(180deg,rgba(252,248,238,0.94),rgba(252,248,238,0.97));box-shadow:inset 0 0 0 .4rem #FCF8EE,inset 0 0 0 .5rem rgba(150,20,36,.8)}
-html.light .ftile.focus,html.light .ctile.focus{box-shadow:inset 0 0 0 .4rem #FCF8EE,inset 0 0 0 .5rem rgba(170,24,40,.95),0 0 4rem rgba(231,185,111,.4)}
+html.light .ftile.focus,html.light .ctile.focus{box-shadow:inset 0 0 0 .4rem #FCF8EE,inset 0 0 0 .5rem rgba(170,24,40,.95),0 0 2rem rgba(231,185,111,.28)}
 html.light .ft-comp{color:#3A1D18}
 html.light .ft-pill.rep{color:#3A1D18}
 html.light .ft-names{color:#3A1D18}
@@ -877,12 +918,13 @@ html.light .gpv-line{color:#8A5A1C}
 html.light .gmnote{color:#8A5A1C}
 html.light .cd-on{color:#8A5A1C}
 html.light .htheme{background:rgba(252,248,238,0.55);color:#3A1D18}
-html.light .ftile.focus,html.light .ctile.focus{box-shadow:inset 0 0 0 .4rem rgba(255,243,210,.6),inset 0 0 0 .52rem rgba(130,18,34,.92),0 0 4.5rem rgba(240,196,110,.6),0 1.2rem 2.6rem rgba(90,60,30,0.28)}
+html.light .ftile.focus,html.light .ctile.focus{box-shadow:inset 0 0 0 .4rem rgba(255,243,210,.6),inset 0 0 0 .52rem rgba(130,18,34,.92),0 0 2rem rgba(240,196,110,.35),0 1.2rem 2.6rem rgba(90,60,30,0.28)}
 html.light .ctile.focus .ct-logo .lt{border-color:#D9C7A3}
 html.light .chead.doubt{color:#8A5A1C}
 html.light .cmore{color:#8A5A1C}
-html.light .chip.lift{box-shadow:0 1.3rem 2.2rem rgba(90,60,30,0.28),0 0 2.6rem rgba(231,185,111,.6)}
-html.light .hbtab.on{color:#8A5A1C}
+html.light .chip.lift{box-shadow:0 1.3rem 2.2rem rgba(90,60,30,0.28),0 0 1.4rem rgba(231,185,111,.4)}
+html.light .hbtab{color:#3A1D18;background:rgba(252,248,238,0.35)}
+html.light .hbtab.on{color:#3A1D18}
 
 html.light{--bg:#F6EEDC;--panel:#FFFDF7;--raise:#F2E7CF;--line:#D9C7A3;--text:#3A1D18;--muted:#7B6650;--amber:#9A5B16;--amber-soft:rgba(154,91,22,.14);--focus-bg:linear-gradient(90deg,rgba(168,28,44,.18),rgba(168,28,44,.04));--red2:#B02030;--red-deep:#8E1522;color-scheme:light}
 html.light body{background:#F6EEDC;color:#3A1D18}
@@ -1018,7 +1060,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
   <div class="hwrap">
     <div class="hhead"><img src="logo.png" class="hlogo" alt=""><div class="hclock"><div id="h-time" class="htime"></div><div id="h-date" class="hdate"></div><div id="h-sub" class="hsub"></div></div><button id="h-theme" class="htheme" type="button" aria-label="Switch between light and dark"><span class="th-sun"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.3 5.3l1.9 1.9M16.8 16.8l1.9 1.9M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9"/></svg></span><span class="th-moon"><svg viewBox="0 0 24 24"><path d="M20.2 14.6A8.6 8.6 0 0 1 9.4 3.8a8.6 8.6 0 1 0 10.8 10.8z"/></svg></span></button></div>
     <div id="h-tiles" class="hcar"></div>
-    <div id="h-strip-wrap" class="hstrip"><div class="hhub-head"><div id="h-strip-title" class="slabel"></div><div id="h-strip-tabs" class="hbtabs"></div></div><div id="hhub" class="hhub"><div id="h-strip" class="hhub-game"></div><div class="hsport-toggle-row"><button id="h-sport-toggle" class="hsport-toggle" type="button"><span class="hst-car">▾</span>Sport Selector</button></div><div id="h-find" class="hhub-sports"></div></div></div>
+    <div id="h-strip-wrap" class="hstrip"><div id="hhub" class="hhub"><div class="hhub-head"><button id="h-brand" class="hhub-brand" type="button"><img class="hhub-sh" src="sh-badge.png" alt=""><div id="h-strip-title" class="hhub-title"></div></button><div id="h-strip-tabs" class="hbtabs"></div></div><div id="h-strip" class="hhub-game"></div><div class="hsport-toggle-row"><button id="h-sport-toggle" class="hsport-toggle" type="button"><span class="hst-car">▾</span>Sport Selector</button></div><div id="h-find" class="hhub-sports"></div></div></div>
   </div>
   <div id="h-ver" class="hver"></div>
   <footer id="hhints" class="hints"></footer>
@@ -1063,7 +1105,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 </div>
 
 <div id="ask" class="overlay hidden"><div class="obox askbox"><div id="ask-title" class="slabel"></div><p id="ask-msg" class="note"></p><input id="ask-in" type="text" autocomplete="off" spellcheck="false"><p class="note">OK to save, Back to cancel</p></div></div>
-<div id="pk" class="overlay hidden"><div class="obox pkbox"><div class="pkcol"><div id="pk-title" class="slabel"></div><p class="pkm">Scan this with your phone’s camera, type, and press Send.</p><p id="pk-msg" class="pkst">Starting…</p><p id="pk-url" class="pku"></p><p class="note">Back to cancel</p></div><canvas id="pk-qr"></canvas></div></div>
+<div id="pk" class="overlay hidden"><div class="obox pkbox"><div class="pkcol"><div id="pk-title" class="slabel"></div><p class="pkm">Scan this with your phone’s camera, type, and press Send.</p><p id="pk-msg" class="pkst">Starting…</p><p id="pk-url" class="pku hidden"></p><p class="note">Back to cancel</p></div><canvas id="pk-qr"></canvas></div></div>
 <div id="opts" class="overlay hidden"><div class="obox"><div class="slabel">Options</div><div id="opts-list"></div></div></div>
 <div id="loading" class="loading hidden"><div class="spinner"></div><p id="loading-msg">Loading…</p><div id="loading-bar" class="pbar hidden"><div id="loading-bar-fill" class="pbar-fill"></div></div></div>
 <div id="toast" class="toast hidden"></div>
@@ -1076,7 +1118,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.23.2';
+const APP_VERSION = '3.23.12';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 const PC = !!window.RCSPC || !!window.RCS_DESKTOP;   /* Windows app, or the no-install desktop version */
 const PHONE = FIRE && navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) < 700;   /* Android phone */
@@ -1564,7 +1606,7 @@ async function refreshAll(fg) {
       const d = parseM3u(text);
       await idb.set(cacheKey(), d);
       await applyData(d, fg);
-      if (S.screen === 'main') { showPage(S.page); if (S.page === 'search' && Q.text) runSearch(); }
+      if (S.screen === 'main') { showPage(S.page); if (isSearchPage(S.page) && Q.text) runSearch(); }
       if (!fg) toast('Lists updated');
       return;
     }
@@ -1584,7 +1626,7 @@ async function refreshAll(fg) {
     };
     await idb.set(cacheKey(), d);
     await applyData(d, fg);
-    if (S.screen === 'main') { showPage(S.page); if (S.page === 'search' && Q.text) runSearch(); }
+    if (S.screen === 'main') { showPage(S.page); if (isSearchPage(S.page) && Q.text) runSearch(); }
     if (!fg) toast('Lists updated');
   } finally {
     refreshing = false;
@@ -1818,7 +1860,13 @@ class VView {
 }
 
 /* ================= app state ================= */
-const PAGES = [{id: 'search', label: 'Search'}, {id: 'favs', label: 'Favourites'}, {id: 'live', label: 'Live TV'}, {id: 'vod', label: 'Movies'}, {id: 'series', label: 'Series'}, {id: 'settings', label: 'Settings'}];
+const PAGES = [{id: 'sportshub', label: 'Sports Hub'}, {id: 'search', label: 'Search'}, {id: 'favs', label: 'Favourites'}, {id: 'live', label: 'Live TV'}, {id: 'vod', label: 'Movies'}, {id: 'series', label: 'Series'}, {id: 'settings', label: 'Settings'}];
+/* Sports Hub and Search share one underlying page (#page-search: the sport chips/fixture browser and
+   the typed keyword search were always the same screen, chips just swapped between "sport shortcuts"
+   and "result type filters" depending on whether Q.text was set -- see searchChips/resultList). Sports
+   Hub is just a second door into that page, landing on the sport-browse state Search used to default
+   to; Search itself now always opens straight into typing instead. */
+const isSearchPage = p => p === 'search' || p === 'sportshub';
 const S = {screen: '', page: 'live', rail: 1, zone: 'cats', setIdx: 0};
 const B = {favs: {cats: [], cat: 0, catId: null, items: [], item: 0}, live: {cats: [], cat: 0, catId: null, items: [], item: 0, lv: 0, cc: null},
   /* row/rpos/rows: Movies/Series show the current category as stacked horizontally-scrolling rows
@@ -1917,7 +1965,7 @@ async function loadGuideV2(force) {
   } catch (e) { /* guide-v2 is additive -- a failed fetch just leaves whatever was cached (or nothing) in place, never breaks the rest of the guide */ }
   GUIDE_V2_BUSY = false;
   if (S.screen === 'home') renderHome();
-  if (S.screen === 'main' && S.page === 'search') { Q.skey = ''; Q.gkey = ''; renderMain(); }
+  if (S.screen === 'main' && isSearchPage(S.page)) { Q.skey = ''; Q.gkey = ''; renderMain(); }
 }
 setInterval(() => { if (S.screen !== 'player') loadGuideV2(false); }, 20 * 60000);
 /* Shapes guide-v2's pre-resolved events exactly like fixtureEvents()'s output so both merge into
@@ -1993,7 +2041,7 @@ async function loadFixtures(force) {
     if (changed) EVENTS = null;
   } catch (e) { FD.err = 'Fixtures couldn’t be updated: ' + e.message; }
   FD.busy = false; if (S.screen === 'home') renderHome();
-  if (S.screen === 'main' && S.page === 'search') { Q.skey = ''; Q.gkey = ''; renderMain(); }
+  if (S.screen === 'main' && isSearchPage(S.page)) { Q.skey = ''; Q.gkey = ''; renderMain(); }
 }
 setInterval(() => { if (ui.fdKey && S.screen !== 'player') loadFixtures(false); }, 5 * 60000);
 
@@ -2023,7 +2071,7 @@ async function loadF1(force) {
     if (changed) EVENTS = null;
   } catch (e) { F1.err = 'The F1 schedule couldn’t be updated: ' + e.message; }
   F1.busy = false; if (S.screen === 'home') renderHome();
-  if (S.screen === 'main' && S.page === 'search') { Q.skey = ''; Q.gkey = ''; renderMain(); }
+  if (S.screen === 'main' && isSearchPage(S.page)) { Q.skey = ''; Q.gkey = ''; renderMain(); }
 }
 /* which channels the guides show carrying a session: a Formula 1 listing for that race, starting within an hour of the session */
 function f1GuideChans(s) {
@@ -2383,7 +2431,7 @@ function pinTarget() {
   if (sc === 'game') { const x = GS.list[GS.ch]; return x && !x.hdr ? x.g : null; }
   if (sc === 'player') { const c = cur(); return c && c.t === 'live' ? c : null; }
   if (sc === 'main') {
-    if (S.page === 'search' && S.zone === 'results') { const x = resultList()[Q.item]; return x && !x.hdr && x.t === 'live' ? x : null; }
+    if (isSearchPage(S.page) && S.zone === 'results') { const x = resultList()[Q.item]; return x && !x.hdr && x.t === 'live' ? x : null; }
     if ((S.page === 'live' || S.page === 'favs') && S.zone === 'items' && kindOf(S.page) === 'live') { const b = B[S.page]; return b.items[b.item] || null; }
   }
   return null;
@@ -2428,7 +2476,7 @@ async function loadTsdb(force) {
     await idb.set(ck, {list: all, ts: TSDB.ts});
   } catch (e) { TSDB.err = 'TV listings couldn’t be updated: ' + e.message; }
   TSDB.busy = false; EVENTS = null;
-  if (S.screen === 'main' && S.page === 'search') { Q.skey = ''; Q.gkey = ''; renderMain(); }
+  if (S.screen === 'main' && isSearchPage(S.page)) { Q.skey = ''; Q.gkey = ''; renderMain(); }
 }
 setInterval(() => { if (ui.tsdbKey && S.screen !== 'player') loadTsdb(false); }, 30 * 60000);
 /* IPTV channels that match a channel name from a listing, in that listing's country */
@@ -2661,7 +2709,17 @@ function genericCompChannels(comp) {
     let sc = 0;
     if (named) sc += 5;
     if (FOOTBALL_COMPS.has(comp) && / (football|soccer|futbol|fussball|calcio) /.test(t)) sc += 3;
-    if (FOOTBALL_COMPS.has(comp) && EN_NETWORKS.test(g.raw + ' ' + g.name)) sc += 2;
+    /* This bonus used to only apply to football comps -- so Cricket, Rugby, AFL, NRL, NBA, NHL, MLB,
+       NFL, tennis, golf, UFC and Boxing could only ever get a channel into their "usually shows this"
+       fallback list by literal name match (named, above). A channel generically labelled "Sky Sports
+       Main Event" or "DIGI Sport 2" never qualified for any of those sports, no matter how often it
+       actually carries them -- only a channel explicitly named "...Cricket" or "...Tennis" did. Real
+       result: those sports' own browse pages (e.g. Men's Tennis / ATP Tour) came up completely empty
+       whenever nothing had a confirmed matched game, even on a channel list with plenty of real
+       Sky Sports/BT Sport/ESPN-type channels that do carry them. EN_NETWORKS is a recognised
+       multi-sport broadcaster, not a football-specific one, so there's no real reason this signal
+       should only count for football -- applying it to every sport, not gating on FOOTBALL_COMPS. */
+    if (EN_NETWORKS.test(g.raw + ' ' + g.name)) sc += 3;
     if (g.g === 'Sports') sc += 1;
     if (sc >= 4) out.push({g, sc});
   }
@@ -2801,6 +2859,11 @@ function askShortcuts() {
       v.split(',').map(parseShortcut).filter(Boolean).forEach(id => { if (out.indexOf(id) < 0) out.push(id); });
       ui.chips = out.length ? out.slice(0, 14) : DEFAULT_CHIPS.slice();
       save('sp_ui', ui); Q.chip = 0; Q.sport = ui.chips[0]; Q.skey = ''; resView.reset(); renderMain();
+      /* renderMain() above is a no-op unless S.screen is already 'main' -- now reachable straight from
+         Home's Sport Selector strip too, where the effect (Live/Upcoming's priority order) is actually
+         visible, so that screen needs its own explicit refresh or the new order wouldn't show until
+         whatever next happened to call renderHome() on its own (the 3s rotation, a zone change...). */
+      if (S.screen === 'home') renderHome();
     });
 }
 /* "+ Add" on the tab row itself: a free-text box here used to invite typing anything, but only the
@@ -3006,7 +3069,7 @@ async function loadExtraGuides(chans, chIdx, items, from, to, every, force) {
         let ci = chIdx.get(cl);
         if (ci === undefined) { ci = chans.push(cl) - 1; chIdx.set(cl, ci); xmap[cl] = gs; }
         items.push([ci, st, en, xmlDec(ti[1]), subWithDesc(block, xmlDec(ti[1]), su), 'x']);
-      }, bytes => { if (S.page === 'search') { GUIDE_MSG = 'Adding the free ' + name + ' guide… ' + (bytes / 1e6).toFixed(0) + ' MB read'; renderSearchHead(); } }, block => {
+      }, bytes => { if (isSearchPage(S.page)) { GUIDE_MSG = 'Adding the free ' + name + ' guide… ' + (bytes / 1e6).toFixed(0) + ' MB read'; renderSearchHead(); } }, block => {
         const id = (block.match(/\bid="([^"]*)"/) || [])[1];
         if (!id) return;
         /* the country the guide channel belongs to, from the end of its id (…uk, …au, …qa). A channel that names its country
@@ -3097,7 +3160,7 @@ async function loadGuide(force) {
   }
   const url = guideUrl();
   if (!url) { GUIDE = {ts: Date.now(), items: [], chans: [], none: true}; EVENTS = null; return; }
-  GUIDE_BUSY = true; GUIDE_MSG = 'Downloading the TV guide…'; if (S.page === 'search') renderMain();
+  GUIDE_BUSY = true; GUIDE_MSG = 'Downloading the TV guide…'; if (isSearchPage(S.page)) renderMain();
   if (S.screen === 'home') renderHome();
   const want = sportsEpgMap(false), every = sportsEpgMap(true), chans = [], chIdx = new Map(), items = [];
   GUIDE_AC = new AbortController();
@@ -3134,7 +3197,7 @@ async function loadGuide(force) {
       if (ci === undefined) { ci = chans.push(cl) - 1; chIdx.set(cl, ci); }
       items.push([ci, st, en, xmlDec(ti[1]), subWithDesc(block, xmlDec(ti[1]), su), 'p']);
     }, bytes => {
-      if (Date.now() - lastShow > 700 && S.page === 'search') { lastShow = Date.now(); GUIDE_MSG = 'Downloading the TV guide… ' + (bytes / 1e6).toFixed(0) + ' MB read, ' + items.length.toLocaleString() + ' sports programmes found'; renderSearchHead(); }
+      if (Date.now() - lastShow > 700 && isSearchPage(S.page)) { lastShow = Date.now(); GUIDE_MSG = 'Downloading the TV guide… ' + (bytes / 1e6).toFixed(0) + ' MB read, ' + items.length.toLocaleString() + ' sports programmes found'; renderSearchHead(); }
       if (Date.now() - lastMem > 5000) { lastMem = Date.now(); memLog('streamXml @' + (bytes / 1e6).toFixed(1) + 'MB read, ' + items.length + ' items, ' + chans.length + ' chans'); }
     });
     memLog('streamXml done, ' + items.length + ' items, ' + chans.length + ' chans');
@@ -3164,7 +3227,7 @@ async function loadGuide(force) {
   GUIDE_AC = null; GUIDE_BUSY = false; EVENTS = null;
   memLog('loadGuide done');
   if (S.screen === 'home') renderHome();
-  if (S.page === 'search' && S.screen === 'main') { Q.skey = ''; Q.gkey = ''; resView.reset(); renderMain(); }
+  if (isSearchPage(S.page) && S.screen === 'main') { Q.skey = ''; Q.gkey = ''; resView.reset(); renderMain(); }
 }
 
 /* Some providers' full guide file has its times shifted by their time-zone difference.
@@ -3426,7 +3489,23 @@ function* buildEventsG() {
       const anyLive = c.items.some(e => e.info.live), allRep = c.items.every(e => e.info.replay);
       const newMatch = !cur ? !allRep : (!allRep && c.first - cur.first >= 2 * 86400e3 && (chs.size >= 3 || (chs.size >= 2 && anyLive)));
       if (newMatch) { cur = {first: c.first, items: c.items.slice(), live: c.items.filter(e => !e.info.replay), reps: [], isMatch: true, sure: true}; groups.push(cur); }
-      else if (cur) { cur.items.push(...c.items); cur.reps.push(...c.items); }
+      else if (cur) {
+        cur.items.push(...c.items); cur.reps.push(...c.items);
+        /* A later broadcast under the 2-day/multi-channel bar above isn't necessarily a rerun -- that
+           bar exists to tell "a brand new match" apart from "a repeat of the one we already found",
+           not to tell "still live" apart from "a repeat". A multi-day event (cricket Tests are the
+           clear case: ~24h between daily sessions, well under the 2-day threshold, 5 days running) airs
+           fresh LIVE coverage every single day under the exact same fixture/team key, and every one of
+           those days was getting folded into reps only -- so by day 2 ev.chans/ev.start/ev.stop (built
+           from cur.live below, merged further down by earliest start/latest stop per channel) stayed
+           frozen to day 1's window, evState() read the event as finished, and it vanished from Live Now
+           entirely (reported: a live Australia cricket match the Hub never showed). Anything in this
+           cast the guide itself tags live, not a repeat, still belongs in cur.live regardless of the
+           gate above -- the merge step below already extends ev.stop to the latest such item's end
+           time, so a later day's live session correctly keeps the whole event evState()-live. */
+        const stillLive = c.items.filter(e => e.info.live && !e.info.replay);
+        if (stillLive.length) cur.live.push(...stillLive);
+      }
       /* airings before any live broadcast in the guide: the match itself was before the guide's history, so these are only replays */
       else { cur = {first: c.first, items: c.items.slice(), live: c.items.slice(), reps: [], isMatch: true, sure: false}; groups.push(cur); }
     }
@@ -3487,6 +3566,34 @@ function* buildEventsG() {
      cover (Champions League, Europa League, AFL, NRL, Cricket, Rugby, A-League...) still runs through
      the existing fx/f1/out path exactly as before. */
   const v2 = v2Events(), v2Comps = new Set((GUIDE_V2 && GUIDE_V2.competitions) || []);
+  /* TheSportsDB's own TV listings have real gaps -- confirmed live for several sports (Eredivisie,
+     MotoGP, NASCAR, PGA Tour, European Tour all came back with zero channels for every fixture), and
+     it's the same eventstv.php mechanism for every guide-v2 sport, tennis (ATP/WTA) included. A v2
+     event with no channels is never assumed to genuinely have none -- the client's own EPG-built events
+     (out, above) already find real channels independently of TheSportsDB; borrow them whenever a v2
+     event comes up empty. Matched by competition plus the two names in the event's own label -- team
+     names when there are any, otherwise whatever a plain "X v Y" split of the label gives, which also
+     covers one-on-one sports where TheSportsDB supplies no home/away team at all (tennis, golf, fight
+     cards) -- within a day of kickoff. This used to only happen for the football leagues football-data.org
+     also covers (the fxById block below, matched by a shared TheSportsDB event id); this generalises the
+     same idea to every sport guide-v2 tracks, tried first by full name, then by surname/one-word fallback
+     since the two sources don't always format a player's name the same way. */
+  if (v2.length) {
+    const sidesOf = ev => ev.teams ? ev.teams.map(norm) : (() => { const m = String(ev.label || '').match(/^(.+?)\s+(?:v|vs\.?|versus)\s+(.+)$/i); return m ? [norm(m[1]), norm(m[2])] : null; })();
+    const lastWord = s => s.trim().split(' ').pop();
+    const byComp = new Map();
+    out.forEach(ev => { if (!ev.chans.length) return; const k = ev.comp || ''; (byComp.get(k) || byComp.set(k, []).get(k)).push(ev); });
+    v2.forEach(v => {
+      if (v.chans.length) return;
+      const sides = sidesOf(v);
+      if (!sides) return;
+      const cands = byComp.get(v.comp) || [];
+      const near = cands.filter(ev => Math.abs(ev.kick - v.kick) < 20 * 3600e3);
+      const found = near.find(ev => sides.every(s => ev.text.indexOf(' ' + s + ' ') >= 0)) ||
+        near.find(ev => sides.every(s => { const w = lastWord(s); return w.length > 3 && ev.text.indexOf(' ' + w + ' ') >= 0; }));
+      if (found) v.chans = found.chans;
+    });
+  }
   if (FD.list.length) {
     /* with real fixtures, football guide entries for those competitions are replaced by the fixtures themselves */
     const fxAll = fixtureEvents(), fx = fxAll.filter(ev => !v2Comps.has(ev.comp)), covered = ev => ev.teams && fx.some(f => Math.abs(f.kick - ev.kick) < 20 * 3600e3 && ev.teams.some(t => f.teams.map(norm).includes(norm(t))));
@@ -3783,7 +3890,7 @@ function homeDetail(id) {
   const n = x => x.toLocaleString();
   if (id === 'live') return n(DATA.live.items.length) + ' channels';
   if (id === 'favs') { const c = ['live', 'vod', 'series'].reduce((a, t) => a + specialList(t, '__fav').length, 0); return c ? c + (c === 1 ? ' favourite' : ' favourites') : 'None yet'; }
-  if (id === 'search') return 'Games, teams, channels';
+  if (id === 'search') return 'Channels, movies, series';
   if (id === 'vod') { const c = specialList('vod', '__cont').length; return c ? c + ' to continue' : DATA.vod.fetched ? n(DATA.vod.items.length) + ' movies' : 'Movies'; }
   if (id === 'series') { const c = specialList('series', '__cont').length; return c ? c + ' to continue' : DATA.series.fetched ? n(DATA.series.items.length) + ' series' : 'Series'; }
   if (id === 'cont') { const c = continueWatchingList().length; return c + (c === 1 ? ' title' : ' titles') + ' to resume'; }
@@ -3851,7 +3958,42 @@ function homeLives() {
        way, showing it in the Sports Hub promises something the app then can't deliver on tap (the
        owner's own report: "Live Now: Lens vs Paris", opened it, no channel had it). Being live is
        necessary but not sufficient to belong here -- it also has to be actually watchable. */
-    return (EVENTS || []).filter(ev => ev.fixture && evState(ev, now) === 0 && ev.chans && ev.chans.length).sort((a, b) => rk(a) - rk(b) || a.kick - b.kick);
+    /* Requiring ev.fixture used to mean: only football-data.org/guide-v2/F1 events could ever appear
+       here -- which silently dropped every sport guide-v2 doesn't cover (Cricket, Rugby, AFL, NRL,
+       Champions League, Europa League, A-League...) even when the provider's own TV guide clearly has
+       it live right now with a real channel attached (buildEventsG's client-built `out` events, same
+       path that already powers those sports' own fixture-list pages -- see the "Everything guide-v2
+       doesn't cover" comment above buildEventsG's v2/out merge). Those events don't set .fixture, so
+       they never reached this filter at all, regardless of ev.chans. Letting them in needs its own
+       bar though: a guide-built event's live/replay status is inferred from EPG timing, not a real
+       fixture API, and Plan-New-Guide.md recorded a real report of a finished game showing as live
+       from exactly that kind of inference.
+       First attempt here required ev.isEvent && ev.live -- wrong bar. parseEvent() sets
+       isEvent = !!teams || live || !!compOf(...), so "live" alone is already ONE of the three things
+       that can make isEvent true on its own -- requiring isEvent && live on a non-fixture event adds
+       nothing when isEvent became true BECAUSE of live in the first place. Real-world result: sports
+       TALK/RADIO shows that happen to air live (title literally says "Live" the same way a live game
+       broadcast does) sailed straight through with zero team names and zero real competition --
+       confirmed live: "The Junkies" and "Boomer and Gio" (sports radio shows) showing as live events
+       alongside one genuine tennis match. The actual signal for "this is a real game, not just
+       something airing live" is ev.teams (buildEventsG only sets it when the listing matched a real
+       "A v B" shape AND grouped by team identity, isMatch:true) or ev.liveEvent (the narrower flag
+       already built for the individual-sport case where there's no "vs" structure at all -- F1/MotoGP
+       race sessions). Neither is set for a talk show.
+       Second correction: this first also required ev.live (the title literally containing the word
+       "live"), meant as a second, independent guard against a replay misread as live from timing
+       alone. Too blunt in practice -- confirmed live: Sky Sports Tennis UK's WTA China Open coverage,
+       a real match airing right now with the right teams and a real channel, simply doesn't put the
+       word "live" in its own title (most EPGs lean on their own start/end times for that, not a text
+       tag), so it got excluded same as the talk shows were meant to be. buildEventsG's own broadcast
+       grouping (the "first broadcast is live, a later one 2+ days on is a new match, anything else is
+       a replay" logic a few screens up) already does the real work of keeping ev.chans/ev.start/
+       ev.stop specific to the identified LIVE broadcast, not blindly to every airing -- evState()
+       reading from that is the actual protection against the replay-misread-as-live failure, not a
+       second literal "live" text match on top of it. Dropped ev.live here; ev.teams/ev.liveEvent
+       alone is both broad enough to catch a real match regardless of how its provider's EPG phrases
+       it, and narrow enough to still exclude a talk show. */
+    return (EVENTS || []).filter(ev => (ev.fixture || ev.teams || ev.liveEvent) && evState(ev, now) === 0 && ev.chans && ev.chans.length).sort((a, b) => rk(a) - rk(b) || a.kick - b.kick);
   } catch (e) { return []; }
 }
 /* games being replayed on a channel right now (shown when nothing is live) */
@@ -3859,7 +4001,12 @@ function homeReplays() {
   try {
     if (!DATA || !EVENTS) return [];
     const now = nowMs();
-    const l = EVENTS.filter(ev => ev.fixture && evState(ev, now) === 2 && (ev.reps || []).some(r => r.start <= now && (!r.stop || r.stop > now))).sort((a, b) => b.kick - a.kick);
+    /* same widening as homeLives() above -- a non-fixture (guide-built) event can be a genuine replay
+       too, it just never carried .fixture so it never reached this far. ev.isEvent alone isn't the
+       right bar though, same reason as homeLives(): it goes true for a talk/radio show whose title
+       just says "live" (one of isEvent's own OR-conditions), with no actual game behind it. Needs
+       ev.teams (a real two-sided match) or ev.liveEvent (the individual-sport live flag) instead. */
+    const l = EVENTS.filter(ev => (ev.fixture || ev.teams || ev.liveEvent) && evState(ev, now) === 2 && (ev.reps || []).some(r => r.start <= now && (!r.stop || r.stop > now))).sort((a, b) => b.kick - a.kick);
     verifyReplayClaims(l, () => { if (S.screen === 'home') renderHome(); });
     return l.filter(ev => repOnNow(ev, now));
   } catch (e) { return []; }
@@ -3869,8 +4016,21 @@ function homeUpcoming() {
   try {
     if (!DATA || !(FD.list.length || F1.list.length)) return [];
     if (!EVENTS) { ensureEventsAsync(); return []; }   /* builds in the background without blocking; renderHome() re-runs when ready */
-    const now = nowMs();
-    return (EVENTS || []).filter(ev => ev.fixture && evState(ev, now) === 1 && ev.kick - now < 48 * 3600e3).sort((a, b) => a.kick - b.kick).slice(0, 6);
+    const now = nowMs(), order = chipsList(), rk = ev => { const k = order.indexOf(ev.comp); return k < 0 ? 99 : k; };
+    /* same widening as homeLives()/homeReplays() -- a guide-built event not yet airing is just an
+       upcoming kickoff time inferred from the channel's own listing. Same correction as both of those
+       too: ev.isEvent alone isn't enough, since it goes true for a talk/radio show's title just saying
+       "live" with no game behind it -- needs ev.teams or ev.liveEvent, same bar as homeReplays(). */
+    /* Widening the filter above massively grew the pool competing for this list's hard cap -- every
+       EPG-matched match on every sport/channel now qualifies, not just the handful of curated fixture
+       sources. Sorting purely by soonest-kickoff meant a flood of minor, unpinned-competition matches
+       kicking off sooner could bump a followed team's own game off the list entirely (reported: a
+       confirmed Arsenal fixture, well inside the 48h window, simply never appeared). homeLives()
+       already solves this with the same chipsList()-priority rk() -- a pinned competition (Premier
+       League by default) always sorts ahead of an unlisted one, soonest-kickoff only breaking ties
+       within the same priority. Applying it here too, plus a slightly larger cap since the pool it's
+       drawn from is now much bigger. */
+    return (EVENTS || []).filter(ev => (ev.fixture || ev.teams || ev.liveEvent) && evState(ev, now) === 1 && ev.kick - now < 48 * 3600e3).sort((a, b) => rk(a) - rk(b) || a.kick - b.kick).slice(0, 8);
   } catch (e) { return []; }
 }
 /* "auto" picks the first non-empty list in this order: a replay you can watch right now is more
@@ -3886,6 +4046,29 @@ function homeSportsList(mode) {
   return {list: homeUpcoming(), kind: 'upcoming'};
 }
 const homeShown = () => homeSportsList(HOME.mode).list;
+/* the hero photo behind the Sports Hub card: one of 6 pieces of stadium/athlete art, picked by the
+   calendar day so it's the same all day (no flicker mid-session) and different tomorrow. Built as a full
+   inline "background" (not just background-image) so the readability gradient stays layered over
+   whichever photo is showing -- a CSS variable can't stand in for one layer of a multi-layer background
+   reliably across the WebViews this app runs in, so the whole shorthand is just regenerated per render. */
+function heroBgStyle() {
+  const img = 'sportshub-bg-' + (Math.floor(nowMs() / 86400000) % 6 + 1) + '.jpg';
+  /* the image layer is "cover", not the old "auto 100%" -- that sized the photo to the box's HEIGHT and
+     left its width wherever that landed, which was fine at the old 23rem-tall box but at a shorter one
+     left a big dead gap of nothing but gradient between the text and wherever the (now narrower) photo
+     actually started. cover always fills the box regardless of its aspect ratio; the source images were
+     picked specifically for a dark/empty left two-thirds and the subject on the right, so a crop from
+     cover still reads the same way the "auto" sizing did. */
+  /* one continuous fade, in percentages of the box's own width rather than a second fixed-rem gradient
+     layer pinned to the right edge -- the old two-layer version had its own hard-edged box starting at a
+     fixed 40.1rem from the right, which landed at a different point in the first gradient's fade every
+     time the box width changed (visible as a hard seam where the photo was cut off instead of blending
+     away). A single gradient scales with the box, so the seam can't reappear next time this box resizes. */
+  /* a small saturate/brightness lift on top of the gradient+photo, to read closer to the owner's
+     punchy reference mock (example.jpg) instead of a flat, moody photo crop -- kept modest since the
+     text sitting on top only has its own text-shadow to stay legible against it. */
+  return ' style="filter:saturate(1.12) brightness(1.06) contrast(1.03);background:linear-gradient(90deg,rgba(8,13,20,.92) 0%,rgba(8,13,20,.82) 28%,rgba(8,13,20,.52) 46%,rgba(8,13,20,.16) 64%,rgba(8,13,20,0) 84%),url(' + img + ') right center/cover no-repeat,#0a1019"';
+}
 function homeBanner() {
   const sel = homeSportsList(HOME.mode), shown = sel.list, out = {title: 'Sports Hub', cards: [], n: shown.length, kind: sel.kind};
   if (shown.length) out.cards.push({type: 'game', ev: shown[HOME.liveIdx % shown.length], kind: sel.kind});
@@ -3901,7 +4084,9 @@ setInterval(() => {
 },3000);
 function renderHome() {
   const d = new Date(nowMs());
-  $('home').classList.toggle('stripfocus', HOME.zone === 'strip' || HOME.zone === 'hbtab' || HOME.zone === 'hbtoggle' || HOME.zone === 'sports');
+  $('home').classList.toggle('stripfocus', HOME.zone === 'strip' || HOME.zone === 'hbtab' || HOME.zone === 'hbtoggle' || HOME.zone === 'sports' || HOME.zone === 'brand');
+  $('h-brand').classList.toggle('focus', HOME.zone === 'brand');
+  $('hhub').classList.toggle('focus', HOME.zone === 'brand');
   $('h-theme').classList.toggle('focus', HOME.zone === 'theme');
   $('h-theme').querySelector('.th-sun').classList.toggle('on', !!ui.light);
   $('h-theme').querySelector('.th-moon').classList.toggle('on', !ui.light);
@@ -3931,19 +4116,19 @@ function renderHome() {
      "broken" while fixtures/F1 are still loading. Say so, but only while genuinely still loading
      (FD.busy/F1.busy, or neither has ever completed a load yet) — once both have finished at least
      once, an empty banner correctly means "checked, nothing on right now", not "still working". */
-  const stillBuilding = !hb.n && (FD.busy || F1.busy || (!FD.ts && !F1.ts));
-  let b = hb.n ? '' : (stillBuilding ? '<div class="hb-game idle"><div class="hb-building"><span class="hbd"></span>Building your sports guide…</div></div>' : '<div class="hb-game idle"></div>');      /* no live game: the same hero picture, nothing written on it */
+  const stillBuilding = !hb.n && (FD.busy || F1.busy || (!FD.ts && !F1.ts)), bg = heroBgStyle();
+  let b = hb.n ? '' : (stillBuilding ? '<div class="hb-game idle"' + bg + '><div class="hb-building"><span class="hbd"></span>Building your sports guide…</div></div>' : '<div class="hb-game idle"' + bg + '></div>');      /* no live game: the same hero picture, nothing written on it */
   hb.cards.forEach((c, i) => {
     if (c.type === 'game') {
       const ev = c.ev, nowT = nowMs();
       const chans = ev.chans.slice().sort((a, b) => a.lang - b.lang), when = c.kind === 'upcoming' ? ((dayWord(ev.kick) || 'Today ') + clockStr(new Date(ev.kick))).trim() : '';
       const ch = chans.length ? (chans[0].kind === 'name' ? feedTitle(chans[0].g) : disp(chans[0].g)) + (chans.length > 1 ? ' +' + (chans.length - 1) : '') : '';
       const pill = c.kind === 'upcoming' ? '<span class="hb-pill next">UPCOMING</span>' : c.kind === 'replay' ? '<span class="hb-pill rep">● REPLAY</span>' : '<span class="hb-pill">● LIVE NOW</span>';
-      b += '<div class="hb-game' + foc(i) + (HOME.fade ? ' fade' : '') + '" data-i="' + i + '"><div class="hb-top">' + pill + (hb.n > 1 ? '<span class="hb-count">' + (HOME.liveIdx % hb.n + 1) + ' / ' + hb.n + '</span>' : '') + '</div>' +
-        '<div class="hb-title' + (ev.label.length > 31 ? ' xlong' : ev.label.length > 26 ? ' long' : '') + '">' + esc(ev.label.replace(/ v /, ' vs ')) + '</div><div class="hb-sub">' + esc([compLabel(ev.comp), when, ch].filter(Boolean).join('  ·  ')) + '</div></div>';
+      b += '<div class="hb-game' + foc(i) + (HOME.fade ? ' fade' : '') + '" data-i="' + i + '"' + bg + '><div class="hb-top">' + pill + (hb.n > 1 ? '<span class="hb-count">' + (HOME.liveIdx % hb.n + 1) + ' / ' + hb.n + '</span>' : '') + '</div>' +
+        '<div class="hb-title' + (ev.label.length > 31 ? ' xlong' : ev.label.length > 26 ? ' long' : '') + '">' + esc(ev.label).replace(/ v /, ' <span class="hb-vs">vs</span> ') + '</div><div class="hb-sub">' + esc([compLabel(ev.comp), when, ch].filter(Boolean).join('  ·  ')) + '</div></div>';
     } else if (c.type === 'cont') {
       const it = c.it, sub = [it.sub, it.pct ? Math.round(it.pct) + '% watched' : ''].filter(Boolean).join('  ·  ');
-      b += '<div class="hb-game' + foc(i) + (HOME.fade ? ' fade' : '') + '" data-i="' + i + '"><div class="hb-top"><span class="hb-pill rep">RESUME</span></div>' +
+      b += '<div class="hb-game' + foc(i) + (HOME.fade ? ' fade' : '') + '" data-i="' + i + '"' + bg + '><div class="hb-top"><span class="hb-pill rep">RESUME</span></div>' +
         '<div class="hb-title' + (it.name.length > 31 ? ' xlong' : it.name.length > 26 ? ' long' : '') + '">' + esc(it.name) + '</div><div class="hb-sub">' + esc(sub) + '</div></div>';
     }
   });
@@ -3953,7 +4138,13 @@ function renderHome() {
      from the game-card carousel above, since the two are independent now. */
   $('h-sport-toggle').classList.toggle('focus', HOME.zone === 'hbtoggle');
   $('hhub').classList.toggle('sports-open', HOME.sportsOpen);
-  $('h-find').innerHTML = SPORT_GROUPS.map((g, i) => '<div class="hb-chip' + (HOME.zone === 'sports' && HOME.sportCard === i ? ' focus' : '') + '" data-i="' + i + '"><div class="hb-logo"><img class="hb-lg" src="' + g[2] + '" alt=""></div><div class="hb-cl">' + esc(g[1]) + '</div></div>').join('');
+  /* one extra tile at the end, same visual family as the sport icons, index SPORT_GROUPS.length so it
+     slots into the existing left/right navigation and hover handling as just one more position rather
+     than a special case everywhere. Opens the owner's own existing "Edit search shortcuts" prompt --
+     that list already drives Live/Upcoming priority (homeLives()/homeUpcoming()'s rk()), it just lived
+     only in Settings before, disconnected from the one screen its effect is actually visible on. */
+  $('h-find').innerHTML = SPORT_GROUPS.map((g, i) => '<div class="hb-chip' + (HOME.zone === 'sports' && HOME.sportCard === i ? ' focus' : '') + '" data-i="' + i + '"><div class="hb-logo"><img class="hb-lg" src="' + g[2] + '" alt=""></div><div class="hb-cl">' + esc(g[1]) + '</div></div>').join('') +
+    '<div class="hb-chip' + (HOME.zone === 'sports' && HOME.sportCard === SPORT_GROUPS.length ? ' focus' : '') + '" data-i="' + SPORT_GROUPS.length + '"><div class="hb-logo"><img class="hb-lg" src="glyph-settings.png" alt=""></div><div class="hb-cl">Prioritize</div></div>';
   if (HOME.zone === 'sports') { const focEl = $('h-find').querySelector('.hb-chip.focus'); if (focEl) focEl.scrollIntoView({block: 'nearest', inline: 'nearest'}); }
   HOME.fade = false;
   $('h-strip-wrap').classList.remove('hidden');
@@ -3962,15 +4153,15 @@ function renderHome() {
 function homeOpenTile(i) {
   const id = homeTiles()[i][0];
   if (id === 'cont') { homeOpenContinue(); return; }
-  if (id === 'search') Q.sportGroup = '';
+  if (id === 'search') { openTypeSearch('all'); return; }
   show('main');
-  S.zone = id === 'search' ? 'qbox' : id === 'settings' ? 'set' : 'cats';
+  S.zone = id === 'settings' ? 'set' : 'cats';
   showPage(id);
 }
 function homeOpenSearch(id) {
   Q.sportGroup = '';
-  if (id) { Q.sport = id; const k = searchChips().findIndex(c => c.id === id); if (k >= 0) Q.chip = k; Q.skey = ''; }
-  show('main'); S.zone = id ? 'chips' : 'qbox'; showPage('search'); if (id) { S.zone = 'chips'; renderMain(); }
+  if (id) { Q.sport = id; const k = sportChips().findIndex(c => c.id === id); if (k >= 0) Q.chip = k; Q.skey = ''; }
+  show('main'); S.zone = id ? 'chips' : 'qbox'; showPage('sportshub'); if (id) { S.zone = 'chips'; renderMain(); }
 }
 function homeOpenCard(i) {
   const c = HOME.cards[i];
@@ -3993,7 +4184,7 @@ function homeKey(k) {
   if (HOME.zone === 'tiles') {
     if (k === KEY.LEFT) HOME.tile = (HOME.tile + n - 1) % n;
     else if (k === KEY.RIGHT) HOME.tile = (HOME.tile + 1) % n;
-    else if (k === KEY.DOWN) HOME.zone = 'hbtab';
+    else if (k === KEY.DOWN) HOME.zone = 'brand';
     else if (k === KEY.UP) HOME.zone = 'theme';
     else if (k === KEY.ENTER) { homeOpenTile(HOME.tile); return; }
     else if (k === KEY.BACK) { exitPrompt(); return; }
@@ -4002,8 +4193,21 @@ function homeKey(k) {
     if (k === KEY.ENTER) toggleTheme();
     else if (k === KEY.DOWN || k === KEY.BACK) HOME.zone = 'tiles';
     else return;
+  } else if (HOME.zone === 'brand') {
+    /* the whole box's own first stop, not just its badge corner -- landing here highlights the entire
+       Sports Hub box (see #hhub.focus below), and OK opens the full browse page (every sport, nothing
+       pre-picked). The featured game is a deliberate second step inward (DOWN onto the card itself,
+       zone 'strip', its own narrower glow) -- pressing OK on the big glowing box used to always jump
+       straight into whichever one game happened to be featured, with no way to just "go to the Sports
+       Hub" without first noticing a game was even showing. Distinct from the sport-selector strip's
+       icons too, which still open one specific sport, not the neutral browse view. */
+    if (k === KEY.RIGHT) HOME.zone = 'hbtab';
+    else if (k === KEY.DOWN) HOME.zone = HOME.cards.length ? 'strip' : 'hbtoggle';
+    else if (k === KEY.UP || k === KEY.BACK) HOME.zone = 'tiles';
+    else if (k === KEY.ENTER) { homeOpenSportsHub(); return; }
+    else return;
   } else if (HOME.zone === 'hbtab') {
-    if (k === KEY.LEFT) HOME.tab = (HOME.tab + HB_TABS.length - 1) % HB_TABS.length;
+    if (k === KEY.LEFT) { if (HOME.tab === 0) HOME.zone = 'brand'; else HOME.tab--; }
     else if (k === KEY.RIGHT) HOME.tab = (HOME.tab + 1) % HB_TABS.length;
     else if (k === KEY.ENTER) { HOME.mode = HB_TABS[HOME.tab][0]; HOME.liveIdx = 0; }
     else if (k === KEY.DOWN) HOME.zone = HOME.cards.length ? 'strip' : 'hbtoggle';
@@ -4022,10 +4226,14 @@ function homeKey(k) {
     else if (k === KEY.UP || k === KEY.BACK) HOME.zone = HOME.cards.length ? 'strip' : 'hbtab';
     else return;
   } else if (HOME.zone === 'sports') {
-    if (k === KEY.LEFT) HOME.sportCard = (HOME.sportCard + SPORT_GROUPS.length - 1) % SPORT_GROUPS.length;
-    else if (k === KEY.RIGHT) HOME.sportCard = (HOME.sportCard + 1) % SPORT_GROUPS.length;
+    /* SPORT_GROUPS.length itself is a valid position here -- the trailing "Prioritize" tile, not a
+       sport. Keeping it just one more index (rather than a separate zone) means left/right wraparound,
+       hover and scrollIntoView above all keep working on it for free. */
+    const nSport = SPORT_GROUPS.length + 1;
+    if (k === KEY.LEFT) HOME.sportCard = (HOME.sportCard + nSport - 1) % nSport;
+    else if (k === KEY.RIGHT) HOME.sportCard = (HOME.sportCard + 1) % nSport;
     else if (k === KEY.UP || k === KEY.BACK) HOME.zone = 'hbtoggle';
-    else if (k === KEY.ENTER) { homeOpenSportGroup(SPORT_GROUPS[HOME.sportCard][0]); return; }
+    else if (k === KEY.ENTER) { if (HOME.sportCard === SPORT_GROUPS.length) askShortcuts(); else homeOpenSportGroup(SPORT_GROUPS[HOME.sportCard][0]); return; }
     else return;
   } else return;
   renderHome();
@@ -4038,11 +4246,12 @@ $('h-tiles').addEventListener('click', e => {
 });
 $('h-strip-wrap').addEventListener('click', e => {
   const sp = e.target.closest('#h-find [data-i]');
-  if (sp) { const g = SPORT_GROUPS[Number(sp.dataset.i)]; if (g) homeOpenSportGroup(g[0]); return; }
+  if (sp) { const i = Number(sp.dataset.i); if (i === SPORT_GROUPS.length) { askShortcuts(); return; } const g = SPORT_GROUPS[i]; if (g) homeOpenSportGroup(g[0]); return; }
   const el = e.target.closest('#h-strip [data-i]');
   if (el) homeOpenCard(Number(el.dataset.i));
 });
 $('h-sport-toggle').addEventListener('click', () => { HOME.sportsOpen = !HOME.sportsOpen; HOME.zone = 'hbtoggle'; renderHome(); });
+$('h-brand').addEventListener('click', () => homeOpenSportsHub());
 $('h-strip-tabs').addEventListener('click', e => {
   const el = e.target.closest('.hbtab'); if (!el) return;
   const i = Number(el.dataset.tab); HOME.tab = i; HOME.mode = HB_TABS[i][0]; HOME.zone = 'hbtab'; HOME.liveIdx = 0; renderHome();
@@ -5574,17 +5783,17 @@ function renderHints() {
 async function showPage(p) {
   S.page = p;
   S.rail = PAGES.findIndex(x => x.id === p);
-  $('main').classList.toggle('sport', p === 'search' || p === 'favs');
+  $('main').classList.toggle('sport', isSearchPage(p) || p === 'favs');
   const browse = p === 'live' || p === 'vod' || p === 'series' || p === 'favs' || p === 'cont';
   if (p === 'favs') B.favs.cats = [];   /* rebuilt each visit so the counts are current */
   $('page-browse').classList.toggle('hidden', !browse);
-  $('page-search').classList.toggle('hidden', p !== 'search');
+  $('page-search').classList.toggle('hidden', !isSearchPage(p));
   $('page-settings').classList.toggle('hidden', p !== 'settings');
-  if (p === 'search') loadGuideV2(false);
-  if (p === 'search' && ui.fdKey) loadFixtures(false);
-  if (p === 'search') loadF1(false);
-  if (p === 'search' && ui.tsdbKey) loadTsdb(false);
-  if (p === 'search' && !GUIDE_BUSY && (!GUIDE || Date.now() - GUIDE.ts > 3 * 3600e3)) loadGuide(false);
+  if (isSearchPage(p)) loadGuideV2(false);
+  if (isSearchPage(p) && ui.fdKey) loadFixtures(false);
+  if (isSearchPage(p)) loadF1(false);
+  if (isSearchPage(p) && ui.tsdbKey) loadTsdb(false);
+  if (isSearchPage(p) && !GUIDE_BUSY && (!GUIDE || Date.now() - GUIDE.ts > 3 * 3600e3)) loadGuide(false);
   /* Opening Movies/Series itself is cheap now — just the category list (ensureCats below), nothing
      fetched yet. Only Search still pulls in the whole catalog (it can need any item from any category,
      and is core to the app). The Home Favourites page's Movies/Series tabs used to as well — removed
@@ -5600,9 +5809,9 @@ async function showPage(p) {
      device. ensureSearchCatalog builds a lean {id,name,cat} index instead (procSearchIndexG) -- a small
      fraction of the memory -- which Search matches against; opening a result hydrates the full item on
      demand via ensureCategoryItems, same as Movies/Series browsing already does (see openItem). */
-  if (p === 'search' && DATA && !(SRCHIDX.vod && SRCHIDX.series) && !(isM3u() && DATA.vod.grouped && DATA.series.grouped)) {
+  if (isSearchPage(p) && DATA && !(SRCHIDX.vod && SRCHIDX.series) && !(isM3u() && DATA.vod.grouped && DATA.series.grouped)) {
     ensureSearchCatalog().then(() => {
-      if (S.page === 'search') { Q.last = null; renderMain(); }
+      if (isSearchPage(S.page)) { Q.last = null; renderMain(); }
     }).catch(err => toast(err && err.message ? err.message : 'Could not load movies/series.'));
   }
   if (S.page !== p) return;
@@ -5624,13 +5833,13 @@ async function showPage(p) {
        newly-started or newly-finished item is reflected immediately, same as favs clearing b.cats. */
     if (p === 'cont') selectCat('cont', 0, true);
   }
-  if (p === 'search') resView.reset();
+  if (isSearchPage(p)) resView.reset();
   renderMain();
 }
 function renderMain() {
   if (S.screen !== 'main') return;
   renderRail();
-  if (S.page === 'search') renderSearch();
+  if (isSearchPage(S.page)) renderSearch();
   else if (S.page === 'settings') renderSettings();
   else renderBrowse();
   renderHints();
@@ -5658,7 +5867,9 @@ function sportChips() {
   return c;
 }
 function searchChips() {
-  if (!Q.text) return sportChips();
+  /* Sports Hub keeps the sport-shortcut chips when nothing's typed; generic Search starts blank -- no
+     chips to browse until there's something to search for (see resultList below, same split). */
+  if (!Q.text) return S.page === 'sportshub' ? sportChips() : [];
   return CHIPS.map(c => ({id: c[0], l: c[1], n: c[0] === 'games' ? Q.games.length : c[0] === 'all' ? (Q.counts.all || 0) + Q.games.length : (Q.counts[c[0]] || 0)}));
 }
 function publish(scored) {
@@ -5699,6 +5910,7 @@ function stepRes(list, i, d) { let j = i + d; while (j >= 0 && j < list.length &
 function resultList() {
   const minute = Math.floor(nowMs() / 60000), gv = (GUIDE && GUIDE.ts) + '|' + (EVENTS ? 1 : 0) + '|' + minute + '|' + EPGVER;
   if (!Q.text) {
+    if (S.page !== 'sportshub') return [];
     const key = Q.sport + '|' + gv + '|' + (ui.pins ? JSON.stringify(ui.pins).length : 0);
     if (key !== Q.skey) {
       const sched = (GUIDE || FD.list.length) ? withHeads(filteredEvents(Q.sport, '')) : [];
@@ -5809,7 +6021,7 @@ function renderSearch() {
   if (list.length && !selectable(list[Q.item])) { const j = stepRes(list, Q.item, 1); Q.item = j >= 0 ? j : Math.max(0, stepRes(list, Q.item, -1)); }
   let empty = '';
   if (Q.text && !list.length && !Q.busy) empty = 'Nothing found for “' + Q.text + '”. Try fewer words or just the start of a name.';
-  else if (!Q.text && !list.length) {
+  else if (!Q.text && !list.length && S.page === 'sportshub') {
     if (ui.fdKey && FD.err && !FD.list.length) empty = FD.err + ' Check Settings → Fixtures key.';
     else if ((!GUIDE || GUIDE_BUSY) && !FD.list.length) empty = GUIDE_MSG || 'Getting the TV guide ready…';
     else if (GUIDE && GUIDE.none) empty = 'There’s no TV guide for this playlist, so games can’t be listed. Type above to search channels, movies and series.';
@@ -5941,7 +6153,14 @@ function homeOpenSportGroup(id) {
 function homeOpenSportGroupAll(id) {
   const g = SPORT_GROUPS.find(s => s[0] === id);
   Q.sportGroup = id; Q.chip = 0; Q.sport = g ? g[3][0] : ''; Q.skey = ''; resView.reset();
-  show('main'); S.zone = 'chips'; showPage('search'); S.zone = 'chips'; renderMain();
+  show('main'); S.zone = 'chips'; showPage('sportshub'); S.zone = 'chips'; renderMain();
+}
+/* same destination as homeOpenSportGroupAll above, just with nothing pre-picked -- the neutral "every
+   sport" landing, same as the rail's own Sports Hub icon (PAGES' 'sportshub' entry) opens once you're
+   past Home. The badge/title button is the only way to reach it directly from Home itself. */
+function homeOpenSportsHub() {
+  Q.sportGroup = ''; Q.chip = 0; Q.sport = ''; Q.skey = ''; resView.reset();
+  show('main'); S.zone = 'chips'; showPage('sportshub'); S.zone = 'chips'; renderMain();
 }
 
 function searchKey(k, e) {
@@ -5965,7 +6184,7 @@ function searchKey(k, e) {
   if (S.zone === 'qbox') {
     if (k === KEY.RIGHT && Q.text) { S.zone = 'qclear'; renderMain(); return; }
     if (k === KEY.ENTER) { if (PC) { q.readOnly = false; q.focus(); return; } Q.kb = true; S.zone = 'kb'; }
-    else if (k === KEY.DOWN) S.zone = 'chips';
+    else if (k === KEY.DOWN) { if (searchChips().length) S.zone = 'chips'; else return; }
     else if (k === KEY.LEFT || k === KEY.BACK) S.zone = 'rail';
     else return;
     renderMain(); return;
@@ -5975,7 +6194,7 @@ function searchKey(k, e) {
     if (k === KEY.UP) { if (Q.kbR > 0) Q.kbR--; else S.zone = 'qbox'; }
     else if (k === KEY.DOWN && Q.kbR < KB.length - 1) Q.kbR++;
     else if (k === KEY.LEFT) { if (ki > 0) Q.kbC = startOf(row, ki - 1); else S.zone = 'rail'; }
-    else if (k === KEY.RIGHT) { if (ki < row.length - 1) Q.kbC = startOf(row, ki + 1); else S.zone = resultList().length ? 'results' : 'chips'; }
+    else if (k === KEY.RIGHT) { if (ki < row.length - 1) Q.kbC = startOf(row, ki + 1); else S.zone = resultList().length ? 'results' : searchChips().length ? 'chips' : 'kb'; }
     else if (k === KEY.ENTER) { pressKey(row[ki]); if (row[ki].a === 'sys') return; }
     else if (k === KEY.BACK) { Q.kb = false; S.zone = 'qbox'; }
     else return;
@@ -6035,7 +6254,7 @@ $('q').addEventListener('input', () => { Q.text = $('q').value; clearTimeout(Q.d
 if (PHONE) $('q').readOnly = false;
 $('qclear').addEventListener('click', e => { e.stopPropagation(); Q.text = ''; onQueryChange(); S.zone = 'qbox'; renderMain(); if (PC || PHONE) $('q').focus(); });
 $('q').addEventListener('blur', () => { if (!PC && !PHONE) $('q').readOnly = true; });
-$('q').addEventListener('focus', () => { if (S.screen === 'main' && S.page === 'search' && S.zone !== 'qbox' && S.zone !== 'kb') { S.zone = 'qbox'; renderSearchHead(); } });
+$('q').addEventListener('focus', () => { if (S.screen === 'main' && isSearchPage(S.page) && S.zone !== 'qbox' && S.zone !== 'kb') { S.zone = 'qbox'; renderSearchHead(); } });
 
 /* ================= a game: details and the channels showing it ================= */
 const GS = {ev: null, ch: 0, list: [], now: new Map(), q: ''};
@@ -6242,7 +6461,13 @@ function chanTile(x, i, now, past) {
   const tag = x.kind === 'replay' || x.kind === 'catchup' ? '' : sure ? '<span class="ct-ok">✓ Confirmed</span>' : '<span class="ct-lk">' + (x.kind === 'slot' ? 'Confirmation pending' : '') + '</span>';
   return '<div class="ctile' + (sure || x.kind === 'replay' || x.kind === 'catchup' ? '' : ' unsure') + '" data-i="' + i + '"><div class="ct-logo">' + logoTile(x.g, 'ct-l') + '</div><div class="ct-info">' +
     '<div class="ct-name">' + esc(x.kind === 'name' ? feedTitle(x.g) : disp(x.g)) + badges(x.g) + '</div><div class="ct-sub">' + esc(sub) + (x.start > now && ['live', 'slot', 'preview', 'replay'].indexOf(x.kind) >= 0 ? ' ' + cdHtml(x.start, 'in ') : '') + '</div>' +
-    '<div class="ct-tags">' + tag + (isAppFeed(x.g) ? '<span class="ct-app">App feed</span>' : '') + (() => { const c = langCodeOf(x.g); return c && c !== prefLang() ? '<span class="ct-lang">' + (LANGS[c] || c.toUpperCase()) + '</span>' : ''; })() + (x.src ? '<span class="ct-src">' + (x.src === 'free' ? 'Free guide' : 'Provider guide') + '</span>' : '') + '</div>' +
+    '<div class="ct-tags">' + tag + (isAppFeed(x.g) ? '<span class="ct-app">App feed</span>' : '') + (() => { const c = langCodeOf(x.g); return c && c !== prefLang() ? '<span class="ct-lang">' + (LANGS[c] || c.toUpperCase()) + '</span>' : ''; })() +
+    /* several brands (beIN chief among them) run near-identical channel numbering per country -- "beIN
+       Sports 3" alone doesn't say which one. g.cc already exists (clean() reads it off the channel's own
+       name/category) and already drives tsdbGroups()'s country filtering; this just also shows it, so
+       picking between several same-named tiles doesn't mean guessing or pressing OK to find out. */
+    (() => { const cc = x.g.cc; return cc && cc !== 'ZZ' ? '<span class="ct-region">' + esc(REGION_OF[cc] || cc) + '</span>' : ''; })() +
+    (x.src ? '<span class="ct-src">' + (x.src === 'free' ? 'Free guide' : 'Provider guide') + '</span>' : '') + '</div>' +
     (warn ? '<div class="ct-warn">But its own guide shows “' + esc(chk.title) + '”</div>' : '') +
     (() => { const o = showingNowElse(x, now); return o ? '<div class="ct-warn">Not on yet: showing “' + esc(o.title) + '” now</div>' : ''; })() +
     (x.more && x.more.length ? '<div class="ct-also">Also ' + esc(x.more.slice(0, 3).map(y => t(y.start)).join(' · ')) + (x.more.length > 3 ? ' +' + (x.more.length - 3) : '') + '</div>' : '') + '</div></div>';
@@ -6281,9 +6506,20 @@ function renderChanTiles() {
   const confirmed = secs[0].length + secs[1].length + secs[2].length, SENT = GS.list.length;
   const GC = gcols();
   el.style.setProperty('--gc', GC);
-  shown.forEach(a => a.forEach((i, j) => { if (j % GC === 0) GS.rows.push([]); GS.rows[GS.rows.length - 1].push(i); }));
+  let maybeRowStart = -1;
+  shown.forEach((a, k) => a.forEach((i, j) => {
+    if (j % GC === 0) { GS.rows.push([]); if (k >= 3 && maybeRowStart < 0) maybeRowStart = GS.rows.length - 1; }
+    GS.rows[GS.rows.length - 1].push(i);
+  }));
   if (extra) GS.rows.push([SENT]);
   if (GS.rows.length && !GS.moved && !GS.keep) GS.ch = GS.rows[0][0];
+  /* pressing the "Show N more channels" button used to leave focus sitting on that button -- now the
+     last row, under everything just revealed -- so the very next press (reaching for the new channels)
+     landed on the bottom-most one instead of the top of what just appeared. Since the doubtful/possible
+     sections rank low-trust brands (beIN chief among them) toward the end of their own group, that
+     bottom tile was disproportionately a beIN variant -- looked like the app was singling it out, it
+     was really just "whatever's currently last". Land on the first newly-revealed tile instead. */
+  if (GS._expandFocus) { GS._expandFocus = false; if (maybeRowStart >= 0) GS.ch = GS.rows[maybeRowStart][0]; }
   const sig = [ev.key, GS.q, V, GC, GS.now.size, EPGVER, GS.showMaybe ? 1 : 0, extra, Math.floor(now / 60000), GS.list.map(x => x.g ? x.g.id + x.kind + (x.dups ? x.dups.length : 0) : 'h').join(',')].join('|');
   if (el.dataset.sig !== sig) {
     el.dataset.sig = sig; el.classList.add('ctiles');
@@ -6335,7 +6571,7 @@ function gameKey(k) {
   else if (k === KEY.RIGHT) { if (c < rows[r].length - 1) GS.ch = rows[r][c + 1]; else if (r < rows.length - 1) GS.ch = rows[r + 1][0]; }
   else if (k === KEY.CH_UP) GS.ch = pick(r - 3);
   else if (k === KEY.CH_DOWN) GS.ch = pick(r + 3);
-  else if (k === KEY.ENTER) { if (GS.ch === GS.list.length) { GS.showMaybe = !GS.showMaybe; GS.moved = true; renderGame(); return; } if (GS.list[GS.ch] && !GS.list[GS.ch].hdr) playEvent(GS.ev, GS.ch, GS.list); return; }
+  else if (k === KEY.ENTER) { if (GS.ch === GS.list.length) { GS.showMaybe = !GS.showMaybe; GS.moved = true; if (GS.showMaybe) GS._expandFocus = true; renderGame(); return; } if (GS.list[GS.ch] && !GS.list[GS.ch].hdr) playEvent(GS.ev, GS.ch, GS.list); return; }
   else return;
   renderGame();
 }
@@ -6642,11 +6878,11 @@ function mainKey(k, e) {
   if (S.zone === 'rail') {
     if (k === KEY.UP && S.rail > 0) showPage(PAGES[S.rail - 1].id);
     else if (k === KEY.DOWN && S.rail < PAGES.length - 1) showPage(PAGES[S.rail + 1].id);
-    else if (k === KEY.RIGHT || k === KEY.ENTER) { S.zone = S.page === 'search' ? (Q.text || !resultList().length ? 'qbox' : 'results') : S.page === 'settings' ? 'set' : 'cats'; renderMain(); }
+    else if (k === KEY.RIGHT || k === KEY.ENTER) { S.zone = S.page === 'sportshub' ? 'chips' : S.page === 'search' ? (Q.text || !resultList().length ? 'qbox' : 'results') : S.page === 'settings' ? 'set' : 'cats'; renderMain(); }
     else if (k === KEY.BACK) openHome();
     return;
   }
-  if (S.page === 'search') return searchKey(k, e);
+  if (isSearchPage(S.page)) return searchKey(k, e);
   if (S.page === 'settings') {
     if (k === KEY.UP) S.setIdx = Math.max(0, S.setIdx - 1);
     else if (k === KEY.DOWN) S.setIdx = Math.min(SETS.length - 1, S.setIdx + 1);
@@ -6726,6 +6962,8 @@ function renderSeries() {
   if (vers[SER.vi] && !shown.includes(vers[SER.vi])) shown.push(vers[SER.vi]);
   $('s-vers').innerHTML = shown.length > 1 ? '<span class="svl">Version</span>' + shown.map(v => { const k = vers.indexOf(v); return '<button class="chip' + (k === SER.vi ? ' on' : '') + (SER.zone === 'svers' && k === SER.vi ? ' focus' : '') +
     '" data-i="' + k + '">' + esc(verLabel(v)) + '</button>'; }).join('') : '';
+  const svf = document.querySelector('#s-vers .chip.focus');
+  if (svf) svf.scrollIntoView({block: 'nearest', inline: 'nearest'});
   const cover = info.cover || it.icon;
   $('s-cover').style.backgroundImage = cover ? 'url("' + String(cover).replace(/"/g, '%22') + '")' : 'none';
   $('s-title').innerHTML = esc(disp(it)) + (isFav(it) ? ' <span class="star">★</span>' : '');
@@ -7281,7 +7519,7 @@ function optItems() {
     if (x) it.push({l: favLabel(x), k: KEY.RED});
     if ((S.zone === 'items' || S.zone === 'cats') && sortable(b.cats[b.cat])) it.push({l: 'Change sort order (now ' + SORTS[S.page][ui.sort[S.page]] + ')', k: KEY.YELLOW});
   }
-  if (sc === 'main' && S.page === 'search' && S.zone === 'results') { const x = resultList()[Q.item]; if (x && !x.rq) it.push({l: favLabel(x), k: KEY.RED}); }
+  if (sc === 'main' && isSearchPage(S.page) && S.zone === 'results') { const x = resultList()[Q.item]; if (x && !x.rq) it.push({l: favLabel(x), k: KEY.RED}); }
   if (sc === 'movie' && MV.g) it.push({l: favLabel(MV.g), k: KEY.RED});
   if (sc === 'series' && (SER.g || SER.it)) it.push({l: favLabel(SER.g || SER.it), k: KEY.RED});
   if (sc === 'player' && cur() && cur().t !== 'ep') it.push({l: favLabel(cur()), k: KEY.RED});
@@ -7318,15 +7556,16 @@ function optItems() {
   if (sc === 'player' && cur()) it.push({l: 'Stream info and quality tips', a: () => askText('Stream info', streamInfoText(), '', () => {}, true)});
   if (sc === 'player' && EXT && cur() && !MPV.on) it.push({l: 'Open in VLC (if there’s no sound or picture)', a: () => { const c = cur(); const at = c.t === 'live' ? 0 : (video.currentTime || 0); main.stop(); openExternal(c, at); }});
   if (sc === 'player' && HAS_MPV && cur() && !MPV.on) it.push({l: 'Open in the mpv player (if there’s no sound or picture)', a: () => { const c = cur(); main.stop(); playMpv(c, c.t === 'live' ? 0 : NV._t || video.currentTime || 0); }});
-  if (sc === 'main' && S.page === 'search' && S.zone === 'chips' && !Q.text) {
+  if (sc === 'main' && S.page === 'sportshub' && S.zone === 'chips' && !Q.text) {
     const c = searchChips()[Q.chip];
     if (c && c.id !== 'add') it.push({l: 'Remove the “' + c.l + '” shortcut', a: () => removeChip(c)});
   }
   if (sc === 'login') {
     try { const at = lItems()[L.idx], el = at && $(inputOf(at)); if (el && el.tagName === 'INPUT') it.push({l: 'Type this on your phone (QR code)', a: () => openPhone(el.placeholder || 'Sign-in', t => { el.value = t; })}); } catch (e) { }
   }
-  if (sc === 'main' && S.page === 'search') it.push({l: 'Type your search on your phone (QR code)', a: () => openPhone('Search', t => { Q.text = t; onQueryChange(); })});
-  if (sc === 'main' && S.page === 'search') it.push({l: 'Update the TV guide now', a: () => loadGuide(true)}, {l: 'Edit search shortcuts', a: askShortcuts});
+  if (sc === 'main' && isSearchPage(S.page)) it.push({l: 'Type your search on your phone (QR code)', a: () => openPhone('Search', t => { Q.text = t; onQueryChange(); })});
+  if (sc === 'main' && isSearchPage(S.page)) it.push({l: 'Update the TV guide now', a: () => loadGuide(true)});
+  if (sc === 'main' && S.page === 'sportshub') it.push({l: 'Edit search shortcuts', a: askShortcuts});
   if (sc === 'game') it.push({l: 'Search channels for this game', a: doGameSearch});
   if (sc === 'game' && ui.aiKey && GS.ev && GS.ev.fixture) it.push({l: 'Look this game up online again', a: () => runLookup(GS.ev, true)});
   const pt = pinTarget();
@@ -7723,7 +7962,7 @@ function handleKey(k, e) {
     if (k === KEY.MENU && !$('ask-in').classList.contains('hidden')) { e.preventDefault(); openPhone($('ask-title').textContent, t => { $('ask-in').value = t; }); return; } if (k === KEY.ENTER) { e.preventDefault(); closeAsk(true); } else if (k === KEY.BACK || k === KEY.ESC) { e.preventDefault(); closeAsk(false); } return; }
   if (OPT.open) { if (k === KEY.ESC || k === KEY.BKSP) k = KEY.BACK; optsKey(k); e.preventDefault(); return; }
   const ae = document.activeElement, typing = ae && ae.tagName === 'INPUT' && !ae.readOnly;
-  if (PC && !typing && !(S.screen === 'main' && S.page === 'search' && S.zone !== 'rail')) {
+  if (PC && !typing && !(S.screen === 'main' && isSearchPage(S.page) && S.zone !== 'rail')) {
     if (k === 77 || k === 93) k = KEY.MENU;                       /* M or the menu key */
     else if (k === 70 || k === 122) { e.preventDefault(); toggleFS(); return; }   /* F or F11 */
     else if (k === 32 && S.screen === 'player') k = KEY.PLAYPAUSE;
@@ -7737,7 +7976,7 @@ function handleKey(k, e) {
   if (k === KEY.MENU) { openOpts(); return; }
   if (!$('loading').classList.contains('hidden')) { e.preventDefault(); return; }
   if (!typing && [37, 38, 39, 40, 13, 461, 33, 34, 8, 32].includes(k)) e.preventDefault();
-  if (!typing && S.screen === 'main' && S.page === 'search' && S.zone !== 'rail' && k === KEY.BKSP) { delChar(); return; }
+  if (!typing && S.screen === 'main' && isSearchPage(S.page) && S.zone !== 'rail' && k === KEY.BKSP) { delChar(); return; }
   if (!typing && (k === KEY.BKSP || k === KEY.ESC)) k = KEY.BACK;
   if (S.screen === 'login') loginKey(k, e);
   else if (S.screen === 'main') mainKey(k, e);
@@ -7754,7 +7993,7 @@ window.__rcsKey = k => handleKey(k, fakeEv());
 const idxOf = e => { const el = e.target.closest('[data-i]'); return el ? Number(el.getAttribute('data-i')) : -1; };
 $('rail-items').addEventListener('click', e => {
   const i = idxOf(e); if (i < 0) return;
-  if (PHONE) { const id = PAGES[i].id; S.zone = id === 'search' ? 'results' : id === 'settings' ? 'set' : 'cats'; Q.sportGroup = ''; showPage(id); return; }
+  if (PHONE) { const id = PAGES[i].id; S.zone = id === 'sportshub' ? 'chips' : id === 'search' ? 'qbox' : id === 'settings' ? 'set' : 'cats'; Q.sportGroup = ''; showPage(id); return; }
   S.zone = 'rail'; showPage(PAGES[i].id);
 });
 $('cats').addEventListener('click', e => {
@@ -7873,7 +8112,7 @@ wheel($('grid'), d => {
   S.zone = 'items'; b.item = Math.max(0, Math.min(b.items.length - 1, b.item + d * gridView.nc)); renderMain();
 }, 21);
 $('gm-search').addEventListener('click', () => doGameSearch());
-$('g-chans').addEventListener('click', e => { const i = idxOf(e); if (i >= 0 && GS.ev && i === GS.list.length) { GS.showMaybe = !GS.showMaybe; GS.ch = i; GS.moved = true; renderGame(); return; } if (i < 0 || !GS.ev || !GS.list[i] || GS.list[i].hdr) return; GS.ch = i; playEvent(GS.ev, i, GS.list); });
+$('g-chans').addEventListener('click', e => { const i = idxOf(e); if (i >= 0 && GS.ev && i === GS.list.length) { GS.showMaybe = !GS.showMaybe; GS.ch = i; GS.moved = true; if (GS.showMaybe) GS._expandFocus = true; renderGame(); return; } if (i < 0 || !GS.ev || !GS.list[i] || GS.list[i].hdr) return; GS.ch = i; playEvent(GS.ev, i, GS.list); });
 wheel($('rlist'), d => { S.zone = 'results'; Q.item = Math.max(0, Math.min(resultList().length - 1, Q.item + d)); renderMain(); }, 7.4);
 wheel($('eps'), d => { SER.zone = 'eps'; const n = (SER.eps[SER.seasons[SER.s]] || []).length; SER.e = Math.max(0, Math.min(n - 1, SER.e + d)); renderSeries(); });
 wheel($('g-chans'), d => { if (!GS.ev) return; GS.ch = Math.max(0, Math.min(GS.list.length - 1, GS.ch + d)); renderGame(); }, 7.4);
