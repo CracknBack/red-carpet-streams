@@ -1075,7 +1075,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.23.1';
+const APP_VERSION = '3.23.2';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 const PC = !!window.RCSPC || !!window.RCS_DESKTOP;   /* Windows app, or the no-install desktop version */
 const PHONE = FIRE && navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) < 700;   /* Android phone */
@@ -3774,6 +3774,9 @@ const HB_TABS = [['live', 'Live Now'], ['replay', 'Replay'], ['upcoming', 'Upcom
    to reach; a real dedicated page is worth doing later, with time to test it properly, not bolted on
    in a hurry. */
 const HOME_TILES = [['settings', 'Settings'], ['search', 'Search'], ['live', 'Live TV'], ['vod', 'Movies'], ['series', 'TV Series'], ['favs', 'Favourites']];
+/* "Continue" only shows up once there's something to resume -- appended at the end so it never
+   shifts the indices of the six tiles above (HOME.tile's default stays pointing at Live TV). */
+function homeTiles() { return continueWatchingList().length ? HOME_TILES.concat([['cont', 'Continue']]) : HOME_TILES; }
 function homeDetail(id) {
   if (!DATA) return '';
   const n = x => x.toLocaleString();
@@ -3782,6 +3785,7 @@ function homeDetail(id) {
   if (id === 'search') return 'Games, teams, channels';
   if (id === 'vod') { const c = specialList('vod', '__cont').length; return c ? c + ' to continue' : DATA.vod.fetched ? n(DATA.vod.items.length) + ' movies' : 'Movies'; }
   if (id === 'series') { const c = specialList('series', '__cont').length; return c ? c + ' to continue' : DATA.series.fetched ? n(DATA.series.items.length) + ' series' : 'Series'; }
+  if (id === 'cont') { const c = continueWatchingList().length; return c + (c === 1 ? ' title' : ' titles') + ' to resume'; }
   return 'Account and display';
 }
 /* the strip: live games from your sports (shortcuts and teams); otherwise things to continue watching */
@@ -3884,10 +3888,8 @@ const homeShown = () => homeSportsList(HOME.mode).list;
 function homeBanner() {
   const sel = homeSportsList(HOME.mode), shown = sel.list, out = {title: 'Sports Hub', cards: [], n: shown.length, kind: sel.kind};
   if (shown.length) out.cards.push({type: 'game', ev: shown[HOME.liveIdx % shown.length], kind: sel.kind});
-  /* Nothing live, replaying or upcoming (and no tab pinned): use the same hero slot to surface the
-     most recent in-progress movie/series instead of leaving it idle -- tapping it opens the full
-     Continue watching tiles page (homeOpenContinue), this is just a one-item teaser. */
-  else if (HOME.mode === 'auto') { const cw = continueWatchingList(); if (cw.length) { out.title = 'Continue watching'; out.n = 1; out.cards.push({type: 'cont', it: cw[0]}); } }
+  /* Sports Hub always stays Sports Hub -- it never borrows the hero slot to tease a movie/series
+     resume. That has its own home now: the "Continue" tile in the carousel (homeTiles()). */
   return out;
 }
 /* with several games on, the banner moves through them every few seconds (and waits while you are on it) */
@@ -3908,10 +3910,10 @@ function renderHome() {
   $('h-sub').textContent = isM3u() ? 'Playlist' : exp ? 'Subscription active until ' + exp.toLocaleDateString([], {day: 'numeric', month: 'short', year: 'numeric'}) : (u.status || '');
   $('h-ver').innerHTML = (GUIDE_BUSY ? '<span class="hbd"></span>Updating the TV guide…&nbsp;&nbsp;·&nbsp;&nbsp;' : '') + 'Version ' + esc(APP_VERSION);
   /* the carousel: seven slots around the chosen tile (it wraps round) */
-  const n = HOME_TILES.length;
+  const tiles = homeTiles(), n = tiles.length;
   let html = '';
   for (let dd = -3; dd <= 3; dd++) {
-    const i = (((HOME.tile + dd) % n) + n) % n, ghost = false, id = HOME_TILES[i][0], label = HOME_TILES[i][1];
+    const i = (((HOME.tile + dd) % n) + n) % n, ghost = false, id = tiles[i][0], label = tiles[i][1];
     html += '<div class="hslot s' + Math.abs(dd) + (dd < 0 ? ' L' : dd > 0 ? ' R' : '') + (ghost ? ' ghost' : '') + (dd === 0 && HOME.zone === 'tiles' ? ' focus' : '') + '" data-i="' + i + '" data-id="' + id + '">' +
       '<div class="hg"><img src="glyph-' + id + '.png" alt=""></div><div class="hl">' + esc(label) + '</div>' + (dd === 0 ? '<div class="hd">' + esc(homeDetail(id)) + '</div>' : '') + '</div>';
   }
@@ -3957,7 +3959,8 @@ function renderHome() {
   $('hhints').innerHTML = hintsHtml([['OK', 'Open'], ['◀ ▶', 'Choose'], ['▲', 'Light / dark']]);
 }
 function homeOpenTile(i) {
-  const id = HOME_TILES[i][0];
+  const id = homeTiles()[i][0];
+  if (id === 'cont') { homeOpenContinue(); return; }
   if (id === 'search') Q.sportGroup = '';
   show('main');
   S.zone = id === 'search' ? 'qbox' : id === 'settings' ? 'set' : 'cats';
@@ -3985,7 +3988,7 @@ function toggleTheme() {
 }
 $('h-theme').addEventListener('click', toggleTheme);
 function homeKey(k) {
-  const n = HOME_TILES.length;
+  const n = homeTiles().length;
   if (HOME.zone === 'tiles') {
     if (k === KEY.LEFT) HOME.tile = (HOME.tile + n - 1) % n;
     else if (k === KEY.RIGHT) HOME.tile = (HOME.tile + 1) % n;
