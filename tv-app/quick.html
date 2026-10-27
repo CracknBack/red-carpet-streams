@@ -229,7 +229,18 @@ h2{font-size:3rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overfl
 /* the live sports banner */
 .hstrip{margin-top:1rem;margin-bottom:.4rem}
 .hstrip .slabel{font-size:2.6rem;letter-spacing:.1em;color:#E9CBA0;text-transform:uppercase;font-weight:300;margin-bottom:.8rem}
-.hbanner{display:flex;align-items:stretch;height:17rem;flex:none;border-radius:2rem;border:.3rem solid #B98B55;background:linear-gradient(90deg,rgba(18,26,38,.95),rgba(10,16,25,.97));overflow:hidden;box-shadow:0 1rem 3rem rgba(0,0,0,.4)}
+/* one unified box: a wide hero game card on top, the full sport-icon row along the bottom -- used to be
+   two separate bordered boxes side by side (a narrower "live sports" card plus a "Browse" chip column),
+   merged into one so it reads as a single Sports Hub rather than two unrelated panels. */
+.hhub{display:flex;flex-direction:column;border-radius:2rem;border:.3rem solid #B98B55;background:linear-gradient(90deg,rgba(18,26,38,.95),rgba(10,16,25,.97));overflow:hidden;box-shadow:0 1rem 3rem rgba(0,0,0,.4)}
+.hhub-game{display:flex;align-items:stretch;height:17rem;flex:none}
+.hhub-game .hb-game{flex:1}
+.hhub-sports{display:flex;align-items:flex-start;gap:1.6rem;padding:1.6rem 2.4rem;overflow-x:auto;border-top:.15rem solid rgba(231,185,111,.22);scrollbar-width:none}
+.hhub-sports::-webkit-scrollbar{display:none}
+.hhub-sports .hb-chips{display:flex;gap:1.6rem}
+.hhub-sports .hb-chip{flex:none;width:8rem}
+.hhub-sports .hb-logo{width:100%;height:5.4rem}
+.hhub-sports .hb-cl{font-size:1.2rem;max-width:none;white-space:normal;text-align:center;line-height:1.15}
 .hb-game{position:relative;flex:2.5;min-width:0;padding:2rem 3rem;display:flex;flex-direction:column;justify-content:center;gap:.9rem;cursor:pointer;
   justify-content:flex-end;background:linear-gradient(90deg,rgba(8,13,20,.86) 0,rgba(8,13,20,.62) 38%,rgba(8,13,20,.12) 62%,rgba(8,13,20,0) 78%),url(hero-banner.jpg) 85% 40%/cover no-repeat}
 .hb-game .hb-title,.hb-game .hb-sub{text-shadow:0 .2rem 1rem rgba(0,0,0,.9)}
@@ -571,8 +582,10 @@ h2 .sep{color:var(--muted);font-weight:500;margin:0 1.2rem}
 .svers:empty{display:none}
 /* overlays */
 .overlay{position:fixed;top:0;left:0;right:0;bottom:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(6,12,16,.8)}
-.obox{min-width:56rem;background:var(--panel);border:.15rem solid rgba(231,185,111,.45);border-radius:1.2rem;padding:1.6rem 2.4rem 2.4rem;box-shadow:0 2rem 6rem rgba(0,0,0,.6)}
-.obox .row{height:5.4rem}
+.obox{min-width:56rem;max-height:80vh;display:flex;flex-direction:column;background:var(--panel);border:.15rem solid rgba(231,185,111,.45);border-radius:1.2rem;padding:1.6rem 2.4rem 2.4rem;box-shadow:0 2rem 6rem rgba(0,0,0,.6)}
+.obox .slabel{flex:none}
+#opts-list{overflow-y:auto;flex:1 1 auto;min-height:0}
+.obox .row{height:5.4rem;flex:none}
 html.native,html.native body{background:transparent!important}
 html.native #player{background:transparent}
 html.native #video{display:none}
@@ -710,20 +723,12 @@ html:not(.phone) #g-chans .csec{grid-template-columns:repeat(var(--gc,4),1fr)}
 
 
 
-/* the home banner: "Sports Hub" (live/replay/upcoming game + tabs) and "Browse" (sport chips) side by side */
-.hrow2{display:flex;gap:2.4rem;align-items:flex-start}
-.hcol{min-width:0}
-.hlive{flex:1.15}
-.hfind{flex:1}
-.hhead{display:flex;align-items:baseline;justify-content:space-between;gap:1.2rem}
+/* the home banner: one "Sports Hub" box, a wide hero game card with the sport-icon row along its bottom */
+.hhub-head{display:flex;align-items:baseline;justify-content:space-between;gap:1.2rem}
 .hbtabs{display:flex;gap:.7rem;margin-bottom:.8rem}
 .hbtab{font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:1.25rem;color:var(--muted);border:.15rem solid transparent;border-radius:.5rem;padding:.3rem 1.1rem;cursor:pointer;background:rgba(255,255,255,.04)}
 .hbtab.on{color:#E9CBA0;border-color:#B98B55}
 .hbtab.focus{outline:.2rem solid var(--amber);outline-offset:.15rem}
-#h-find .hb-chips{display:flex;align-items:center;justify-content:space-between;gap:.4rem;width:100%;padding:0 1.6rem}
-#h-find .hb-chip{flex:1 1 0;min-width:0;gap:.5rem}
-#h-find .hb-logo{width:100%;height:6.4rem}
-#h-find .hb-cl{font-size:1.25rem;max-width:none;white-space:normal;text-align:center;line-height:1.12}
 .hb-game{background:linear-gradient(90deg,rgba(8,13,20,.93) 0,rgba(8,13,20,.9) 34%,rgba(8,13,20,.52) 48%,rgba(8,13,20,.12) 62%,rgba(8,13,20,0) 80%),linear-gradient(90deg,#0a1019 0,rgba(10,16,25,0) 38%) right center/40.1rem 100% no-repeat,url(hero-banner.jpg) right center/auto 100% no-repeat,#0a1019}
 .hb-title.xlong{font-size:2.2rem}
 
@@ -781,7 +786,7 @@ html.light .hslot{color:#8A5A1C;background:linear-gradient(180deg,rgba(252,248,2
 html.light .hslot .hd{color:#8A5A1C}
 html.light .hslot.s0.focus{box-shadow:inset 0 0 0 .5rem #FCF8EE,inset 0 0 0 .62rem rgba(170,24,40,.95),0 0 6rem rgba(231,185,111,.4),0 0 2rem rgba(231,185,111,.3)}
 html.light .hstrip .slabel{color:#8A5A1C}
-html.light .hbanner{background:linear-gradient(90deg,rgba(252,248,238,0.95),rgba(252,248,238,0.97));box-shadow:0 1rem 3rem rgba(90,60,30,0.22)}
+html.light .hhub{background:linear-gradient(90deg,rgba(252,248,238,0.95),rgba(252,248,238,0.97));box-shadow:0 1rem 3rem rgba(90,60,30,0.22)}
 html.light .hb-building{color:#8A5A1C}
 html.light .hb-find{color:#8A5A1C}
 html.light .hb-badge{color:#8A5A1C}
@@ -969,7 +974,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
   <div class="hwrap">
     <div class="hhead"><img src="logo.png" class="hlogo" alt=""><div class="hclock"><div id="h-time" class="htime"></div><div id="h-date" class="hdate"></div><div id="h-sub" class="hsub"></div></div><button id="h-theme" class="htheme" type="button" aria-label="Switch between light and dark"><span class="th-sun"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.3 5.3l1.9 1.9M16.8 16.8l1.9 1.9M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9"/></svg></span><span class="th-moon"><svg viewBox="0 0 24 24"><path d="M20.2 14.6A8.6 8.6 0 0 1 9.4 3.8a8.6 8.6 0 1 0 10.8 10.8z"/></svg></span></button></div>
     <div id="h-tiles" class="hcar"></div>
-    <div id="h-strip-wrap" class="hstrip"><div class="hrow2"><div class="hcol hlive"><div class="hhead"><div id="h-strip-title" class="slabel"></div><div id="h-strip-tabs" class="hbtabs"></div></div><div id="h-strip" class="hbanner"></div></div><div class="hcol hfind"><div id="h-find-title" class="slabel">Browse</div><div id="h-find" class="hbanner"></div></div></div></div>
+    <div id="h-strip-wrap" class="hstrip"><div class="hhub-head"><div id="h-strip-title" class="slabel"></div><div id="h-strip-tabs" class="hbtabs"></div></div><div class="hhub"><div id="h-strip" class="hhub-game"></div><div id="h-find" class="hhub-sports"></div></div></div>
   </div>
   <div id="h-ver" class="hver"></div>
   <footer id="hhints" class="hints"></footer>
@@ -1027,7 +1032,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.20.3';
+const APP_VERSION = '3.21.0';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 const PC = !!window.RCSPC || !!window.RCS_DESKTOP;   /* Windows app, or the no-install desktop version */
 const PHONE = FIRE && navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) < 700;   /* Android phone */
@@ -2711,6 +2716,24 @@ const chipLabel = id => String(id).startsWith('team:') ? id.slice(5) : compLabel
    list is only for places that summarise what's already pinned (pinSummary, Settings), which are cheap
    regardless of length since an un-pinned competition just doesn't show up there. */
 const PIN_COMPS = COMPS.map(([c]) => c);
+/* the Sports Hub icon row groups every competition under one icon per SPORT (not one per competition --
+   that was 8 nearly-identical footballs). Order matches the owner's own reference mockup. */
+const SPORT_GROUPS = [
+  ['soccer', 'Soccer', 'lg-football.png', ['Premier League', 'Champions League', 'Europa League', 'FA Cup', 'League Cup', 'La Liga', 'Serie A', 'Ligue 1', 'Bundesliga', 'A-League', 'Eredivisie', 'Primeira Liga', 'Belgian Pro League', 'Scottish Premiership', 'League of Ireland', 'Austrian Bundesliga', 'Greek Super League', 'Turkish Super Lig', 'Swiss Super League']],
+  ['basketball', 'Basketball', 'lg-basketball.png', ['NBA']],
+  ['icehockey', 'Ice Hockey', 'lg-ice-hockey.png', ['NHL']],
+  ['baseball', 'Baseball', 'lg-baseball.png', ['MLB']],
+  ['amfootball', 'American Football', 'lg-american-football.png', ['NFL']],
+  ['motorsport', 'Motorsport', 'lg-motor-racing.png', ['Formula 1', 'MotoGP', 'IndyCar', 'NASCAR']],
+  ['tennis', 'Tennis', 'lg-tennis.png', ['ATP Tour', 'WTA Tour']],
+  ['golf', 'Golf', 'lg-golf.png', ['PGA Tour', 'European Tour']],
+  ['mma', 'MMA', 'lg-mma.png', ['UFC']],
+  ['boxing', 'Boxing', 'lg-boxing.png', ['Boxing']],
+  ['rugby', 'Rugby', 'lg-rugby.png', ['Rugby']],
+  ['afl', 'AFL', 'lg-afl.png', ['AFL']],
+  ['nrl', 'Rugby League / NRL', 'lg-rugby-league.png', ['NRL']],
+  ['cricket', 'Cricket', 'lg-cricket.png', ['Cricket']]
+];
 function parseShortcut(x) {
   const n = norm(x);
   if (!n) return '';
@@ -3813,7 +3836,7 @@ function homeBanner() {
      most recent in-progress movie/series instead of leaving it idle -- tapping it opens the full
      Continue watching tiles page (homeOpenContinue), this is just a one-item teaser. */
   else if (HOME.mode === 'auto') { const cw = continueWatchingList(); if (cw.length) { out.title = 'Continue watching'; out.n = 1; out.cards.push({type: 'cont', it: cw[0]}); } }
-  chipsList().filter(id => LG_OK.has(id)).forEach(id => out.cards.push({type: 'chip', id}));
+  SPORT_GROUPS.forEach(g => out.cards.push({type: 'sport', id: g[0]}));
   return out;
 }
 /* with several games on, the banner moves through them every few seconds (and waits while you are on it) */
@@ -3868,21 +3891,27 @@ function renderHome() {
       const it = c.it, sub = [it.sub, it.pct ? Math.round(it.pct) + '% watched' : ''].filter(Boolean).join('  ·  ');
       b += '<div class="hb-game' + foc(i) + (HOME.fade ? ' fade' : '') + '" data-i="' + i + '"><div class="hb-top"><span class="hb-pill rep">RESUME</span></div>' +
         '<div class="hb-title' + (it.name.length > 31 ? ' xlong' : it.name.length > 26 ? ' long' : '') + '">' + esc(it.name) + '</div><div class="hb-sub">' + esc(sub) + '</div></div>';
-    } else chipHtml += '<div class="hb-chip' + foc(i) + '" data-i="' + i + '"><div class="hb-logo">' + lgImg(c.id, 'hb-lg') + '</div><div class="hb-cl">' + esc(chipLabel(c.id)) + '</div></div>';
+    } else if (c.type === 'sport') {
+      const g = SPORT_GROUPS.find(s => s[0] === c.id);
+      if (g) chipHtml += '<div class="hb-chip' + foc(i) + '" data-i="' + i + '"><div class="hb-logo"><img class="hb-lg" src="' + g[2] + '" alt=""></div><div class="hb-cl">' + esc(g[1]) + '</div></div>';
+    }
   });
   $('h-strip').innerHTML = b;
-  $('h-find').innerHTML = chipHtml ? '<div class="hb-chips">' + chipHtml + '</div>' : '';
+  $('h-find').innerHTML = chipHtml;
+  if (HOME.zone === 'strip') { const focEl = $('h-find').querySelector('.hb-chip.focus'); if (focEl) focEl.scrollIntoView({block: 'nearest', inline: 'nearest'}); }
   HOME.fade = false;
   $('h-strip-wrap').classList.remove('hidden');
   $('hhints').innerHTML = hintsHtml([['OK', 'Open'], ['◀ ▶', 'Choose'], ['▲', 'Light / dark']]);
 }
 function homeOpenTile(i) {
   const id = HOME_TILES[i][0];
+  if (id === 'search') Q.sportGroup = '';
   show('main');
   S.zone = id === 'search' ? 'qbox' : id === 'settings' ? 'set' : 'cats';
   showPage(id);
 }
 function homeOpenSearch(id) {
+  Q.sportGroup = '';
   if (id) { Q.sport = id; const k = searchChips().findIndex(c => c.id === id); if (k >= 0) Q.chip = k; Q.skey = ''; }
   show('main'); S.zone = id ? 'chips' : 'qbox'; showPage('search'); if (id) { S.zone = 'chips'; renderMain(); }
 }
@@ -3892,7 +3921,7 @@ function homeOpenCard(i) {
   P.back = 'home';
   if (c.type === 'game') { openGame(c.ev, true); return; }
   if (c.type === 'cont') { homeOpenContinue(); return; }
-  homeOpenSearch(c.type === 'chip' ? c.id : '');
+  if (c.type === 'sport') { homeOpenSportGroup(c.id); return; }
 }
 function homeOpenContinue() {
   show('main'); S.zone = 'items'; showPage('cont');
@@ -5375,11 +5404,15 @@ KB.push([{l: 'Type on your phone', a: 'phone', s: 3}, {l: 'TV keyboard or voice'
 const CHIPS = [['all', 'All'], ['games', 'Games'], ['live', 'Live TV'], ['vod', 'Movies'], ['series', 'Series']];
 const TORD = {live: 0, vod: 1, series: 2};
 const Q = {text: '', filter: 'all', all: [], res: [], counts: {}, item: 0, chip: 0, kbR: 0, kbC: 0, token: 0, last: null, busy: false, deb: 0, ver: 0, toks: [],
-  kb: false, sport: (ui.chips && ui.chips[0]) || 'Premier League', games: [], gkey: '', slist: [], skey: ''};
+  kb: false, sport: (ui.chips && ui.chips[0]) || 'Premier League', games: [], gkey: '', slist: [], skey: '', sportGroup: ''};
 
 function keyAt(row, col) { let c = 0; for (let i = 0; i < row.length; i++) { if (col < c + row[i].s) return i; c += row[i].s; } return row.length - 1; }
 function startOf(row, ki) { let c = 0; for (let i = 0; i < ki; i++) c += row[i].s; return c; }
 function sportChips() {
+  if (Q.sportGroup) {
+    const g = SPORT_GROUPS.find(s => s[0] === Q.sportGroup);
+    if (g) return g[3].map(id => ({id, l: compLabel(id)})).concat([{id: 'allsports', l: '← All sports'}]);
+  }
   const c = chipsList().map(id => ({id, l: chipLabel(id)}));
   c.push({id: 'add', l: '＋ Add'});
   return c;
@@ -5649,8 +5682,26 @@ async function openItem(x, list) {
 function pickChip(c) {
   if (!c) { renderMain(); return; }
   if (c.id === 'add') { askAddChip(); return; }
+  if (c.id === 'allsports') { Q.sportGroup = ''; Q.chip = 0; const first = sportChips()[0]; Q.sport = (first && first.id !== 'add') ? first.id : ''; Q.item = 0; resView.reset(); renderMain(); return; }
   if (Q.text) { Q.filter = c.id; applyFilter(); }
   else { Q.sport = c.id; Q.item = 0; resView.reset(); renderMain(); }
+}
+/* A sport icon with just one competition (Basketball -> NBA, Boxing -> Boxing...) goes straight there --
+   nothing to choose. One with several (Soccer's 18 leagues, Motorsport's 4...) offers each league by
+   name first, "All <sport>" last for everything in that sport together -- picking a specific league is
+   the more common case, so it shouldn't cost an extra tap through an "all" view first. */
+function homeOpenSportGroup(id) {
+  const g = SPORT_GROUPS.find(s => s[0] === id);
+  if (!g) return;
+  if (g[3].length === 1) { homeOpenSearch(g[3][0]); return; }
+  const items = g[3].map(c => ({l: compLabel(c), a: () => homeOpenSearch(c)}));
+  items.push({l: 'All ' + g[1], a: () => homeOpenSportGroupAll(id)});
+  openMenu(items);
+}
+function homeOpenSportGroupAll(id) {
+  const g = SPORT_GROUPS.find(s => s[0] === id);
+  Q.sportGroup = id; Q.chip = 0; Q.sport = g ? g[3][0] : ''; Q.skey = ''; resView.reset();
+  show('main'); S.zone = 'chips'; showPage('search'); S.zone = 'chips'; renderMain();
 }
 
 function searchKey(k, e) {
@@ -5695,7 +5746,7 @@ function searchKey(k, e) {
     /* a lifted tab: left and right carry it along the row, up offers to remove it, anything else puts it down */
     if (Q.lift && !Q.text) {
       const c = chips[Q.chip];
-      if (!c || c.id === 'add') Q.lift = false;
+      if (!c || c.id === 'add' || c.id === 'allsports' || Q.sportGroup) Q.lift = false;
       else if (k === KEY.LEFT) { moveChip(-1); return; }
       else if (k === KEY.RIGHT) { moveChip(1); return; }
       else if (k === KEY.UP) { askRemoveChip(c); return; }
@@ -5704,10 +5755,10 @@ function searchKey(k, e) {
     }
     if (k === KEY.LEFT) { if (Q.chip > 0) { Q.chip--; pickChip(chips[Q.chip]); return; } S.zone = Q.kb ? 'kb' : 'rail'; }
     else if (k === KEY.RIGHT && Q.chip < chips.length - 1) { Q.chip++; pickChip(chips[Q.chip]); return; }
-    else if (k === KEY.UP || k === KEY.BACK) S.zone = 'qbox';
+    else if (k === KEY.UP || k === KEY.BACK) { if (Q.sportGroup) pickChip({id: 'allsports'}); else S.zone = 'qbox'; }
     else if (k === KEY.DOWN) { const l = resultList(); if (l.length) { S.zone = 'results'; Q.item = Math.max(0, stepRes(l, -1, 1)); } else return; }
-    else if (k === KEY.ENTER) { if (chips[Q.chip] && chips[Q.chip].id === 'add') { askAddChip(); return; } if (!Q.text) { Q.lift = true; renderMain(); return; } if (resultList().length) S.zone = 'results'; }
-    else if ((k === 46 || k === KEY.BKSP) && !Q.text) { removeChip(chips[Q.chip]); return; }
+    else if (k === KEY.ENTER) { if (chips[Q.chip] && (chips[Q.chip].id === 'add' || chips[Q.chip].id === 'allsports')) { pickChip(chips[Q.chip]); return; } if (!Q.text && !Q.sportGroup) { Q.lift = true; renderMain(); return; } if (resultList().length) S.zone = 'results'; }
+    else if ((k === 46 || k === KEY.BKSP) && !Q.text && !Q.sportGroup) { removeChip(chips[Q.chip]); return; }
     else return;
     renderMain(); return;
   }
@@ -6341,7 +6392,7 @@ function rowsKey(t, k) {
    type, instead of building a second search UI -- there is already an on-screen keyboard and results
    list there, no reason to duplicate either. */
 function openTypeSearch(t) {
-  Q.text = ''; Q.filter = t; Q.item = 0; resView.reset();
+  Q.text = ''; Q.filter = t; Q.item = 0; Q.sportGroup = ''; resView.reset();
   Q.kb = !PC; S.zone = PC ? 'qbox' : 'kb';
   show('main'); showPage('search');
   if (PC) { const q = $('q'); q.readOnly = false; q.focus(); }
@@ -7059,6 +7110,11 @@ function closeOpts() { OPT.open = false; $('opts').classList.add('hidden'); }
 function renderOpts() {
   $('opts').classList.remove('hidden');
   $('opts-list').innerHTML = OPT.items.map((o, i) => '<div class="row' + (i === OPT.i ? ' focus' : '') + '" data-i="' + i + '"><span class="name">' + esc(o.l) + '</span></div>').join('');
+  /* a long menu (e.g. every competition not already a chip, or a sport's full league list) can run well
+     past .obox's own 80vh cap -- on a remote, with no mouse to scroll, the focused row has to be
+     carried into view itself or moving past the first screenful is just invisible. */
+  const el = $('opts-list').querySelector('.row.focus');
+  if (el) el.scrollIntoView({block: 'nearest'});
 }
 function runOpt(i) {
   const o = OPT.items[i]; closeOpts();
@@ -7431,7 +7487,7 @@ function handleKey(k, e) {
     if (k === 77 || k === 93) k = KEY.MENU;                       /* M or the menu key */
     else if (k === 70 || k === 122) { e.preventDefault(); toggleFS(); return; }   /* F or F11 */
     else if (k === 32 && S.screen === 'player') k = KEY.PLAYPAUSE;
-    else if (k === 191 && S.screen === 'main') { e.preventDefault(); S.zone = 'kb'; showPage('search'); return; }   /* / opens search */
+    else if (k === 191 && S.screen === 'main') { e.preventDefault(); S.zone = 'kb'; Q.sportGroup = ''; showPage('search'); return; }   /* / opens search */
     /* Volume: 173/174/175 are the dedicated mute/down/up keys a keyboard with media keys sends; -/= are
        the fallback for a keyboard without them. Player screen only -- nothing else plays audio. */
     else if (S.screen === 'player' && (k === 174 || k === 189)) { e.preventDefault(); setVolume(-0.1); return; }
@@ -7458,7 +7514,7 @@ window.__rcsKey = k => handleKey(k, fakeEv());
 const idxOf = e => { const el = e.target.closest('[data-i]'); return el ? Number(el.getAttribute('data-i')) : -1; };
 $('rail-items').addEventListener('click', e => {
   const i = idxOf(e); if (i < 0) return;
-  if (PHONE) { const id = PAGES[i].id; S.zone = id === 'search' ? 'results' : id === 'settings' ? 'set' : 'cats'; showPage(id); return; }
+  if (PHONE) { const id = PAGES[i].id; S.zone = id === 'search' ? 'results' : id === 'settings' ? 'set' : 'cats'; Q.sportGroup = ''; showPage(id); return; }
   S.zone = 'rail'; showPage(PAGES[i].id);
 });
 $('cats').addEventListener('click', e => {
