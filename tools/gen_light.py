@@ -120,7 +120,6 @@ html.light #h-time{color:#4A2118} html.light #h-date{color:#7A3B2E} html.light #
 html.light .hslot .hg img,html.light .ri .ic img,html.light .tabi,html.light .ft-comp img,html.light .hb-lg,html.light .hb-chip img{filter:saturate(1.3) brightness(.76) contrast(1.08)}
 html.light .hb-game .hb-title{color:#fff} html.light .hb-game .hb-sub,html.light .hb-game .hb-count{color:#F3D7A6}
 html.light .hb-find{color:#A8352F} html.light .hb-cl{color:#5A2A1E}
-html.light .hbanner{background:linear-gradient(90deg,#FFFDF7,#F7EEDC);border-color:#B98B55;box-shadow:0 1rem 2.4rem rgba(110,50,55,.2)}
 html.light .hslot{background:linear-gradient(180deg,#FFFEFA,#F8F0DD);border-color:#B98B55;box-shadow:inset 0 0 0 .35rem #FFFEFA,inset 0 0 0 .45rem rgba(150,24,40,.6),0 1rem 2.4rem rgba(110,50,55,.2)}
 html.light .hslot.s0.focus{box-shadow:inset 0 0 0 .5rem #FFFEFA,inset 0 0 0 .62rem rgba(170,24,40,.9),0 0 5.5rem rgba(205,155,70,.65),0 1.6rem 3.2rem rgba(110,50,55,.28)}
 html.light .hs-glow.l,html.light .hs-glow.r{background:radial-gradient(ellipse at 50% 40%,rgba(255,252,240,.85),rgba(255,252,240,.3) 38%,rgba(255,252,240,0) 68%)}
