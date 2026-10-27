@@ -91,7 +91,12 @@ input{width:100%;background:var(--panel);border:.2rem solid var(--line);border-r
 #cats{width:23.4rem;flex:none;margin-top:5.8rem}   /* was 28rem -- narrowed so rows get more width for tiles */
 #cats .row{gap:1rem}
 #cats .bd{margin-left:0;flex:none}
-.content{flex:1;min-width:0;display:flex;flex-direction:column}
+.content{flex:1;min-width:0;display:flex;flex-direction:column;position:relative}
+/* A hint that there's more below: rows can run well past one screen (now more than ever, with fewer,
+   taller wide cards per row -- see ROW_TILES_TARGET), and #grid.rows's own scrollbar is the only other
+   sign of that, easy to miss on a TV. A soft fade at the bottom edge reads as "this cuts off, scroll" at
+   a glance; toggled on only for Movies/Series rows (renderBrowse), off for every other page. */
+.rows-fade{position:absolute;left:0;right:0;bottom:0;height:7rem;pointer-events:none;background:linear-gradient(180deg,rgba(10,16,25,0),rgba(10,16,25,.92) 85%);z-index:2}
 .head{position:relative;display:flex;align-items:center;gap:1.2rem;height:5rem;margin-bottom:.8rem;padding:0 .4rem}
 .head::after{content:'';position:absolute;left:0;right:0;bottom:0;height:.15rem;background:linear-gradient(90deg,var(--amber),rgba(160,28,42,.7) 25%,var(--line) 55%)}
 h2{font-size:3rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -381,6 +386,11 @@ html.phone .hwrap{bottom:0;padding:2rem 3rem 0}
 .pfav{position:absolute;top:.5rem;right:.8rem;color:var(--amber);font-size:2.4rem;text-shadow:0 0 .6rem #000}
 .pp{position:absolute;left:0;bottom:0;height:.6rem;background:var(--amber)}
 .card.focus .poster{border-color:var(--amber);box-shadow:0 1rem 2.4rem rgba(160,28,42,.45),0 0 3rem rgba(231,185,111,.5);transform:scale(1.08);transition:transform .12s}
+/* Wide cards (row-track): the poster sits right next to the info panel now, not above a caption with
+   room to spare -- scaling it up on focus (the flat-grid behaviour above) overlaps that panel's text
+   instead of leaving it be, since a transform never reflows neighbours. The border+glow alone already
+   reads as focus clearly enough here. */
+.row-track .card.focus .poster{transform:none}
 .card.current .poster{border-color:var(--line)}
 /* Fixed card width: this is load-bearing, not cosmetic -- without it the caption's own text decides the
    flex item's width (a block with white-space:nowrap has no overflow to truncate against until something
@@ -391,8 +401,17 @@ html.phone .hwrap{bottom:0;padding:2rem 3rem 0}
    value (--cw, set in renderRows()) so "6 tiles + a peek" holds at any resolution; plain width:15rem is
    just the fallback for the older flat grid (Favourites/Continue watching), which never needed to change. */
 .card{width:15rem}
-.row-track .card{width:var(--cw,15rem);flex:none}
-.row-track .poster{width:var(--cw,15rem);height:calc(var(--cw,15rem) * 1.5)}
+/* Wide cards (Movies/Series rows only): poster keeps its own natural portrait shape at --pw (a fraction
+   of the card), the title/rating/quality/version count sit beside it in their own panel -- same fields
+   as before (cardHtml's `meta`), just laid out next to the art instead of squeezed into a caption under
+   a narrow thumbnail. The plain .poster/.ct/.cm rules above stay the flat-grid fallback (Favourites/
+   Continue watching), untouched. */
+.row-track .card{display:flex;align-items:stretch;gap:1.4rem;width:var(--cw,38rem);flex:none}
+.row-track .poster{width:var(--pw,13rem);height:calc(var(--pw,13rem) * 1.5);flex:none}
+.row-track .cinfo{display:flex;flex-direction:column;justify-content:center;min-width:0;flex:1}
+.row-track .ct{margin-top:0;font-size:2.1rem;font-weight:600;line-height:1.25;white-space:normal;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.row-track .cm{flex-wrap:wrap;row-gap:.5rem;margin-top:.9rem}
+.row-track .cm span{border:.13rem solid rgba(184,163,131,.4);border-radius:.4rem;padding:.15rem .7rem;white-space:nowrap}
 .ct{margin-top:.7rem;font-size:1.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card.focus .ct{color:#fff}
 .cm{display:flex;gap:1.2rem;font-size:1.5rem;color:var(--muted);white-space:nowrap;overflow:hidden}
@@ -788,6 +807,7 @@ html.light #rail{background:linear-gradient(180deg,rgba(110,15,26,.35),rgba(252,
 html.light .ri{color:#3A1D18}
 html.light .ri.active{color:#3A1D18}
 html.light .ri.focus{color:#3A1D18}
+html.light .rows-fade{background:linear-gradient(180deg,rgba(252,248,238,0.00),rgba(252,248,238,0.92) 85%)}
 html.light .head h2{color:#8A5A1C}
 html.light .hero::after{background:linear-gradient(90deg,rgba(252,248,238,0.95) 0%,rgba(252,248,238,0.80) 32%,rgba(252,248,238,0.30) 62%,rgba(252,248,238,0.10) 100%),linear-gradient(0deg,rgba(252,248,238,0.92) 0%,rgba(252,248,238,0.00) 45%)}
 html.light .hero-meta{color:#3A1D18}
@@ -908,7 +928,6 @@ html.light #h-time{color:#4A2118} html.light #h-date{color:#7A3B2E} html.light #
 html.light .hslot .hg img,html.light .ri .ic img,html.light .tabi,html.light .ft-comp img,html.light .hb-lg,html.light .hb-chip img{filter:saturate(1.3) brightness(.76) contrast(1.08)}
 html.light .hb-game .hb-title{color:#fff} html.light .hb-game .hb-sub,html.light .hb-game .hb-count{color:#F3D7A6}
 html.light .hb-find{color:#A8352F} html.light .hb-cl{color:#5A2A1E}
-html.light .hbanner{background:linear-gradient(90deg,#FFFDF7,#F7EEDC);border-color:#B98B55;box-shadow:0 1rem 2.4rem rgba(110,50,55,.2)}
 html.light .hslot{background:linear-gradient(180deg,#FFFEFA,#F8F0DD);border-color:#B98B55;box-shadow:inset 0 0 0 .35rem #FFFEFA,inset 0 0 0 .45rem rgba(150,24,40,.6),0 1rem 2.4rem rgba(110,50,55,.2)}
 html.light .hslot.s0.focus{box-shadow:inset 0 0 0 .5rem #FFFEFA,inset 0 0 0 .62rem rgba(170,24,40,.9),0 0 5.5rem rgba(205,155,70,.65),0 1.6rem 3.2rem rgba(110,50,55,.28)}
 html.light .hs-glow.l,html.light .hs-glow.r{background:radial-gradient(ellipse at 50% 40%,rgba(255,252,240,.85),rgba(255,252,240,.3) 38%,rgba(255,252,240,0) 68%)}
@@ -956,6 +975,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
       </div>
       <div id="list" class="list"></div>
       <div id="grid" class="list"></div>
+      <div id="rows-fade" class="rows-fade hidden"></div>
       <div id="tiles" class="list hidden"></div>
       <div id="b-empty" class="empty hidden"></div>
     </div>
@@ -1050,7 +1070,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.21.3';
+const APP_VERSION = '3.22.0';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 const PC = !!window.RCSPC || !!window.RCS_DESKTOP;   /* Windows app, or the no-install desktop version */
 const PHONE = FIRE && navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) < 700;   /* Android phone */
@@ -4722,12 +4742,16 @@ function gridCols() {
    render at an identical pixel size from a phone-width window up to 1499px, silently breaking the tile
    count well before 1280px. Computing from the row's actual measured clientWidth sidesteps that
    entirely and holds the same tile count at any width, by construction, not by coincidence. */
-const ROW_TILES_TARGET = 6.3;   /* 6 full tiles + a clearly-visible peek of the 7th */
-const ROW_PERPAGE = 6;
+/* Wide cards now (poster + title/rating/metadata side by side, like Netflix's own landscape rows) --
+   was 6 narrow poster-only tiles, which read as a dense wall of thumbnails. 3 full cards + a clear peek
+   of the 4th both matches the look the owner asked for and leaves room for the info panel. */
+const ROW_TILES_TARGET = 3.3;
+const ROW_PERPAGE = 3;
 function rowMetrics() {
   const r = remPx(), avail = Math.max(1, $('grid').clientWidth - 0.8 * r);
   const stride = avail / ROW_TILES_TARGET, gap = stride * 0.08, cardW = stride - gap;
-  return {avail, stride, gap, cardW};
+  const posterW = cardW * 0.38;    /* the poster keeps its own natural portrait shape, just as a fraction of the wider card rather than the whole thing */
+  return {avail, stride, gap, cardW, posterW};
 }
 
 /* ================= favourites / history ================= */
@@ -5272,7 +5296,7 @@ function cardHtml(it, i) {
   return '<div class="card" data-i="' + i + '"><div class="poster"><span class="ph">' + esc(disp(it)) + '</span>' +
     (it.icon ? '<img src="' + esc(it.icon) + '" loading="lazy" decoding="async" onerror="this.remove()">' : '') +
     (it.ql ? '<span class="qb">' + esc(it.ql) + '</span>' : '') + (isFav(it) ? '<span class="pfav">★</span>' : '') + (p ? '<i class="pp" style="width:' + p.toFixed(1) + '%"></i>' : '') +
-    '</div><div class="ct">' + esc(disp(it)) + '</div><div class="cm">' + meta + '</div></div>';
+    '</div><div class="cinfo"><div class="ct">' + esc(disp(it)) + '</div><div class="cm">' + meta + '</div></div></div>';
 }
 
 function renderBrowse() {
@@ -5285,6 +5309,7 @@ function renderBrowse() {
   $('page-browse').classList.toggle('tcoll', tm && S.zone === 'items');
   $('page-browse').classList.toggle('rowsfocus', useRows && S.zone === 'items');
   $('b-catbtn').classList.toggle('hidden', !useRows);
+  $('rows-fade').classList.toggle('hidden', !useRows);
   let crumbs = c ? [disp(c)] : [];
   if (isLive && ui.liveLayout !== 'provider' && b.lv === 1 && c) crumbs = [S.zone === 'items' ? b.cc : (CNAME[b.cc] || b.cc), c.kind === 'up' ? 'All channels' : c.name];
   $('b-title').innerHTML = crumbs.map(esc).join('<span class="sep">›</span>');
@@ -5371,6 +5396,7 @@ function renderRows(t) {
   renderHero(t, rows, focRow);
   const m = rowMetrics();
   $('grid').style.setProperty('--cw', m.cardW + 'px');
+  $('grid').style.setProperty('--pw', m.posterW + 'px');
   $('grid').style.setProperty('--rg', m.gap + 'px');
   const srch = '<div class="srchrow' + (focRow === 0 ? ' focus' : '') + '" id="b-srch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg><span>Search ' + (t === 'vod' ? 'movies' : 'series') + '</span></div>';
   const body = rows.map((r, ri) => {
