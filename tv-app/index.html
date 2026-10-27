@@ -1050,7 +1050,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.21.2';
+const APP_VERSION = '3.21.3';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 const PC = !!window.RCSPC || !!window.RCS_DESKTOP;   /* Windows app, or the no-install desktop version */
 const PHONE = FIRE && navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) < 700;   /* Android phone */
@@ -4478,6 +4478,43 @@ async function ensureCategoryReady(t, c) {
   if (isM3u()) { await ensureTitlesGrouped(t); await ensureCategoryItems(t, c.id); return; }
   if (!String(c.id).startsWith('__') && c.id !== 'up' && !c.kind) await ensureCategoryItems(t, c.id);
 }
+/* Opening a title from Browse only ever grouped the copies that live in the SAME provider category it
+   was browsed from (ensureCategoryItems above) -- a popular title re-uploaded under several categories
+   (e.g. once as "New Release", again under a genre) only ever showed whichever copy happened to be in
+   the category you opened it from, silently, with no sign there were others. Search already sees every
+   copy catalog-wide (the lean {id,name,cat} index, SRCHIDX -- see ensureSearchIndex), just as separate
+   ungrouped rows instead of one title with a version list. This bridges the two: use the lean index
+   purely to find WHICH other categories have a same-titled copy, then only those specific categories
+   get pulled in (still one category at a time, still the same memory-safe ensureCategoryItems path --
+   never a full-catalog grouping pass). */
+const crossCatKey = name => norm(name).replace(/\b(19|20)\d{2}\b/g, '').split(' ').filter(w => w && !STRIP_WORDS.has(w)).join('');
+async function crossCategoryVersions(t, g) {
+  if (isM3u() || !g) return g;      /* M3U's whole catalog is already grouped as one pass -- nothing else to find */
+  const d = DATA[t];
+  await ensureSearchIndex(t);
+  const idx = SRCHIDX[t];
+  if (!idx || !idx.length) return g;
+  const myKey = crossCatKey(g.name);
+  if (!myKey) return g;
+  const haveCats = g.cats instanceof Set ? g.cats : new Set([g.cat]);
+  const haveIds = new Set(g.vers.map(v => String(v.id)));
+  const otherCats = new Set();
+  for (const it of idx) {
+    if (haveCats.has(it.cat) || haveIds.has(it.id)) continue;
+    if (crossCatKey(it.name) === myKey) otherCats.add(it.cat);
+  }
+  if (!otherCats.size) return g;
+  for (const catId of otherCats) {
+    await ensureCategoryItems(t, catId);
+    const match = (d.catItems.get(catId) || []).find(x => crossCatKey(x.name) === myKey);
+    if (!match) continue;
+    let added = false;
+    match.vers.forEach(v => { const id = String(v.id); if (!haveIds.has(id)) { g.vers.push(v); haveIds.add(id); d.verToTitle.set(v.id, g); added = true; } });
+    if (added) { g.cats = haveCats; haveCats.add(catId); }
+  }
+  if (g.vers.length > 1) g.vers.sort(verCmp);
+  return g;
+}
 /* Re-sorts every copy-of-a-title list (.vers) by the current quality/language preference — needed by
    both the picture-quality setting and the language setting, for items loaded via ensureCategoryItems
    (resortVersions()/the language handler only ever walked DATA[t].items directly, which stays empty
@@ -4581,7 +4618,13 @@ async function openMovie(g) {
     MV.info = (r && r.info && typeof r.info === 'object') ? r.info : {};
   } catch (e) { MV.info = {}; }
   MV.loading = false;
-  if (S.screen === 'movie') { renderMovie(); fetchVerDetails(g); }
+  if (S.screen === 'movie') {
+    renderMovie(); fetchVerDetails(g);
+    /* background: fold in copies of this same title filed under other provider categories, if any --
+       see crossCategoryVersions. Never blocks the page opening; re-renders only if it actually found
+       something and the owner is still looking at this title. */
+    crossCategoryVersions('vod', g).then(() => { if (MV.g === g && S.screen === 'movie') { renderMovie(); fetchVerDetails(g); } });
+  }
 }
 function movieButtons() {
   const tp = titleProg(MV.g), b = [];
