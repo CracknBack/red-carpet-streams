@@ -121,7 +121,12 @@ h2{font-size:3rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overfl
    instead of fetched. The synopsis only shows if already known (e.g. this title's detail page was
    opened earlier this session) -- deliberately never triggers its own fetch on focus, for the same
    reason: arrowing quickly through a row must never fire a burst of network requests. */
-.hero{position:relative;border-radius:1.2rem;overflow:hidden;margin-bottom:2.8rem;min-height:30rem;display:flex;align-items:flex-end;background:var(--panel)}
+/* Confirmed on the real device tonight: this used to be 30rem + a 2.8rem margin, which on a 1080p TV
+   screen left barely enough room below it for the first row before #grid's own overflow kicked in --
+   on first load, before you've navigated into a row and triggered its own scroll-into-view, you just
+   see whatever fits below the hero as-is, and that cut mid-poster with the caption entirely off-screen.
+   Smaller hero, more guaranteed room for the row to actually show something readable right away. */
+.hero{position:relative;border-radius:1.2rem;overflow:hidden;margin-bottom:1.8rem;min-height:19rem;display:flex;align-items:flex-end;background:var(--panel)}
 .hero-bg{position:absolute;inset:0;background-size:cover;background-position:center 20%;filter:blur(.4rem) brightness(.5) saturate(1.15);transform:scale(1.08)}
 .hero::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgba(8,13,20,.95) 0%,rgba(8,13,20,.8) 32%,rgba(8,13,20,.3) 62%,rgba(8,13,20,.1) 100%),linear-gradient(0deg,rgba(8,13,20,.92) 0%,rgba(8,13,20,0) 45%)}
 .hero-info{position:relative;z-index:1;padding:3.2rem 3.6rem;max-width:62rem}
@@ -1071,7 +1076,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.23.0';
+const APP_VERSION = '3.23.1';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 const PC = !!window.RCSPC || !!window.RCS_DESKTOP;   /* Windows app, or the no-install desktop version */
 const PHONE = FIRE && navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) < 700;   /* Android phone */
