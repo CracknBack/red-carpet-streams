@@ -266,8 +266,8 @@ h2{font-size:3rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overfl
    about how it looks should change just because the tag did. */
 .hhub-brand{appearance:none;background:none;border:none;padding:0;margin:0;font:inherit;text-align:left;cursor:pointer;display:flex;align-items:center;gap:1.1rem;min-width:0;border-radius:.6rem}
 .hhub-brand.focus{box-shadow:0 0 0 .2rem var(--amber);outline:none}
-.hhub-sh{width:4.2rem;height:4.2rem;flex:none;filter:drop-shadow(0 .2rem .5rem rgba(0,0,0,.65))}
-.hhub-title{font-size:2.6rem;letter-spacing:.1em;color:#E9CBA0;text-transform:uppercase;font-weight:700;text-shadow:0 .2rem .8rem rgba(0,0,0,.9);white-space:nowrap}
+.hhub-sh{width:5.4rem;height:5.4rem;flex:none;filter:drop-shadow(0 .2rem .5rem rgba(0,0,0,.65))}
+.hhub-title{font-size:3.4rem;letter-spacing:.1em;color:#E9CBA0;text-transform:uppercase;font-weight:700;text-shadow:0 .2rem .8rem rgba(0,0,0,.9);white-space:nowrap}
 /* the sport-icon row stays in the DOM (so its own focus/scroll state survives) but collapses to zero
    height behind the toggle tab -- the hero/game card above gets that space back until you ask for it. */
 .hsport-toggle-row{display:flex;justify-content:center;flex:none}
@@ -792,13 +792,9 @@ html:not(.phone) #g-chans .csec{grid-template-columns:repeat(var(--gc,4),1fr)}
 
 
 /* the home banner: one "Sports Hub" box, a wide hero game card with the sport-icon row along its bottom.
-   .hhub-head itself (position/layout) is defined up near .hhub -- this just styles the tab pills, which
-   now sit over the photo, so the "on" tab reads as a glowing red pill (like a live broadcast badge)
-   instead of the plain muted-outline tab this used to be when it sat on a flat panel above the box. */
-.hbtabs{display:flex;gap:.5rem}
-.hbtab{font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-weight:700;letter-spacing:.07em;text-transform:uppercase;font-size:1.3rem;color:#D9C7A8;border:.14rem solid rgba(255,255,255,.3);border-radius:999px;padding:.4rem 1.4rem;cursor:pointer;background:rgba(0,0,0,.35);text-shadow:0 .2rem .6rem rgba(0,0,0,.85)}
-.hbtab.on{color:#fff;border-color:#E0354A;background:rgba(196,30,45,.3);box-shadow:0 0 1rem rgba(196,30,45,.6)}
-.hbtab.focus{outline:.2rem solid var(--amber);outline-offset:.15rem}
+   .hhub-head itself (position/layout) is defined up near .hhub. The Live Now/Replay/Upcoming tab row
+   that used to live here is gone -- too much going on in one box per the owner, and there's no longer
+   any per-mode selection to show a tab for anyway (see homeBanner()'s own comment). */
 /* a touch brighter/more saturated than a straight photo crop -- closer to the owner's punchy reference
    mock (example.jpg) without needing new illustrated art: less of the box buried under the dark wash,
    plus a small saturate/brightness lift on the whole card (text already has a strong shadow, so this
@@ -922,8 +918,6 @@ html.light .ctile.focus .ct-logo .lt{border-color:#D9C7A3}
 html.light .chead.doubt{color:#8A5A1C}
 html.light .cmore{color:#8A5A1C}
 html.light .chip.lift{box-shadow:0 1.3rem 2.2rem rgba(90,60,30,0.28),0 0 1.4rem rgba(231,185,111,.4)}
-html.light .hbtab{color:#3A1D18;background:rgba(252,248,238,0.35)}
-html.light .hbtab.on{color:#3A1D18}
 
 html.light{--bg:#F6EEDC;--panel:#FFFDF7;--raise:#F2E7CF;--line:#D9C7A3;--text:#3A1D18;--muted:#7B6650;--amber:#9A5B16;--amber-soft:rgba(154,91,22,.14);--focus-bg:linear-gradient(90deg,rgba(168,28,44,.18),rgba(168,28,44,.04));--red2:#B02030;--red-deep:#8E1522;color-scheme:light}
 html.light body{background:#F6EEDC;color:#3A1D18}
@@ -1059,7 +1053,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
   <div class="hwrap">
     <div class="hhead"><img src="logo.png" class="hlogo" alt=""><div class="hclock"><div id="h-time" class="htime"></div><div id="h-date" class="hdate"></div><div id="h-sub" class="hsub"></div></div><button id="h-theme" class="htheme" type="button" aria-label="Switch between light and dark"><span class="th-sun"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.3 5.3l1.9 1.9M16.8 16.8l1.9 1.9M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9"/></svg></span><span class="th-moon"><svg viewBox="0 0 24 24"><path d="M20.2 14.6A8.6 8.6 0 0 1 9.4 3.8a8.6 8.6 0 1 0 10.8 10.8z"/></svg></span></button></div>
     <div id="h-tiles" class="hcar"></div>
-    <div id="h-strip-wrap" class="hstrip"><div id="hhub" class="hhub"><div class="hhub-head"><button id="h-brand" class="hhub-brand" type="button"><img class="hhub-sh" src="sh-badge.png" alt=""><div id="h-strip-title" class="hhub-title"></div></button><div id="h-strip-tabs" class="hbtabs"></div></div><div id="h-strip" class="hhub-game"></div><div class="hsport-toggle-row"><button id="h-sport-toggle" class="hsport-toggle" type="button"><span class="hst-car">▾</span>Sport Selector</button></div><div id="h-find" class="hhub-sports"></div></div></div>
+    <div id="h-strip-wrap" class="hstrip"><div id="hhub" class="hhub"><div class="hhub-head"><button id="h-brand" class="hhub-brand" type="button"><img class="hhub-sh" src="sh-badge.png" alt=""><div id="h-strip-title" class="hhub-title"></div></button></div><div id="h-strip" class="hhub-game"></div><div class="hsport-toggle-row"><button id="h-sport-toggle" class="hsport-toggle" type="button"><span class="hst-car">▾</span>Sport Selector</button></div><div id="h-find" class="hhub-sports"></div></div></div>
   </div>
   <div id="h-ver" class="hver"></div>
   <footer id="hhints" class="hints"></footer>
@@ -1117,7 +1111,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.23.12';
+const APP_VERSION = '3.23.14';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 const PC = !!window.RCSPC || !!window.RCS_DESKTOP;   /* Windows app, or the no-install desktop version */
 const PHONE = FIRE && navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) < 700;   /* Android phone */
@@ -2798,7 +2792,11 @@ function compOf(text) {
   }
   return '';
 }
-const DEFAULT_CHIPS = ['Premier League', 'Champions League', 'Europa League', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1', 'Formula 1'];
+/* this is both the Sports Hub page's default chip row AND (see homeLives/homeReplays/homeUpcoming) the
+   hard filter on what's allowed to appear in the Home landing banner -- deliberately broad across
+   sports rather than eight near-identical football leagues, since it's no longer just a ranking
+   tiebreaker, it's the actual gate on what counts as a big/known event. */
+const DEFAULT_CHIPS = ['Premier League', 'Champions League', 'NBA', 'NFL', 'Formula 1', 'UFC', 'ATP Tour'];
 const chipsList = () => ui.chips || DEFAULT_CHIPS;
 /* Display-only: every COMPS entry's first element is also the literal ev.comp value used throughout
    fixture matching (fixtureEvents, FD_COMPS, ALL_MATCH) and, critically, is matched byte-for-byte
@@ -3881,10 +3879,7 @@ function catList() {
   askText('Category list', lines.join('\n') + '\n\nSelect all and copy, then send it. Press OK or Back to close.', '', () => {}, true);
 }
 /* ================= start screen ================= */
-const HOME = {zone: 'tiles', tile: 2, card: 0, cards: [], cardKind: '', liveIdx: 0, fade: false, mode: 'auto', tab: 0, sportsOpen: false, sportCard: 0};
-/* "auto" (the default) shows whichever of these has something, in this order; picking a tab pins to
-   just that one -- even when it's empty, so the choice sticks instead of silently reverting to auto */
-const HB_TABS = [['live', 'Live Now'], ['replay', 'Replay'], ['upcoming', 'Upcoming']];
+const HOME = {zone: 'tiles', tile: 2, cards: [], cardKind: '', liveIdx: 0, fade: false, sportsOpen: false, sportCard: 0};
 /* Deliberately NOT adding a dedicated "Sports Hub" tile here: a 7th carousel tile needs its own full
    page (another showPage() target, another S.zone, its own key handling) duplicating what the hlive
    box below already does -- live/replay/upcoming game + sport chips, now with explicit tabs. That's a
@@ -3958,6 +3953,18 @@ function probeIcons() {
   });
 }
 const lgImg = (c, cls) => LG_OK.has(c) ? '<img class="' + (cls || 'lgi') + '" src="' + LG_SLUG(c) + '" alt="">' : '';
+/* an event counts as "known/big" for the Home landing banner (never for a sport's own dedicated browse
+   page -- that still shows everything for the sport you actually opened) if its competition is on the
+   priority list (chipsList(), Settings > Edit search shortcuts / the Sport Selector's own Prioritize
+   tile), or -- for anything not on that list -- it's being carried on enough channels at once that real
+   multi-market broadcast coverage is itself proof this is a big event, not just something that happened
+   to match a "name vs name" pattern. A fixed list alone can't catch a genuinely massive one-off (a World
+   Cup final, the Olympics) that isn't one of the handful of comps someone's pinned; a movie that happens
+   to be titled like a match ("Freddy vs Jason", confirmed live in the banner -- the "A vs B" matcher
+   can't tell a slasher-film crossover from a real fixture) never clears the channel-count bar either,
+   since nobody multi-casts a single film the way a real top-tier event gets carried everywhere at once. */
+const BIG_EVENT_CHANS = 4;
+const isKnownEvent = ev => chipsList().includes(ev.comp) || (ev.chans && ev.chans.length >= BIG_EVENT_CHANS);
 /* the games being played right now, from the fixture lists */
 function homeLives() {
   try {
@@ -4003,8 +4010,15 @@ function homeLives() {
        reading from that is the actual protection against the replay-misread-as-live failure, not a
        second literal "live" text match on top of it. Dropped ev.live here; ev.teams/ev.liveEvent
        alone is both broad enough to catch a real match regardless of how its provider's EPG phrases
-       it, and narrow enough to still exclude a talk show. */
-    return (EVENTS || []).filter(ev => (ev.fixture || ev.teams || ev.liveEvent) && evState(ev, now) === 0 && ev.chans && ev.chans.length).sort((a, b) => rk(a) - rk(b) || a.kick - b.kick);
+       it, and narrow enough to still exclude a talk show.
+       Third correction: ev.teams/ev.liveEvent still isn't narrow enough on its own -- it just means
+       "looked like a match", not "is a big, known one". With every EPG "A vs B" now eligible, 195
+       simultaneous "live" entries turned out to mostly be unrecognised teams/leagues and streams that
+       don't work, plus real false positives like a movie titled "Freddy vs Jason" (confirmed live in
+       the banner -- it matches the same regex a real fixture does). isKnownEvent() above is the actual
+       bar now: a pinned/default competition, or wide enough channel coverage to prove it's genuinely
+       major on its own. */
+    return (EVENTS || []).filter(ev => (ev.fixture || ev.teams || ev.liveEvent) && evState(ev, now) === 0 && ev.chans && ev.chans.length && isKnownEvent(ev)).sort((a, b) => rk(a) - rk(b) || a.kick - b.kick);
   } catch (e) { return []; }
 }
 /* games being replayed on a channel right now (shown when nothing is live) */
@@ -4016,8 +4030,9 @@ function homeReplays() {
        too, it just never carried .fixture so it never reached this far. ev.isEvent alone isn't the
        right bar though, same reason as homeLives(): it goes true for a talk/radio show whose title
        just says "live" (one of isEvent's own OR-conditions), with no actual game behind it. Needs
-       ev.teams (a real two-sided match) or ev.liveEvent (the individual-sport live flag) instead. */
-    const l = EVENTS.filter(ev => (ev.fixture || ev.teams || ev.liveEvent) && evState(ev, now) === 2 && (ev.reps || []).some(r => r.start <= now && (!r.stop || r.stop > now))).sort((a, b) => b.kick - a.kick);
+       ev.teams (a real two-sided match) or ev.liveEvent (the individual-sport live flag) instead --
+       and isKnownEvent() on top, same "known/big" bar as homeLives(). */
+    const l = EVENTS.filter(ev => (ev.fixture || ev.teams || ev.liveEvent) && evState(ev, now) === 2 && isKnownEvent(ev) && (ev.reps || []).some(r => r.start <= now && (!r.stop || r.stop > now))).sort((a, b) => b.kick - a.kick);
     verifyReplayClaims(l, () => { if (S.screen === 'home') renderHome(); });
     return l.filter(ev => repOnNow(ev, now));
   } catch (e) { return []; }
@@ -4040,23 +4055,26 @@ function homeUpcoming() {
        already solves this with the same chipsList()-priority rk() -- a pinned competition (Premier
        League by default) always sorts ahead of an unlisted one, soonest-kickoff only breaking ties
        within the same priority. Applying it here too, plus a slightly larger cap since the pool it's
-       drawn from is now much bigger. */
-    return (EVENTS || []).filter(ev => (ev.fixture || ev.teams || ev.liveEvent) && evState(ev, now) === 1 && ev.kick - now < 48 * 3600e3).sort((a, b) => rk(a) - rk(b) || a.kick - b.kick).slice(0, 8);
+       drawn from is now much bigger. isKnownEvent() on top, same "known/big" bar as homeLives() -- an
+       upcoming match with no channels confirmed yet only still shows if its competition is pinned;
+       otherwise there's nothing yet to prove it's a big one, same as how homeLives() already treats a
+       channel-less live match as not actually watchable. */
+    return (EVENTS || []).filter(ev => (ev.fixture || ev.teams || ev.liveEvent) && evState(ev, now) === 1 && ev.kick - now < 48 * 3600e3 && isKnownEvent(ev)).sort((a, b) => rk(a) - rk(b) || a.kick - b.kick).slice(0, 8);
   } catch (e) { return []; }
 }
-/* "auto" picks the first non-empty list in this order: a replay you can watch right now is more
-   actionable than a game that's merely scheduled, so it outranks "upcoming" even though it's a weaker
-   signal than something genuinely live. Picking a tab explicitly bypasses this and pins to just that
-   list, including when it's empty -- the owner's own choice shouldn't silently fall back to auto. */
-function homeSportsList(mode) {
-  if (mode === 'live') return {list: homeLives(), kind: 'live'};
-  if (mode === 'replay') return {list: homeReplays(), kind: 'replay'};
-  if (mode === 'upcoming') return {list: homeUpcoming(), kind: 'upcoming'};
+/* picks the first non-empty list in this order: a replay you can watch right now is more actionable
+   than a game that's merely scheduled, so it outranks "upcoming" even though it's a weaker signal than
+   something genuinely live. Used to also take a mode to pin to one list explicitly, for the Live Now/
+   Replay/Upcoming tab row -- that row's gone (the owner's own framing: the box is highlighted, or the
+   sport selector is, nothing to pick a mode from in between), so this is always just the one order now. */
+function homeSportsList() {
   const lives = homeLives(); if (lives.length) return {list: lives, kind: 'live'};
   const reps = homeReplays(); if (reps.length) return {list: reps, kind: 'replay'};
   return {list: homeUpcoming(), kind: 'upcoming'};
 }
-const homeShown = () => homeSportsList(HOME.mode).list;
+/* No more Live Now/Replay/Upcoming tab selector -- there's nothing left to pick a mode FOR, so this
+   always runs "auto" (live beats replay beats upcoming, whichever's first non-empty). */
+const homeShown = () => homeSportsList().list;
 /* the hero photo behind the Sports Hub card: one of 6 pieces of stadium/athlete art, picked by the
    calendar day so it's the same all day (no flicker mid-session) and different tomorrow. Built as a full
    inline "background" (not just background-image) so the readability gradient stays layered over
@@ -4081,7 +4099,7 @@ function heroBgStyle() {
   return ' style="filter:saturate(1.12) brightness(1.06) contrast(1.03);background:linear-gradient(90deg,rgba(8,13,20,.92) 0%,rgba(8,13,20,.82) 28%,rgba(8,13,20,.52) 46%,rgba(8,13,20,.16) 64%,rgba(8,13,20,0) 84%),url(' + img + ') right center/cover no-repeat,#0a1019"';
 }
 function homeBanner() {
-  const sel = homeSportsList(HOME.mode), shown = sel.list, out = {title: 'Sports Hub', cards: [], n: shown.length, kind: sel.kind};
+  const sel = homeSportsList(), shown = sel.list, out = {title: 'Sports Hub', cards: [], n: shown.length, kind: sel.kind};
   if (shown.length) out.cards.push({type: 'game', ev: shown[HOME.liveIdx % shown.length], kind: sel.kind});
   /* Sports Hub always stays Sports Hub -- it never borrows the hero slot to tease a movie/series
      resume. That has its own home now: the "Continue" tile in the carousel (homeTiles()). */
@@ -4089,13 +4107,13 @@ function homeBanner() {
 }
 /* with several games on, the banner moves through them every few seconds (and waits while you are on it) */
 setInterval(() => {
-  if (S.screen !== 'home' || HOME.zone === 'strip') return;
+  if (S.screen !== 'home') return;
   const n = homeShown().length;
   if (n > 1) { HOME.liveIdx = (HOME.liveIdx + 1) % n; HOME.fade = true; renderHome(); }
 },3000);
 function renderHome() {
   const d = new Date(nowMs());
-  $('home').classList.toggle('stripfocus', HOME.zone === 'strip' || HOME.zone === 'hbtab' || HOME.zone === 'hbtoggle' || HOME.zone === 'sports' || HOME.zone === 'brand');
+  $('home').classList.toggle('stripfocus', HOME.zone === 'hbtoggle' || HOME.zone === 'sports' || HOME.zone === 'brand');
   $('h-brand').classList.toggle('focus', HOME.zone === 'brand');
   $('hhub').classList.toggle('focus', HOME.zone === 'brand');
   $('h-theme').classList.toggle('focus', HOME.zone === 'theme');
@@ -4118,28 +4136,35 @@ function renderHome() {
   /* the banner: a live game when there is one, then "find your game" */
   const hb = homeBanner();
   HOME.cards = hb.cards; HOME.cardKind = 'banner';
-  HOME.card = Math.min(HOME.card, Math.max(0, hb.cards.length - 1));
   $('h-strip-title').textContent = hb.title;
-  $('h-strip-tabs').innerHTML = HB_TABS.map((t, i) => '<div class="hbtab' + (HOME.mode === t[0] ? ' on' : '') + (HOME.zone === 'hbtab' && HOME.tab === i ? ' focus' : '') + '" data-tab="' + i + '">' + esc(t[1]) + '</div>').join('');
   $('h-strip-wrap').classList.toggle('nolive', !hb.n);
-  const foc = i => HOME.zone === 'strip' && HOME.card === i ? ' focus' : '';
+  /* the featured card itself is no longer its own focus stop (see homeKey()'s 'brand' zone) -- pressing
+     OK anywhere on the box opens the full Sports Hub, never this one cycling game, so there's nothing
+     left for a per-card focus ring to mean. */
   /* An empty banner used to just be a blank hero picture with no explanation — indistinguishable from
      "broken" while fixtures/F1 are still loading. Say so, but only while genuinely still loading
      (FD.busy/F1.busy, or neither has ever completed a load yet) — once both have finished at least
      once, an empty banner correctly means "checked, nothing on right now", not "still working". */
   const stillBuilding = !hb.n && (FD.busy || F1.busy || (!FD.ts && !F1.ts)), bg = heroBgStyle();
-  let b = hb.n ? '' : (stillBuilding ? '<div class="hb-game idle"' + bg + '><div class="hb-building"><span class="hbd"></span>Building your sports guide…</div></div>' : '<div class="hb-game idle"' + bg + '></div>');      /* no live game: the same hero picture, nothing written on it */
+  /* The other genuinely-empty case, now that isKnownEvent() hard-filters the banner down to the
+     priority list (or wide-enough channel coverage): your pinned sports can all legitimately be quiet
+     at once -- different time zones, a seasonal gap (NFL alone is dark 7 months a year) -- without the
+     app being broken or still loading. A blank hero photo with nothing written on it reads as broken
+     either way; say what's actually true and point at the way out (Sport Selector still shows
+     everything for a sport, unfiltered, regardless of what's pinned). */
+  let b = hb.n ? '' : (stillBuilding ? '<div class="hb-game idle"' + bg + '><div class="hb-building"><span class="hbd"></span>Building your sports guide…</div></div>' :
+    '<div class="hb-game idle"' + bg + '><div class="hb-building">Nothing from your priority list right now — browse everything via Sport Selector below.</div></div>');
   hb.cards.forEach((c, i) => {
     if (c.type === 'game') {
       const ev = c.ev, nowT = nowMs();
       const chans = ev.chans.slice().sort((a, b) => a.lang - b.lang), when = c.kind === 'upcoming' ? ((dayWord(ev.kick) || 'Today ') + clockStr(new Date(ev.kick))).trim() : '';
       const ch = chans.length ? (chans[0].kind === 'name' ? feedTitle(chans[0].g) : disp(chans[0].g)) + (chans.length > 1 ? ' +' + (chans.length - 1) : '') : '';
       const pill = c.kind === 'upcoming' ? '<span class="hb-pill next">UPCOMING</span>' : c.kind === 'replay' ? '<span class="hb-pill rep">● REPLAY</span>' : '<span class="hb-pill">● LIVE NOW</span>';
-      b += '<div class="hb-game' + foc(i) + (HOME.fade ? ' fade' : '') + '" data-i="' + i + '"' + bg + '><div class="hb-top">' + pill + (hb.n > 1 ? '<span class="hb-count">' + (HOME.liveIdx % hb.n + 1) + ' / ' + hb.n + '</span>' : '') + '</div>' +
+      b += '<div class="hb-game' + (HOME.fade ? ' fade' : '') + '" data-i="' + i + '"' + bg + '><div class="hb-top">' + pill + (hb.n > 1 ? '<span class="hb-count">' + (HOME.liveIdx % hb.n + 1) + ' / ' + hb.n + '</span>' : '') + '</div>' +
         '<div class="hb-title' + (ev.label.length > 31 ? ' xlong' : ev.label.length > 26 ? ' long' : '') + '">' + esc(ev.label).replace(/ v /, ' <span class="hb-vs">vs</span> ') + '</div><div class="hb-sub">' + esc([compLabel(ev.comp), when, ch].filter(Boolean).join('  ·  ')) + '</div></div>';
     } else if (c.type === 'cont') {
       const it = c.it, sub = [it.sub, it.pct ? Math.round(it.pct) + '% watched' : ''].filter(Boolean).join('  ·  ');
-      b += '<div class="hb-game' + foc(i) + (HOME.fade ? ' fade' : '') + '" data-i="' + i + '"' + bg + '><div class="hb-top"><span class="hb-pill rep">RESUME</span></div>' +
+      b += '<div class="hb-game' + (HOME.fade ? ' fade' : '') + '" data-i="' + i + '"' + bg + '><div class="hb-top"><span class="hb-pill rep">RESUME</span></div>' +
         '<div class="hb-title' + (it.name.length > 31 ? ' xlong' : it.name.length > 26 ? ' long' : '') + '">' + esc(it.name) + '</div><div class="hb-sub">' + esc(sub) + '</div></div>';
     }
   });
@@ -4174,13 +4199,6 @@ function homeOpenSearch(id) {
   if (id) { Q.sport = id; const k = sportChips().findIndex(c => c.id === id); if (k >= 0) Q.chip = k; Q.skey = ''; }
   show('main'); S.zone = id ? 'chips' : 'qbox'; showPage('sportshub'); if (id) { S.zone = 'chips'; renderMain(); }
 }
-function homeOpenCard(i) {
-  const c = HOME.cards[i];
-  if (!c) return;
-  P.back = 'home';
-  if (c.type === 'game') { openGame(c.ev, true); return; }
-  if (c.type === 'cont') { homeOpenContinue(); return; }
-}
 function homeOpenContinue() {
   show('main'); S.zone = 'items'; showPage('cont');
 }
@@ -4205,36 +4223,21 @@ function homeKey(k) {
     else if (k === KEY.DOWN || k === KEY.BACK) HOME.zone = 'tiles';
     else return;
   } else if (HOME.zone === 'brand') {
-    /* the whole box's own first stop, not just its badge corner -- landing here highlights the entire
-       Sports Hub box (see #hhub.focus below), and OK opens the full browse page (every sport, nothing
-       pre-picked). The featured game is a deliberate second step inward (DOWN onto the card itself,
-       zone 'strip', its own narrower glow) -- pressing OK on the big glowing box used to always jump
-       straight into whichever one game happened to be featured, with no way to just "go to the Sports
-       Hub" without first noticing a game was even showing. Distinct from the sport-selector strip's
-       icons too, which still open one specific sport, not the neutral browse view. */
-    if (k === KEY.RIGHT) HOME.zone = 'hbtab';
-    else if (k === KEY.DOWN) HOME.zone = HOME.cards.length ? 'strip' : 'hbtoggle';
+    /* The box's one and only focus stop now -- there is no second, narrower stop on the featured game
+       card anymore, and no per-mode tab row either. The owner's own framing: the box is highlighted, or
+       the sport selector is highlighted, nothing in between. Pressing OK anywhere on the box always
+       opens the full Sports Hub browse page (every sport, nothing pre-picked); the cycling card is
+       purely an "acknowledgement something's on" display now, never its own destination -- a game
+       opens from within the Sports Hub page itself once you're there, not by jumping straight at
+       whichever one happened to be showing when you pressed OK. */
+    if (k === KEY.DOWN) HOME.zone = 'hbtoggle';
     else if (k === KEY.UP || k === KEY.BACK) HOME.zone = 'tiles';
     else if (k === KEY.ENTER) { homeOpenSportsHub(); return; }
-    else return;
-  } else if (HOME.zone === 'hbtab') {
-    if (k === KEY.LEFT) { if (HOME.tab === 0) HOME.zone = 'brand'; else HOME.tab--; }
-    else if (k === KEY.RIGHT) HOME.tab = (HOME.tab + 1) % HB_TABS.length;
-    else if (k === KEY.ENTER) { HOME.mode = HB_TABS[HOME.tab][0]; HOME.liveIdx = 0; }
-    else if (k === KEY.DOWN) HOME.zone = HOME.cards.length ? 'strip' : 'hbtoggle';
-    else if (k === KEY.UP || k === KEY.BACK) HOME.zone = 'tiles';
-    else return;
-  } else if (HOME.zone === 'strip') {
-    if (k === KEY.LEFT && HOME.card > 0) HOME.card--;
-    else if (k === KEY.RIGHT && HOME.card < HOME.cards.length - 1) HOME.card++;
-    else if (k === KEY.UP || k === KEY.BACK) HOME.zone = 'hbtab';
-    else if (k === KEY.DOWN) HOME.zone = 'hbtoggle';
-    else if (k === KEY.ENTER) { homeOpenCard(HOME.card); return; }
     else return;
   } else if (HOME.zone === 'hbtoggle') {
     if (k === KEY.ENTER) { HOME.sportsOpen = !HOME.sportsOpen; }
     else if (k === KEY.DOWN && HOME.sportsOpen) HOME.zone = 'sports';
-    else if (k === KEY.UP || k === KEY.BACK) HOME.zone = HOME.cards.length ? 'strip' : 'hbtab';
+    else if (k === KEY.UP || k === KEY.BACK) HOME.zone = 'brand';
     else return;
   } else if (HOME.zone === 'sports') {
     /* SPORT_GROUPS.length itself is a valid position here -- the trailing "Prioritize" tile, not a
@@ -4258,23 +4261,19 @@ $('h-tiles').addEventListener('click', e => {
 $('h-strip-wrap').addEventListener('click', e => {
   const sp = e.target.closest('#h-find [data-i]');
   if (sp) { const i = Number(sp.dataset.i); if (i === SPORT_GROUPS.length) { askShortcuts(); return; } const g = SPORT_GROUPS[i]; if (g) homeOpenSportGroup(g[0]); return; }
-  const el = e.target.closest('#h-strip [data-i]');
-  if (el) homeOpenCard(Number(el.dataset.i));
+  /* the featured card itself is no longer a link to that one game -- clicking it does the same thing
+     clicking the badge/title does, opening the full Sports Hub. See homeKey()'s 'brand' zone comment. */
+  if (e.target.closest('#h-strip [data-i]')) { homeOpenSportsHub(); return; }
 });
 $('h-sport-toggle').addEventListener('click', () => { HOME.sportsOpen = !HOME.sportsOpen; HOME.zone = 'hbtoggle'; renderHome(); });
 $('h-brand').addEventListener('click', () => homeOpenSportsHub());
-$('h-strip-tabs').addEventListener('click', e => {
-  const el = e.target.closest('.hbtab'); if (!el) return;
-  const i = Number(el.dataset.tab); HOME.tab = i; HOME.mode = HB_TABS[i][0]; HOME.zone = 'hbtab'; HOME.liveIdx = 0; renderHome();
-});
 if (PC) {
   $('h-strip-wrap').addEventListener('mousemove', e => {
     const sp = e.target.closest('#h-find [data-i]');
     if (sp) { const i = Number(sp.dataset.i); if (HOME.zone !== 'sports' || HOME.sportCard !== i) { HOME.zone = 'sports'; HOME.sportCard = i; renderHome(); } return; }
-    const el = e.target.closest('#h-strip [data-i]');
-    if (!el) return;
-    const i = Number(el.dataset.i);
-    if (HOME.zone !== 'strip' || HOME.card !== i) { HOME.zone = 'strip'; HOME.card = i; renderHome(); }
+    /* hovering the featured card now highlights the whole box (zone 'brand'), same as hovering the
+       badge -- there's no separate narrower focus state for the card anymore. */
+    if (e.target.closest('#h-strip [data-i]') && HOME.zone !== 'brand') { HOME.zone = 'brand'; renderHome(); }
   });
 }
 
