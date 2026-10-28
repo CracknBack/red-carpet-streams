@@ -11,6 +11,13 @@ android {
     namespace 'com.tyre.redcarpetstreams'
     compileSdk 34
 
+    /* BuildConfig.DEBUG gates the PLAYBACK_AUDIT.md Phase B measurement harness (diagnostics overlay,
+       structured playback logging, device-capability dump) -- AGP 8+ no longer generates BuildConfig by
+       default, so it has to be turned back on explicitly for that gate to exist at all. */
+    buildFeatures {
+        buildConfig true
+    }
+
     defaultConfig {
         applicationId 'com.tyre.redcarpetstreams'
         minSdk 25
@@ -34,6 +41,15 @@ android {
         release {
             minifyEnabled false
             signingConfig signingConfigs.release
+        }
+        /* A separate package ID (com.tyre.redcarpetstreams.debug) so a debug build -- different
+           signing key, since AGP auto-generates a debug keystore -- installs side by side with the
+           release app instead of conflicting with it. Without this, `adb install` on a debug APK
+           would fail outright, or force uninstalling the release app first and losing its sign-in
+           and favourites (see the signing-key comment above). PLAYBACK_AUDIT.md Phase B harness
+           only runs in this build type. */
+        debug {
+            applicationIdSuffix '.debug'
         }
     }
 
