@@ -250,12 +250,7 @@ h2{font-size:3rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overfl
    whole box (this), not just the one featured game; .hb-game.focus below is the narrower, separate
    glow for once you've actually stepped inward onto the card itself. */
 .hhub.focus{border-color:#F4C97E;box-shadow:0 0 0 .3rem rgba(231,185,111,.4),0 0 3.5rem rgba(231,185,111,.3),0 1rem 3rem rgba(0,0,0,.4)}
-.hhub-game{display:flex;align-items:stretch;height:19.5rem;flex:none;transition:height .28s ease}
-/* sports-open used to drop straight to 15rem -- fine before the header/title text got bigger, but once
-   the badge/title/match-title grew (below) that cut was tight enough to crowd the header row against
-   the hero text the moment the sport-icon strip opened ("the sports icons squish everything up"). Keep
-   a bigger cushion now so opening the strip doesn't fight the enlarged text for room. */
-.hhub.sports-open .hhub-game{height:15.5rem}
+.hhub-game{display:flex;align-items:stretch;height:19.5rem;flex:none}
 .hhub-game .hb-game{flex:1}
 /* the brand + Live/Replay/Upcoming tabs sit pinned over the top of the hero photo now (not a separate
    header bar above the box) -- out of flow so it never pushes the bottom-anchored game text down. */
@@ -275,12 +270,22 @@ h2{font-size:3rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overfl
 .hsport-toggle.focus{outline:.2rem solid var(--amber);outline-offset:-.3rem}
 .hst-car{display:inline-block;transition:transform .25s ease;font-size:1.1rem}
 .hhub.sports-open .hst-car{transform:rotate(180deg)}
-.hhub-sports{display:flex;align-items:flex-start;justify-content:space-between;gap:1.2rem;max-height:0;padding:0 2.6rem;overflow:hidden;border-top:0 solid rgba(231,185,111,.22);transition:max-height .28s ease,padding .28s ease}
-.hhub.sports-open .hhub-sports{max-height:13.5rem;padding:1.8rem 2.6rem 2rem;overflow-x:auto;overflow-y:hidden;border-top-width:.15rem;scrollbar-width:none}
-.hhub-sports::-webkit-scrollbar{display:none}
-.hhub-sports .hb-chip{flex:none;width:8.6rem}
-.hhub-sports .hb-logo{width:100%;height:6.2rem}
-.hhub-sports .hb-cl{font-size:1.3rem;max-width:none;white-space:normal;text-align:center;line-height:1.15}
+/* a fixed centre slot, same idea as .hcar/.hslot above -- HOME.sportCard stays put on screen (dead
+   centre of this row) and the icons slide through it instead of the row auto-scrolling to catch up with
+   focus. Only ever needs room for a handful of icons (see renderHome's windowed dd loop), so unlike the
+   old auto-scroll strip it never has to fight the hero card above it for height ("the sports icons
+   squish everything up") -- .hhub-game has no sports-open override anymore. */
+.hhub-sports{display:flex;align-items:center;justify-content:center;gap:1.6rem;max-height:0;padding:0 2.6rem;overflow:hidden;border-top:0 solid rgba(231,185,111,.22);transition:max-height .28s ease,padding .28s ease}
+.hhub.sports-open .hhub-sports{max-height:10.5rem;padding:1.6rem 2.6rem 1.8rem;border-top-width:.15rem}
+.hhub-sports .spslot{flex:none;display:flex;flex-direction:column;align-items:center;gap:.5rem;cursor:pointer;color:#E9CBA0;text-align:center;transition:transform .2s ease,opacity .2s ease}
+.hhub-sports .spslot.c0{transform:scale(1.25)}
+.hhub-sports .spslot.c0.focus{color:#fff}
+.hhub-sports .spslot.c0.focus .hb-logo img{filter:drop-shadow(0 0 .7rem rgba(231,185,111,.75))}
+.hhub-sports .spslot.c1{opacity:.6}
+.hhub-sports .spslot.c2{opacity:.32}
+.hhub-sports .spslot.c3{opacity:.12}
+.hhub-sports .hb-logo{width:4.4rem;height:4.4rem}
+.hhub-sports .hb-cl{font-size:1.2rem;max-width:8.5rem;white-space:normal;text-align:center;line-height:1.15}
 .hb-game{position:relative;flex:2.5;min-width:0;padding:1.4rem 2.4rem;display:flex;flex-direction:column;justify-content:center;gap:.6rem;cursor:pointer;
   justify-content:flex-end;background:linear-gradient(90deg,rgba(8,13,20,.86) 0,rgba(8,13,20,.62) 38%,rgba(8,13,20,.12) 62%,rgba(8,13,20,0) 78%),url(hero-banner.jpg) 85% 40%/cover no-repeat}
 .hb-game .hb-title,.hb-game .hb-sub{text-shadow:0 .2rem 1rem rgba(0,0,0,.9)}
@@ -866,6 +871,8 @@ html.light .hhub{background:linear-gradient(90deg,rgba(252,248,238,0.95),rgba(25
 html.light .hhub.focus{box-shadow:0 0 0 .3rem rgba(231,185,111,.4),0 0 3.5rem rgba(231,185,111,.3),0 1rem 3rem rgba(90,60,30,0.22)}
 html.light .hhub-title{color:#8A5A1C}
 html.light .hsport-toggle{background:rgba(252,248,238,0.25);color:#8A5A1C}
+html.light .hhub-sports .spslot{color:#8A5A1C}
+html.light .hhub-sports .spslot.c0.focus{color:#3A1D18}
 html.light .hb-building{color:#8A5A1C}
 html.light .hb-vs{color:#8A5A1C}
 html.light .hb-find{color:#8A5A1C}
@@ -4174,14 +4181,23 @@ function renderHome() {
      from the game-card carousel above, since the two are independent now. */
   $('h-sport-toggle').classList.toggle('focus', HOME.zone === 'hbtoggle');
   $('hhub').classList.toggle('sports-open', HOME.sportsOpen);
-  /* one extra tile at the end, same visual family as the sport icons, index SPORT_GROUPS.length so it
-     slots into the existing left/right navigation and hover handling as just one more position rather
-     than a special case everywhere. Opens the owner's own existing "Edit search shortcuts" prompt --
-     that list already drives Live/Upcoming priority (homeLives()/homeUpcoming()'s rk()), it just lived
-     only in Settings before, disconnected from the one screen its effect is actually visible on. */
-  $('h-find').innerHTML = SPORT_GROUPS.map((g, i) => '<div class="hb-chip' + (HOME.zone === 'sports' && HOME.sportCard === i ? ' focus' : '') + '" data-i="' + i + '"><div class="hb-logo"><img class="hb-lg" src="' + g[2] + '" alt=""></div><div class="hb-cl">' + esc(g[1]) + '</div></div>').join('') +
-    '<div class="hb-chip' + (HOME.zone === 'sports' && HOME.sportCard === SPORT_GROUPS.length ? ' focus' : '') + '" data-i="' + SPORT_GROUPS.length + '"><div class="hb-logo"><img class="hb-lg" src="glyph-settings.png" alt=""></div><div class="hb-cl">Prioritize</div></div>';
-  if (HOME.zone === 'sports') { const focEl = $('h-find').querySelector('.hb-chip.focus'); if (focEl) focEl.scrollIntoView({block: 'nearest', inline: 'nearest'}); }
+  /* a fixed centre slot, same idea as h-tiles above: HOME.sportCard never moves on screen, the icons
+     slide through it instead. Used to be a flat auto-scrolling row (scrollIntoView-ing the focused chip
+     into view) that had to reserve enough height for the whole 15-icon list, which is what forced the
+     hero card to shrink the moment you opened it ("the sports icons squish everything up"). A windowed
+     carousel only ever needs room for a few icons, so the hero can stay full height instead -- see
+     .hhub-game below, no longer has a sports-open override. One extra slot at the end, index
+     SPORT_GROUPS.length, same visual family as the sport icons -- opens the owner's own existing "Edit
+     search shortcuts" prompt (that list already drives Live/Upcoming priority, it just lived only in
+     Settings before, disconnected from the one screen its effect is actually visible on). */
+  const nSport = SPORT_GROUPS.length + 1;
+  let spHtml = '';
+  for (let dd = -3; dd <= 3; dd++) {
+    const i = ((HOME.sportCard + dd) % nSport + nSport) % nSport, prior = i === SPORT_GROUPS.length;
+    const icon = prior ? 'glyph-settings.png' : SPORT_GROUPS[i][2], label = prior ? 'Prioritize' : SPORT_GROUPS[i][1];
+    spHtml += '<div class="spslot c' + Math.abs(dd) + (dd === 0 && HOME.zone === 'sports' ? ' focus' : '') + '" data-i="' + i + '"><div class="hb-logo"><img class="hb-lg" src="' + icon + '" alt=""></div><div class="hb-cl">' + esc(label) + '</div></div>';
+  }
+  $('h-find').innerHTML = spHtml;
   HOME.fade = false;
   $('h-strip-wrap').classList.remove('hidden');
   $('hhints').innerHTML = hintsHtml([['OK', 'Open'], ['◀ ▶', 'Choose'], ['▲', 'Light / dark']]);
@@ -6219,7 +6235,14 @@ function homeOpenSportGroupAll(id) {
    sport" landing, same as the rail's own Sports Hub icon (PAGES' 'sportshub' entry) opens once you're
    past Home. The badge/title button is the only way to reach it directly from Home itself. */
 function homeOpenSportsHub() {
-  Q.sportGroup = ''; Q.chip = 0; Q.sport = ''; Q.skey = ''; resView.reset();
+  /* Used to set Q.sport = '' for "nothing pre-picked" -- but filteredEvents() has no "every sport" case
+     for an empty string, so '' fell through to its generic else-branch (`ev.comp === f`), which matched
+     only events with no competition assigned at all: a page of games that none said what sport they
+     were, with the first chip merely *focused*, not actually selected, so it looked highlighted while
+     showing unrelated events. Land on the first chip for real instead, same as picking it by hand
+     (pickChip's 'allsports' case uses this same first-chip fallback). */
+  const first = sportChips()[0];
+  Q.sportGroup = ''; Q.chip = 0; Q.sport = (first && first.id !== 'add') ? first.id : 'all'; Q.skey = ''; resView.reset();
   show('main'); S.zone = 'chips'; showPage('sportshub'); S.zone = 'chips'; renderMain();
 }
 
