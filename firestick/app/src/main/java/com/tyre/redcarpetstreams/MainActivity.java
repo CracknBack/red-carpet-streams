@@ -103,6 +103,11 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
+        /* Debug-only: lets chrome://inspect attach over the existing ADB connection, so Phase B's
+           Checkpoint B test case (and anything later) can drive window.RCS.play(<test-clip-url>)
+           directly from the DevTools console -- without touching the owner's actual playlist/login
+           just to get a clip playing. */
+        if (BuildConfig.DEBUG) WebView.setWebContentsDebuggingEnabled(true);
         root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
 
