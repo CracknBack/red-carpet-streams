@@ -1111,7 +1111,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.23.15';
+const APP_VERSION = '3.23.16';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 const PC = !!window.RCSPC || !!window.RCS_DESKTOP;   /* Windows app, or the no-install desktop version */
 const PHONE = FIRE && navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) < 700;   /* Android phone */
@@ -7655,8 +7655,16 @@ function optItems() {
   if (sc === 'main' || sc === 'movie' || sc === 'series') it.push({l: 'Settings', a: () => { if (S.screen !== 'main') show('main'); S.zone = 'set'; showPage('settings'); }});
   return it;
 }
+/* Found the real bug behind a whole night of login phone-keyboard reports (labels, double-press-down,
+   values not landing): this blocked the login screen unconditionally, which means MENU -- the ONLY way
+   optItems()'s sc==='login' branch (the "Type this on your phone" item) was ever reachable -- did
+   nothing there at all. The phone-QR feature for login's own fields was never actually reachable through
+   this app's own UI, full stop; whatever partially worked before was something else entirely (the
+   device's own IME, not this relay). Safe to just let login through normally: optItems()'s login branch
+   only ever pushes the one phone-QR item for whichever field is currently highlighted, nothing else
+   login-irrelevant (Settings, shortcuts, playback options) can appear, since every other branch there
+   gates on a different sc value. */
 function openOpts() {
-  if (S.screen === 'login') return;
   OPT.items = optItems(); OPT.i = 0; OPT.open = true; renderOpts();
 }
 function closeOpts() { OPT.open = false; $('opts').classList.add('hidden'); }
