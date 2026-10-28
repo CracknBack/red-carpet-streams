@@ -1112,7 +1112,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.23.14';
+const APP_VERSION = '3.23.15';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 const PC = !!window.RCSPC || !!window.RCS_DESKTOP;   /* Windows app, or the no-install desktop version */
 const PHONE = FIRE && navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) < 700;   /* Android phone */
@@ -5072,10 +5072,6 @@ function buildCats0(t) {
    until they can be rebuilt on per-item lookups (get_vod_info/get_series_info by id) instead of a
    full-catalog scan — a real feature cut, not a bug, in exchange for category browsing actually being
    reliable today. */
-/* TEMPORARY (2026-10-28): one-time logcat dump of the real, raw series category names, so the owner's
-   actual provider category list (reported: ~30 Netflix-prefixed categories) can be read back over ADB
-   instead of guessed at -- remove this block once that's done, it's not meant to stay. */
-let DEBUGCATS_LOGGED = false;
 function buildVodCats(t) {
   const d = DATA[t], bad = adultBadCats(t);
   const v = [];
@@ -5084,11 +5080,6 @@ function buildVodCats(t) {
     const n = d.catItems && d.catItems.has(c.id) ? d.catItems.get(c.id).length : undefined;
     v.push({id: c.id, name: c.name, raw: c.raw, co: c.co, n});
   });
-  if (t === 'series' && !DEBUGCATS_LOGGED) {
-    DEBUGCATS_LOGGED = true;
-    console.log('DEBUGCATS series category count: ' + v.length);
-    v.forEach((c, i) => console.log('DEBUGCATS[' + i + '] ' + c.name));
-  }
   return t === 'series' ? groupSeriesCats(v) : v;
 }
 /* TV Series: the provider's own category list runs to ~200 entries on this account (confirmed on the
@@ -5136,10 +5127,44 @@ function classifySeriesCat(name) {
   for (const [key, label, english, pats] of SERIES_GROUPS) if (pats.some(re => re.test(n))) return {key, label, english};
   return null;
 }
+/* Streaming-platform categories: the provider has the same "<Platform> <Genre>" pattern repeated for
+   Netflix, HBO Max, Disney+, Amazon, Paramount+ etc. (confirmed live, 2026-10-28 -- Netflix alone is
+   ~20+ separate categories: Series, Kids, Reality, Docu-Series, Anime, WWE, Podcast, Stand-Up Comedy,
+   Adult-Swim, each again per-language: "Netflix Kids", "Germany Netflix", "Turkish Netflix", "Nordic
+   Netflix"...). Order matters here the same way it does in SERIES_GROUPS above: SkyShowtime has to be
+   checked before the plain Showtime pattern, or "Netherlands Sky Showtime" would match Showtime first
+   and never reach the more specific SkyShowtime pattern at all. */
+const SERIES_PLATFORMS = [
+  ['netflix', 'Netflix', [/\bnetflix\b/i]],
+  ['skyshowtime', 'SkyShowtime', [/\bsky\s*showtime\b/i]],
+  ['hbomax', 'HBO Max', [/\bhbo\b/i]],
+  ['disney', 'Disney+', [/\bdisney\+?\b/i]],
+  ['amazon', 'Amazon', [/\bamazon\b/i]],
+  ['paramount', 'Paramount+', [/\bparamount\+?\b/i]],
+  ['discovery', 'Discovery+', [/\bdiscovery\+?\b/i]],
+  ['crunchyroll', 'Crunchyroll', [/\bcrunchyroll\b/i]],
+  ['peacock', 'Peacock', [/\bpeacock\b/i]],
+  ['appletv', 'Apple TV+', [/\bapple(\s*tv)?\+?\b/i]],
+  ['hulu', 'Hulu', [/\bhulu\b/i]],
+  ['starz', 'Starz', [/\bstarz\b/i]],
+  ['showtime', 'Showtime', [/\bshowtime\b/i]]
+];
+function classifySeriesPlatform(name) {
+  const n = ' ' + String(name) + ' ';
+  for (const [key, label, pats] of SERIES_PLATFORMS) if (pats.some(re => re.test(n))) return {key, label};
+  return null;
+}
 function groupSeriesCats(cats) {
   const groups = new Map(), standalone = [];
   cats.forEach(c => {
-    const g = classifySeriesCat(c.name);
+    let g = classifySeriesCat(c.name);
+    /* A provider category naming a streaming platform (Netflix, HBO Max...) but no country/language is
+       its English/default listing -- every OTHER language's copy of the same platform is explicitly
+       prefixed ("Germany Netflix", "Turkish Netflix"), so the unprefixed one isn't ambiguous, it's just
+       not spelled "English" the way the language patterns above expect. Without this, "Netflix Series"
+       fell all the way through to the flat standalone pile, same tier as everything genuinely
+       unclassified, instead of counting as English content the way it actually is. */
+    if (!g && classifySeriesPlatform(c.name)) g = {key: 'english', label: 'English', english: true};
     if (!g) { standalone.push(c); return; }
     let e = groups.get(g.key);
     if (!e) { e = {key: g.key, label: g.label, english: g.english, members: []}; groups.set(g.key, e); }
@@ -5147,11 +5172,27 @@ function groupSeriesCats(cats) {
   });
   const out = [];
   groups.forEach(e => {
-    /* a "group" that only ever matched one real category isn't reducing anything -- leave that one
-       exactly as it was, not wrapped in a group of one for no benefit. */
-    if (e.members.length === 1) { standalone.push(e.members[0]); return; }
-    const n = e.members.every(c => typeof c.n === 'number') ? e.members.reduce((s, c) => s + c.n, 0) : undefined;
-    out.push({id: 'grp:' + e.key, name: e.label, kind: 'group', english: e.english, realCats: e.members.map(c => c.id), n});
+    /* Within a language, a further split by streaming platform -- "English - Netflix" pools every
+       Netflix category in English (Series, Kids, Reality, Docu-Series, Anime, WWE, Podcast...) into one
+       entry instead of leaving them as ten separate near-identical rows, and the same split applies to
+       every other language that has its own platform-branded categories, not just English. */
+    const byPlatform = new Map(), rest = [];
+    e.members.forEach(c => {
+      const p = classifySeriesPlatform(c.name);
+      if (!p) { rest.push(c); return; }
+      let pe = byPlatform.get(p.key);
+      if (!pe) { pe = {label: p.label, members: []}; byPlatform.set(p.key, pe); }
+      pe.members.push(c);
+    });
+    const pushGroup = (key, label, english, members) => {
+      /* a "group" that only ever matched one real category isn't reducing anything -- leave that one
+         exactly as it was, not wrapped in a group of one for no benefit. */
+      if (members.length === 1) { standalone.push(members[0]); return; }
+      const n = members.every(c => typeof c.n === 'number') ? members.reduce((s, c) => s + c.n, 0) : undefined;
+      out.push({id: 'grp:' + key, name: label, kind: 'group', english, realCats: members.map(c => c.id), n});
+    };
+    if (rest.length) pushGroup(e.key, e.label, e.english, rest);
+    byPlatform.forEach((pe, pkey) => pushGroup(e.key + ':' + pkey, e.label + ' - ' + pe.label, e.english, pe.members));
   });
   return [...out.filter(e => e.english), ...out.filter(e => !e.english), ...standalone];
 }
