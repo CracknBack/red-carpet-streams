@@ -1112,7 +1112,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.23.16';
+const APP_VERSION = '3.23.17';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 const PC = !!window.RCSPC || !!window.RCS_DESKTOP;   /* Windows app, or the no-install desktop version */
 const PHONE = FIRE && navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) < 700;   /* Android phone */
@@ -7634,7 +7634,15 @@ function optItems() {
       if (el && el.tagName === 'INPUT') {
         const lbl = el.closest('label.field');
         const name = (lbl && lbl.querySelector('span') && lbl.querySelector('span').textContent) || el.placeholder || 'Sign-in';
-        it.push({l: 'Type this on your phone (QR code)', a: () => openPhone(name, t => { el.value = t; })});
+        it.push({l: 'Type this on your phone (QR code)', a: () => openPhone(name, t => {
+          el.value = t;
+          /* fill one field from the phone, land straight on the next one -- its name (via this same
+             sc==='login' branch, next time the menu opens) is now the one thing highlighted, so there's
+             no separate step needed to find out what's needed next. Same single-step advance ENTER/DOWN
+             already do after typing directly; this is just the phone-QR path's own version of it. */
+          const i = lItems().indexOf(at);
+          if (i >= 0) { L.idx = Math.min(lItems().length - 1, i + 1); loginRender(); }
+        })});
       }
     } catch (e) { }
   }
