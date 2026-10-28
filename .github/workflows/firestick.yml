@@ -3,6 +3,15 @@ name: Build Firestick app
 # Manual only (Actions tab > Run workflow, or gh workflow run) -- not on every push, so pushing code changes does not burn a build until you ask for one.
 on:
   workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type (debug has the PLAYBACK_AUDIT.md Phase B harness; release never does)'
+        required: false
+        default: release
+        type: choice
+        options:
+          - release
+          - debug
 
 permissions:
   contents: write
@@ -41,19 +50,28 @@ jobs:
           cp -r "$ROOT/tv-app/." "$ROOT/firestick/app/src/main/assets/www/"
 
       - name: Build
-        run: gradle -p "$ROOT/firestick" assembleRelease --no-daemon
+        run: |
+          if [ "${{ inputs.build_type }}" = "debug" ]; then
+            gradle -p "$ROOT/firestick" assembleDebug --no-daemon
+            echo "APK_SRC=$ROOT/firestick/app/build/outputs/apk/debug/app-debug.apk" >> "$GITHUB_ENV"
+            echo "SUFFIX=-debug" >> "$GITHUB_ENV"
+          else
+            gradle -p "$ROOT/firestick" assembleRelease --no-daemon
+            echo "APK_SRC=$ROOT/firestick/app/build/outputs/apk/release/app-release.apk" >> "$GITHUB_ENV"
+            echo "SUFFIX=" >> "$GITHUB_ENV"
+          fi
 
       - name: Name the file
-        run: cp "$ROOT/firestick/app/build/outputs/apk/release/app-release.apk" "RedCarpetStreams-${{ env.VER }}-build${{ github.run_number }}.apk"
+        run: cp "$APK_SRC" "RedCarpetStreams-${{ env.VER }}-build${{ github.run_number }}${{ env.SUFFIX }}.apk"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: RedCarpetStreams-${{ env.VER }}-build${{ github.run_number }}
-          path: RedCarpetStreams-${{ env.VER }}-build${{ github.run_number }}.apk
+          name: RedCarpetStreams-${{ env.VER }}-build${{ github.run_number }}${{ env.SUFFIX }}
+          path: RedCarpetStreams-${{ env.VER }}-build${{ github.run_number }}${{ env.SUFFIX }}.apk
 
       - name: Publish as a release (easy to download on your phone)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: firestick-${{ github.run_number }}
-          name: Red Carpet Streams ${{ env.VER }} (build ${{ github.run_number }})
-          files: RedCarpetStreams-${{ env.VER }}-build${{ github.run_number }}.apk
+          name: Red Carpet Streams ${{ env.VER }} (build ${{ github.run_number }}${{ env.SUFFIX }})
+          files: RedCarpetStreams-${{ env.VER }}-build${{ github.run_number }}${{ env.SUFFIX }}.apk

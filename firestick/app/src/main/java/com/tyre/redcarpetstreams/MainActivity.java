@@ -2,10 +2,19 @@ package com.tyre.redcarpetstreams;
 
 import android.app.Activity;
 import android.graphics.Color;
+import android.graphics.Typeface;
+import android.media.AudioFormat;
+import android.media.AudioManager;
+import android.media.AudioTrack;
+import android.media.MediaCodecInfo;
+import android.media.MediaCodecList;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.view.Display;
+import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
@@ -17,6 +26,7 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
+import android.widget.TextView;
 
 import androidx.annotation.OptIn;
 import androidx.media3.common.C;
@@ -31,6 +41,7 @@ import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DefaultDataSource;
 import androidx.media3.datasource.DefaultHttpDataSource;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.analytics.AnalyticsListener;
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 import androidx.media3.ui.AspectRatioFrameLayout;
 import androidx.media3.ui.PlayerView;
@@ -39,6 +50,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 /*
  * Red Carpet Streams for Fire TV.
@@ -58,9 +70,35 @@ public class MainActivity extends Activity {
     private final Runnable ticker = new Runnable() {
         @Override public void run() {
             if (player != null && player.isPlaying()) send("timeupdate");
+            if (BuildConfig.DEBUG) updateDebugOverlay();
             ui.postDelayed(this, 500);
         }
     };
+
+    /* ---- PLAYBACK_AUDIT.md Phase B: debug-only measurement harness (overlay + structured
+       logcat). Gated on BuildConfig.DEBUG throughout per the audit's ground rule 6 ("harness code
+       must be debug-only and must not be in release builds") -- none of this runs in a release
+       APK, a debug build is required to see any of it. */
+    private TextView debugOverlay;
+    private long playRequestedAtMs = 0;
+    private boolean sawFirstFrame = false;
+    private int rebufferCount = 0;
+    private long rebufferStartMs = 0;
+    private long lastRebufferMs = -1;
+    private String lastVideoDecoder = "-", lastAudioDecoder = "-";
+    private String lastVideoFormat = "-", lastAudioFormat = "-";
+    private int droppedFrames = 0;
+    private String lastError = "-";
+    /* Media3's AnalyticsListener never directly reports decoded-vs-passthrough; the only signal
+       available without relying on an API we can't verify compiles against 1.4.1
+       (onAudioTrackInitialized's AudioTrackConfig) is indirect: a software/hardware *decoder* only
+       gets instantiated (onAudioDecoderInitialized fires) when Media3 is decoding to PCM itself --
+       passthrough skips that step and writes the compressed bytes straight to the AudioTrack. So
+       "no decoder initialized for the current audio format" is read as passthrough. Best-effort;
+       confirm against the real decoder name in Checkpoint B rather than trusting this alone. */
+    private boolean audioDecoderSeenForCurrentTrack = false;
+    private long keySeqLastMs = 0;
+    private int keySeqCount = 0;
 
     @Override
     protected void onCreate(Bundle saved) {
@@ -76,6 +114,21 @@ public class MainActivity extends Activity {
 
         web = makeWebView();
         root.addView(web, new FrameLayout.LayoutParams(-1, -1));
+
+        if (BuildConfig.DEBUG) {
+            debugOverlay = new TextView(this);
+            debugOverlay.setTypeface(Typeface.MONOSPACE);
+            debugOverlay.setTextColor(Color.GREEN);
+            debugOverlay.setTextSize(11);
+            debugOverlay.setBackgroundColor(0xA0000000);
+            debugOverlay.setPadding(16, 16, 16, 16);
+            debugOverlay.setGravity(Gravity.TOP | Gravity.START);
+            debugOverlay.setVisibility(View.GONE);
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+            lp.gravity = Gravity.TOP | Gravity.START;
+            root.addView(debugOverlay, lp);
+        }
+
         setContentView(root);
         web.requestFocus();
 
@@ -90,16 +143,40 @@ public class MainActivity extends Activity {
         pv.setPlayer(player);
         player.addListener(new Player.Listener() {
             @Override public void onPlaybackStateChanged(int st) {
-                if (st == Player.STATE_BUFFERING) send("waiting");
-                else if (st == Player.STATE_READY && !metaSent) { metaSent = true; send("loadedmetadata"); }
-                else if (st == Player.STATE_ENDED) send("ended");
+                if (st == Player.STATE_BUFFERING) {
+                    send("waiting");
+                    if (BuildConfig.DEBUG) rebufferStartMs = System.currentTimeMillis();
+                } else if (st == Player.STATE_READY) {
+                    if (!metaSent) { metaSent = true; send("loadedmetadata"); }
+                    if (BuildConfig.DEBUG && rebufferStartMs != 0) {
+                        lastRebufferMs = System.currentTimeMillis() - rebufferStartMs;
+                        rebufferCount++;
+                        Log.i("RCS_PBLOG", "event=rebuffer durationMs=" + lastRebufferMs + " count=" + rebufferCount);
+                        rebufferStartMs = 0;
+                    }
+                } else if (st == Player.STATE_ENDED) send("ended");
             }
             @Override public void onIsPlayingChanged(boolean playing) {
+                /* B2 asks for "recoveries" alongside errors/rebuffers -- a recovery here means
+                   something started playing again after the last thing we logged was an error
+                   (the JS NativeStreamer did the actual retry, by moving to the next candidate
+                   URL; this just confirms from the native side that it worked). */
+                if (BuildConfig.DEBUG && playing && !"-".equals(lastError)) {
+                    Log.i("RCS_PBLOG", "event=recovered previousError=" + lastError);
+                    lastError = "-";
+                }
                 send(playing ? "playing" : "pause");
                 keepScreenOn(playing);
             }
-            @Override public void onPlayerError(PlaybackException e) { send("error"); }
+            @Override public void onPlayerError(PlaybackException e) {
+                if (BuildConfig.DEBUG) { lastError = e.errorCodeName + " (" + e.errorCode + ")"; Log.w("RCS_PBLOG", "event=error code=" + e.errorCodeName + " url=" + redact(String.valueOf(e.getMessage()))); }
+                send("error");
+            }
         });
+        if (BuildConfig.DEBUG) {
+            player.addAnalyticsListener(new DebugAnalytics());
+            dumpDeviceCapabilities();
+        }
         ui.post(ticker);
 
         web.loadUrl("file:///android_asset/www/index.html");
@@ -178,6 +255,18 @@ public class MainActivity extends Activity {
     /* Remote buttons the WebView doesn't pass on as web key presses (Back, Menu, media keys). */
     @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
+        /* PLAYBACK_AUDIT.md B1: the overlay's remote toggle -- 5x MENU within 2s. Counts alongside
+           (not instead of) MENU's normal single-press forward below, since 5 presses in under 2s
+           doesn't happen during ordinary single use. Debug builds only. */
+        if (BuildConfig.DEBUG && e.getAction() == KeyEvent.ACTION_DOWN && e.getKeyCode() == KeyEvent.KEYCODE_MENU) {
+            long now = System.currentTimeMillis();
+            keySeqCount = (now - keySeqLastMs <= 2000) ? keySeqCount + 1 : 1;
+            keySeqLastMs = now;
+            if (keySeqCount >= 5) {
+                keySeqCount = 0;
+                toggleDebugOverlay();
+            }
+        }
         int code = map(e.getKeyCode());
         if (code != 0) {
             if (e.getAction() == KeyEvent.ACTION_DOWN && (e.getRepeatCount() == 0 || code != 461)) js("window.__rcsKey&&__rcsKey(" + code + ")");
@@ -283,11 +372,144 @@ public class MainActivity extends Activity {
         }
     }
 
+    /* ---- PLAYBACK_AUDIT.md Phase B harness (debug builds only) ---- */
+
+    /* Xtream URLs embed the username/password as path segments (.../live/USER/PASS/ID.ext), not
+       query params, so a plain "strip the query string" redaction isn't enough -- ground rule 5
+       ("never commit, log, or print the owner's playlist URLs ... credentials"). Replaces the two
+       path segments after /live/, /movie/ or /series/ and drops any query string outright. */
+    private static final Pattern XTREAM_CREDS = Pattern.compile("/(live|movie|series)/[^/]+/[^/]+/");
+    static String redact(String url) {
+        if (url == null) return "-";
+        String noQuery = url.replaceAll("\\?.*$", "");
+        return XTREAM_CREDS.matcher(noQuery).replaceAll("/$1/***/***/");
+    }
+
+    private void toggleDebugOverlay() {
+        if (debugOverlay == null) return;
+        boolean show = debugOverlay.getVisibility() != View.VISIBLE;
+        debugOverlay.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (show) { updateDebugOverlay(); dumpDeviceCapabilities(); }
+    }
+
+    /* B1: the on-screen stats panel. Values come from the Player interface directly (buffer level,
+       live offset, playback state) plus whatever DebugAnalytics below has captured from the most
+       recent AnalyticsListener callbacks (decoder names, dropped frames, last error). */
+    private void updateDebugOverlay() {
+        if (debugOverlay == null || debugOverlay.getVisibility() != View.VISIBLE || player == null) return;
+        long bufferedAheadMs = Math.max(0, player.getBufferedPosition() - player.getCurrentPosition());
+        long liveOffsetMs = player.getCurrentLiveOffset();
+        String ttff = sawFirstFrame ? "-" : "pending";
+        StringBuilder sb = new StringBuilder();
+        sb.append("RCS PLAYBACK DEBUG (5x MENU to hide)\n");
+        sb.append("video decoder: ").append(lastVideoDecoder).append('\n');
+        sb.append("audio decoder: ").append(lastAudioDecoder).append(audioDecoderSeenForCurrentTrack ? " (decoded)" : " (passthrough? no decoder seen)").append('\n');
+        sb.append("video format:  ").append(lastVideoFormat).append('\n');
+        sb.append("audio format:  ").append(lastAudioFormat).append('\n');
+        sb.append("buffer ahead:  ").append(String.format(Locale.US, "%.1fs", bufferedAheadMs / 1000.0)).append('\n');
+        sb.append("behind live:   ").append(liveOffsetMs == C.TIME_UNSET ? "n/a (not live)" : String.format(Locale.US, "%.1fs", liveOffsetMs / 1000.0)).append('\n');
+        sb.append("rebuffers:     ").append(rebufferCount).append(lastRebufferMs >= 0 ? " (last " + lastRebufferMs + "ms)" : "").append('\n');
+        sb.append("dropped frames:").append(droppedFrames).append('\n');
+        sb.append("time to first frame: ").append(ttff).append('\n');
+        sb.append("last error:    ").append(lastError);
+        debugOverlay.setText(sb.toString());
+    }
+
+    /* B3: device capability dump -- MediaCodecList (profiles/levels/max res+fps per decoder),
+       audio passthrough support via AudioTrack.isDirectPlaybackSupported (the API-29+ official way
+       to ask; below that there's no reliable public API, so we say so rather than guess), and the
+       display's supported refresh-rate modes. One tag (RCS_CAPS) so `adb logcat | grep RCS_CAPS`
+       pulls the whole dump. Runs once at startup and again each time the overlay is opened. */
+    @SuppressWarnings("deprecation")
+    private void dumpDeviceCapabilities() {
+        try {
+            Log.i("RCS_CAPS", "=== device capability dump: Build.MODEL=" + Build.MODEL + " Build.VERSION.SDK_INT=" + Build.VERSION.SDK_INT + " Build.DISPLAY=" + Build.DISPLAY + " ===");
+            for (MediaCodecInfo info : new MediaCodecList(MediaCodecList.ALL_CODECS).getCodecInfos()) {
+                if (info.isEncoder()) continue;
+                for (String type : info.getSupportedTypes()) {
+                    if (!type.startsWith("video/") && !type.startsWith("audio/")) continue;
+                    try {
+                        MediaCodecInfo.CodecCapabilities caps = info.getCapabilitiesForType(type);
+                        StringBuilder line = new StringBuilder("event=decoder name=" + info.getName() + " type=" + type);
+                        if (Build.VERSION.SDK_INT >= 29) line.append(" hw=").append(info.isHardwareAccelerated());
+                        MediaCodecInfo.VideoCapabilities vc = caps.getVideoCapabilities();
+                        if (vc != null) line.append(" maxW=").append(vc.getSupportedWidths().getUpper())
+                                .append(" maxH=").append(vc.getSupportedHeights().getUpper())
+                                .append(" maxFps=").append(vc.getSupportedFrameRatesFor(vc.getSupportedWidths().getUpper(), vc.getSupportedHeights().getUpper()));
+                        if (caps.profileLevels != null) for (MediaCodecInfo.CodecProfileLevel pl : caps.profileLevels)
+                            line.append(" profile/level=").append(pl.profile).append('/').append(pl.level);
+                        Log.i("RCS_CAPS", line.toString());
+                    } catch (Exception inner) { Log.w("RCS_CAPS", "event=decoder_error name=" + info.getName() + " type=" + type + " err=" + inner); }
+                }
+            }
+            if (Build.VERSION.SDK_INT >= 29) {
+                int[] encodings = {AudioFormat.ENCODING_AC3, AudioFormat.ENCODING_E_AC3, AudioFormat.ENCODING_E_AC3_JOC, AudioFormat.ENCODING_DTS};
+                String[] names = {"AC3", "E_AC3", "E_AC3_JOC", "DTS"};
+                android.media.AudioAttributes attrs = new android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_MEDIA).setContentType(android.media.AudioAttributes.CONTENT_TYPE_MOVIE).build();
+                for (int i = 0; i < encodings.length; i++) {
+                    AudioFormat af = new AudioFormat.Builder().setEncoding(encodings[i]).setSampleRate(48000).setChannelMask(AudioFormat.CHANNEL_OUT_5POINT1).build();
+                    boolean ok = AudioTrack.isDirectPlaybackSupported(af, attrs);
+                    Log.i("RCS_CAPS", "event=audio_passthrough format=" + names[i] + " supported=" + ok);
+                }
+            } else {
+                Log.i("RCS_CAPS", "event=audio_passthrough note=AudioTrack.isDirectPlaybackSupported needs API 29+, this device is API " + Build.VERSION.SDK_INT + " -- UNVERIFIED by this dump");
+            }
+            AudioManager am = (AudioManager) getSystemService(AUDIO_SERVICE);
+            if (am != null) Log.i("RCS_CAPS", "event=audio_output sampleRate=" + am.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE) + " framesPerBuffer=" + am.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER));
+            Display d = getWindowManager().getDefaultDisplay();
+            for (Display.Mode m : d.getSupportedModes())
+                Log.i("RCS_CAPS", "event=display_mode id=" + m.getModeId() + " " + m.getPhysicalWidth() + "x" + m.getPhysicalHeight() + "@" + m.getRefreshRate());
+        } catch (Exception e) { Log.w("RCS_CAPS", "event=dump_error err=" + e); }
+    }
+
+    /* B2: structured playback logging, one line per event, tag RCS_PBLOG -- `adb logcat` plus the
+       summary script in tools/playback-audit/ parses these. Shares the same callbacks B1's overlay
+       reads from, so the two surfaces can't drift apart (same reasoning as the shared menu-item
+       builders elsewhere in this app -- see CLAUDE.md). */
+    private class DebugAnalytics implements AnalyticsListener {
+        @Override public void onRenderedFirstFrame(EventTime et, Object output, long renderTimeMs) {
+            if (sawFirstFrame) return;
+            sawFirstFrame = true;
+            long ttffMs = playRequestedAtMs > 0 ? System.currentTimeMillis() - playRequestedAtMs : -1;
+            Log.i("RCS_PBLOG", "event=first_frame ttffMs=" + ttffMs);
+        }
+        @Override public void onDroppedVideoFrames(EventTime et, int count, long elapsedMs) {
+            droppedFrames += count;
+            Log.i("RCS_PBLOG", "event=dropped_frames count=" + count + " totalMs=" + elapsedMs);
+        }
+        @Override public void onVideoDecoderInitialized(EventTime et, String decoderName, long initializedTimestampMs, long initializationDurationMs) {
+            lastVideoDecoder = decoderName;
+            Log.i("RCS_PBLOG", "event=video_decoder_init name=" + decoderName + " initMs=" + initializationDurationMs);
+        }
+        @Override public void onAudioDecoderInitialized(EventTime et, String decoderName, long initializedTimestampMs, long initializationDurationMs) {
+            lastAudioDecoder = decoderName;
+            audioDecoderSeenForCurrentTrack = true;
+            Log.i("RCS_PBLOG", "event=audio_decoder_init name=" + decoderName + " initMs=" + initializationDurationMs);
+        }
+        @Override public void onVideoInputFormatChanged(EventTime et, Format format, androidx.media3.exoplayer.DecoderReuseEvaluation reuse) {
+            lastVideoFormat = format.sampleMimeType + " " + format.width + "x" + format.height + "@" + format.frameRate + " " + (format.bitrate > 0 ? format.bitrate / 1000 + "kbps" : "");
+            Log.i("RCS_PBLOG", "event=video_format_change format=" + lastVideoFormat);
+        }
+        @Override public void onAudioInputFormatChanged(EventTime et, Format format, androidx.media3.exoplayer.DecoderReuseEvaluation reuse) {
+            audioDecoderSeenForCurrentTrack = false;   /* new track: re-derive decoded-vs-passthrough from here */
+            lastAudioFormat = format.sampleMimeType + " " + format.channelCount + "ch " + format.sampleRate + "Hz " + (format.bitrate > 0 ? format.bitrate / 1000 + "kbps" : "");
+            Log.i("RCS_PBLOG", "event=audio_format_change format=" + lastAudioFormat);
+        }
+    }
+
     /* Methods the web app can call as window.RCS.*  */
     class Bridge {
         @JavascriptInterface public void play(final String url) {
             ui.post(() -> {
                 metaSent = false;
+                if (BuildConfig.DEBUG) {
+                    playRequestedAtMs = System.currentTimeMillis();
+                    sawFirstFrame = false;
+                    rebufferCount = 0; lastRebufferMs = -1; droppedFrames = 0; lastError = "-";
+                    audioDecoderSeenForCurrentTrack = false;
+                    Log.i("RCS_PBLOG", "event=play url=" + redact(url));
+                }
                 player.setPlaybackSpeed(1f);
                 player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon()
                         .clearOverrides().setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true).build());

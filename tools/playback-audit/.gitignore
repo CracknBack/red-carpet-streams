@@ -1,0 +1,2 @@
+# PLAYBACK_AUDIT.md ground rule 5: generated test media is never committed, only the generator script.
+clips/out/
