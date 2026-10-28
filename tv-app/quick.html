@@ -5072,6 +5072,10 @@ function buildCats0(t) {
    until they can be rebuilt on per-item lookups (get_vod_info/get_series_info by id) instead of a
    full-catalog scan — a real feature cut, not a bug, in exchange for category browsing actually being
    reliable today. */
+/* TEMPORARY (2026-10-28): one-time logcat dump of the real, raw series category names, so the owner's
+   actual provider category list (reported: ~30 Netflix-prefixed categories) can be read back over ADB
+   instead of guessed at -- remove this block once that's done, it's not meant to stay. */
+let DEBUGCATS_LOGGED = false;
 function buildVodCats(t) {
   const d = DATA[t], bad = adultBadCats(t);
   const v = [];
@@ -5080,6 +5084,11 @@ function buildVodCats(t) {
     const n = d.catItems && d.catItems.has(c.id) ? d.catItems.get(c.id).length : undefined;
     v.push({id: c.id, name: c.name, raw: c.raw, co: c.co, n});
   });
+  if (t === 'series' && !DEBUGCATS_LOGGED) {
+    DEBUGCATS_LOGGED = true;
+    console.log('DEBUGCATS series category count: ' + v.length);
+    v.forEach((c, i) => console.log('DEBUGCATS[' + i + '] ' + c.name));
+  }
   return t === 'series' ? groupSeriesCats(v) : v;
 }
 /* TV Series: the provider's own category list runs to ~200 entries on this account (confirmed on the
