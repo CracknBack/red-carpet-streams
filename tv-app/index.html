@@ -3552,7 +3552,19 @@ function* buildEventsG() {
     if (ev.junk) ev.isEvent = false;
     /* a match is over 3 hours after kick-off at the latest, whatever a channel's listing says */
     ev.stop = Math.min(Math.max(...ev.chans.map(c => c.stop)), isMatch ? kick + 3 * 3600e3 : Infinity);
-    out.push(ev);
+    /* junk was always excluded from EVERY actual use of this array (isEvent above, and every home-
+       banner/browse-page filter requires isEvent/teams/liveEvent, none of which a junk item has unless
+       it's also liveEvent) -- it just never stopped being BUILT and held in memory. On a real device
+       this was most of the array: a logcat pull (2026-10-28) showed buildEventsG producing 5087 "events"
+       from only 6000 raw guide listings -- barely any collapsing, because most TV listings on a sports
+       channel aren't a match at all (news, magazine shows, studio content), and every one of those still
+       got a full ev object, pushed, and carried around for the rest of the session. That's real memory
+       and CPU this function doesn't need to spend, on the one device (Fire TV Stick HD) this file's own
+       history already flags as having repeatedly hit real limits from exactly this function. Dropping a
+       junk item here changes nothing any caller could observe -- it was already functionally invisible
+       everywhere, just not actually gone. liveEvent is independent of isMatch/junk (the F1/MotoGP
+       individual-event flag), so still kept even on the rare item where both ended up true. */
+    if (!ev.junk || ev.liveEvent) out.push(ev);
     if ((++n & 255) === 0) yield;
   }
   yield;
@@ -7560,7 +7572,21 @@ function optItems() {
     if (c && c.id !== 'add') it.push({l: 'Remove the “' + c.l + '” shortcut', a: () => removeChip(c)});
   }
   if (sc === 'login') {
-    try { const at = lItems()[L.idx], el = at && $(inputOf(at)); if (el && el.tagName === 'INPUT') it.push({l: 'Type this on your phone (QR code)', a: () => openPhone(el.placeholder || 'Sign-in', t => { el.value = t; })}); } catch (e) { }
+    /* the phone page shows this back as "Typing into: <label>" -- the one way you can tell, on the
+       phone itself, which of the TV's fields you're actually about to fill. el.placeholder was wrong
+       for this: Server's placeholder is a format example ("http://example.com:8080"), not its name, and
+       Username/Password both have no placeholder at all, so every "Type this on your phone" except
+       Server showed the exact same generic "Sign-in" with nothing to tell the two apart (reported: no
+       way to see what box is highlighted/needed). Each field's own <label><span> already has the real
+       name right there in the DOM -- use that instead. */
+    try {
+      const at = lItems()[L.idx], el = at && $(inputOf(at));
+      if (el && el.tagName === 'INPUT') {
+        const lbl = el.closest('label.field');
+        const name = (lbl && lbl.querySelector('span') && lbl.querySelector('span').textContent) || el.placeholder || 'Sign-in';
+        it.push({l: 'Type this on your phone (QR code)', a: () => openPhone(name, t => { el.value = t; })});
+      }
+    } catch (e) { }
   }
   if (sc === 'main' && isSearchPage(S.page)) it.push({l: 'Type your search on your phone (QR code)', a: () => openPhone('Search', t => { Q.text = t; onQueryChange(); })});
   if (sc === 'main' && isSearchPage(S.page)) it.push({l: 'Update the TV guide now', a: () => loadGuide(true)});
@@ -7857,7 +7883,14 @@ async function doLogin() {
 function loginKey(k, e) {
   const ae = document.activeElement, items = lItems();
   if (ae && ae.tagName === 'INPUT') {
-    if (k === KEY.ENTER) { e.preventDefault(); ae.blur(); L.idx = Math.min(items.length - 1, L.idx + 1); loginRender(); }
+    /* DOWN/UP used to do nothing at all here -- only ENTER/BACK/ESC were handled while an input still
+       had real focus, so the very first DOWN press after typing (e.g. once a phone-keyboard send lands,
+       or just tabbing through fields) was silently swallowed. The field LOOKED like it hadn't responded,
+       and it took a second press to actually move on -- reported as "have to push down twice to
+       submit". DOWN/UP now blur and move the highlight the same single step ENTER already did, so one
+       press behaves the same regardless of whether the input still has literal focus. */
+    if (k === KEY.ENTER || k === KEY.DOWN) { e.preventDefault(); ae.blur(); L.idx = Math.min(items.length - 1, L.idx + 1); loginRender(); }
+    else if (k === KEY.UP) { e.preventDefault(); ae.blur(); L.idx = Math.max(0, L.idx - 1); loginRender(); }
     else if (k === KEY.BACK || k === KEY.ESC) { e.preventDefault(); ae.blur(); }
     return;
   }
