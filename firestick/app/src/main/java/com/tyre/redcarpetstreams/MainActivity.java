@@ -169,7 +169,13 @@ public class MainActivity extends Activity {
                 keepScreenOn(playing);
             }
             @Override public void onPlayerError(PlaybackException e) {
-                if (BuildConfig.DEBUG) { lastError = e.errorCodeName + " (" + e.errorCode + ")"; Log.w("RCS_PBLOG", "event=error code=" + e.errorCodeName + " url=" + redact(String.valueOf(e.getMessage()))); }
+                if (BuildConfig.DEBUG) {
+                    /* PlaybackException has no errorCodeName field -- the name lookup is the static
+                       PlaybackException.getErrorCodeName(int), keyed off the numeric errorCode. */
+                    String codeName = PlaybackException.getErrorCodeName(e.errorCode);
+                    lastError = codeName + " (" + e.errorCode + ")";
+                    Log.w("RCS_PBLOG", "event=error code=" + codeName + " url=" + redact(String.valueOf(e.getMessage())));
+                }
                 send("error");
             }
         });

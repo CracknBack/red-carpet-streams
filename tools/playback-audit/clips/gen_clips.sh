@@ -21,8 +21,7 @@ cd "$OUT"
 # fontconfig, and without a fontconfig.conf/cache present (fresh Windows install, no fontconfig
 # setup) drawtext's font lookup segfaults instead of erroring cleanly. Pointing it straight at a
 # real font file skips fontconfig's own lookup path entirely.
-FONTFILE="${WINDIR:-C:/Windows}/Fonts/consola.ttf"
-FONTFILE="${FONTFILE//\\//}"
+FONTFILE=$(echo "${WINDIR:-C:/Windows}/Fonts/consola.ttf" | tr '\\' '/')
 BS=$'\x5c'   # bash's own backslash-escaping rules inside ${var//pat/repl} don't survive a literal
              # "\\" in the replacement text (it silently no-ops instead of erroring) -- routing the
              # backslash through a variable sidesteps that rather than fighting bash's parser further.
@@ -133,9 +132,14 @@ ffmpeg -y -i h264_1080p50.mp4 -i captions.vtt -c:v copy -c:a aac -c:s dvbsub -f 
 # 50ms window, so the two should land on the same frame if sync is correct.
 # ---------------------------------------------------------------------------
 echo "== sync: flash+beep clip =="
-ffmpeg -y -f lavfi -i "color=size=1920x1080:rate=50:color=black" -t 30 \
-  -vf "geq=lum='if(lt(mod(T\,1)\,0.05),255,16)':cb=128:cr=128,${CLOCK}" \
+# Both -i's first, then -t/-vf as output options -- an earlier version interleaved -t/-vf between
+# the two -i's, which ffmpeg's option parser silently misattached to the second input instead of
+# the output, producing an "Error parsing options for input file aevalsrc=...:s=48000" that had
+# nothing to do with aevalsrc's own (valid) syntax.
+ffmpeg -y \
+  -f lavfi -i "color=size=1920x1080:rate=50:color=black" \
   -f lavfi -i "aevalsrc=exprs='if(lt(mod(t\,1)\,0.05),sin(2*PI*1000*t),0)':s=48000" \
+  -t 30 -vf "geq=lum='if(lt(mod(T\,1)\,0.05),255,16)':cb=128:cr=128,${CLOCK}" \
   -map 0:v -map 1:a -c:v libx264 -preset veryfast -crf 18 -c:a aac -shortest sync_flash_beep.mp4
 
 # ---------------------------------------------------------------------------
