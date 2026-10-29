@@ -40,6 +40,7 @@ import androidx.media3.common.Tracks;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DefaultDataSource;
 import androidx.media3.datasource.DefaultHttpDataSource;
+import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.analytics.AnalyticsListener;
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
@@ -150,8 +151,22 @@ public class MainActivity extends Activity {
                 .setUserAgent("Mozilla/5.0 (Linux; Android) RedCarpetStreams")
                 .setConnectTimeoutMs(15000)
                 .setReadTimeoutMs(20000);
+        /* PLAYBACK_AUDIT.md Phase C finding: a ~3-4.5s rebuffer was observed landing almost immediately
+           after first frame, reproduced 5+ times across synthetic clips AND a real live HLS channel --
+           not one bad test file. Media3's own default start threshold (bufferForPlaybackMs ~2.5s) lets
+           playback begin before much of a cushion exists; on this device's weak CPU (Fire TV Stick HD,
+           1GB RAM, confirmed via B3's capability dump) that cushion drains almost immediately, into a
+           stall. Raising the start thresholds trades a little more time-to-first-frame for not stalling
+           right after it. Min/max buffer bounds are also set explicitly (Media3's own defaults of
+           50s/50s were never tuned for this device's actual RAM) rather than left as a guess. This is a
+           single profile, not separate live/VOD ones -- D4's full "separate profiles" recommendation is
+           a bigger follow-up, not attempted here. */
+        LoadControl loadControl = new DefaultLoadControl.Builder()
+                .setBufferDurationsMs(15_000, 30_000, 4_000, 6_000)
+                .build();
         player = new ExoPlayer.Builder(this)
                 .setMediaSourceFactory(new DefaultMediaSourceFactory(new DefaultDataSource.Factory(this, http)))
+                .setLoadControl(loadControl)
                 .build();
         pv.setPlayer(player);
         player.addListener(new Player.Listener() {
@@ -522,7 +537,16 @@ public class MainActivity extends Activity {
 
     /* Methods the web app can call as window.RCS.*  */
     class Bridge {
-        @JavascriptInterface public void play(final String url) {
+        /* PLAYBACK_AUDIT.md Phase C finding: getCurrentLiveOffset() returned "not live" (C.TIME_UNSET)
+           even while genuinely playing a live HLS channel, because no MediaItem ever got a
+           LiveConfiguration -- live and VOD used the exact same MediaItem.fromUri(url) path. isLive
+           comes from the page (NativeStreamer.start() already knows it.t === 'live'); without it,
+           native code has no way to tell live and VOD apart at all. The 10s target offset is a
+           starting point per the audit's own D5 -- not a tuned final value, the owner should confirm.
+           A single two-arg method rather than an overload: WebView's JS-bridge reflection resolves
+           overloads by argument count/type, which works, but there's only one real caller (JS always
+           passes both now) so there's no reason to add that ambiguity for no benefit. */
+        @JavascriptInterface public void play(final String url, final boolean isLive) {
             ui.post(() -> {
                 metaSent = false;
                 if (BuildConfig.DEBUG) {
@@ -530,13 +554,19 @@ public class MainActivity extends Activity {
                     sawFirstFrame = false;
                     rebufferCount = 0; lastRebufferMs = -1; droppedFrames = 0; lastError = "-";
                     audioDecoderSeenForCurrentTrack = false;
-                    Log.i("RCS_PBLOG", "event=play url=" + redact(url));
+                    Log.i("RCS_PBLOG", "event=play url=" + redact(url) + " live=" + isLive);
                 }
                 player.setPlaybackSpeed(1f);
                 player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon()
                         .clearOverrides().setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true).build());
                 pv.setVisibility(View.VISIBLE);
-                player.setMediaItem(MediaItem.fromUri(url));
+                MediaItem.Builder mb = new MediaItem.Builder().setUri(url);
+                if (isLive) {
+                    mb.setLiveConfiguration(new MediaItem.LiveConfiguration.Builder()
+                            .setTargetOffsetMs(10_000)
+                            .build());
+                }
+                player.setMediaItem(mb.build());
                 player.prepare();
                 player.play();
             });

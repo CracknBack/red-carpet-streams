@@ -7349,7 +7349,7 @@ class NativeStreamer {
     NV.addEventListener('playing', () => { clearTimeout(this.stallT); if (this.on) this.msg(''); });
     NV.addEventListener('waiting', () => { if (this.on) this.msg('Buffering…'); });
   }
-  start(it) { const seen = new Set(); this.on = true; this.att = urlsFor(it).filter(a => a.how !== 'hls' && !seen.has(a.url) && seen.add(a.url)); this.tries = 0; this.next(); }
+  start(it) { const seen = new Set(); this.on = true; this.isLive = it.t === 'live'; this.att = urlsFor(it).filter(a => a.how !== 'hls' && !seen.has(a.url) && seen.add(a.url)); this.tries = 0; this.next(); }
   clear() { clearTimeout(this.stallT); try { window.RCS.stop(); } catch (e) {} NV.readyState = 0; NV._d = NaN; NV._t = 0; NV._p = true; }
   stop() { this.on = false; this.clear(); this.msg(''); document.documentElement.classList.remove('native'); }
   next() {
@@ -7361,7 +7361,7 @@ class NativeStreamer {
     this.msg('Loading…');
     document.documentElement.classList.add('native');
     try { window.RCS.setLang(ui.lang === 'in' ? 'hi' : ui.lang); } catch (e) {}
-    window.RCS.play(a.url);
+    window.RCS.play(a.url, !!this.isLive);
     this.stallT = setTimeout(() => { if (this.on && NV.readyState < 3) this.next(); }, 20000);
   }
 }
