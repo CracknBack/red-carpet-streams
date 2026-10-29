@@ -174,7 +174,14 @@ public class MainActivity extends Activity {
             @Override public void onPlaybackStateChanged(int st) {
                 if (st == Player.STATE_BUFFERING) {
                     send("waiting");
-                    if (BuildConfig.DEBUG) rebufferStartMs = System.currentTimeMillis();
+                    /* Real bug in this harness, caught by a suspicious result during Phase C re-testing:
+                       every stream passes through STATE_BUFFERING once before its first frame ever
+                       renders -- that's normal startup, not a rebuffer. Counting it unconditionally
+                       meant EVERY test was reporting a fake "rebuffer" for ordinary first-load
+                       buffering, which is what the "~3-4.5s rebuffer right after start" finding
+                       actually was. Gating on sawFirstFrame means only a stall that happens AFTER
+                       playback has genuinely begun counts as a real rebuffer. */
+                    if (BuildConfig.DEBUG && sawFirstFrame) rebufferStartMs = System.currentTimeMillis();
                 } else if (st == Player.STATE_READY) {
                     if (!metaSent) { metaSent = true; send("loadedmetadata"); }
                     if (BuildConfig.DEBUG && rebufferStartMs != 0) {
