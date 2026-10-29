@@ -1121,6 +1121,23 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 /* ================= basics ================= */
 const APP_VERSION = '3.23.17';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
+/* MainActivity's dispatchKeyEvent intercepts every digit keypress globally, for the remote's
+   number-jump feature -- with no way for native code to know a text <input> currently has focus,
+   so every digit typed into the server/username/password/search/PIN fields via the physical
+   remote was silently eaten before it ever reached the WebView (confirmed on-device: typing
+   a real username into the Username field silently came out with every digit stripped). Mirrors handleKey's
+   own `typing` check (line ~8084) so native code learns the same thing the JS key router already
+   knows, and only swallows digits when nothing is actually being typed into. */
+if (FIRE && window.RCS.setTyping) {
+  let typingWasActive = false;
+  document.addEventListener('focusin', () => {
+    const ae = document.activeElement, typing = !!(ae && ae.tagName === 'INPUT' && !ae.readOnly);
+    if (typing !== typingWasActive) { typingWasActive = typing; window.RCS.setTyping(typing); }
+  });
+  document.addEventListener('focusout', () => {
+    if (typingWasActive) { typingWasActive = false; window.RCS.setTyping(false); }
+  });
+}
 const PC = !!window.RCSPC || !!window.RCS_DESKTOP;   /* Windows app, or the no-install desktop version */
 const PHONE = FIRE && navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) < 700;   /* Android phone */
 if (PHONE) document.documentElement.classList.add('phone');

@@ -70,15 +70,34 @@ const server = http.createServer(async (req, res) => {
   const preDelay = Number(q.slowstart || q.latency || 0);
   if (preDelay > 0) await sleep(preDelay);
 
-  res.writeHead(200, { 'Content-Type': mimeFor(filePath), 'Content-Length': stat.size, 'Cache-Control': 'no-store' });
+  // Range support is not optional for a progressive-MP4 test: a moov atom muxed at the end of the
+  // file (ffmpeg's default without -movflags +faststart, which gen_clips.sh doesn't set) means
+  // Media3's HTTP data source opens with a Range request for the file's tail before it can read
+  // the metadata needed to start playback at all. Without this, every progressive-MP4 clip just
+  // sits there -- discovered exactly that way, testing h264_1080p50.mp4 for real.
+  let start = 0, end = stat.size - 1, status = 200;
+  const range = req.headers.range;
+  if (range) {
+    const m = /bytes=(\d*)-(\d*)/.exec(range);
+    if (m) {
+      if (m[1]) start = Number(m[1]);
+      if (m[2]) end = Number(m[2]);
+      else if (!m[1]) { start = stat.size - Number(m[2] || 0); end = stat.size - 1; } // bytes=-N (suffix range)
+      status = 206;
+    }
+  }
+  const length = end - start + 1;
+  const headers = { 'Content-Type': mimeFor(filePath), 'Content-Length': length, 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-store' };
+  if (status === 206) headers['Content-Range'] = `bytes ${start}-${end}/${stat.size}`;
+  res.writeHead(status, headers);
 
-  const stream = fs.createReadStream(filePath, { highWaterMark: 64 * 1024 });
+  const stream = fs.createReadStream(filePath, { start, end, highWaterMark: 64 * 1024 });
   let sent = 0;
   const capMbps = Number(q.cap || 0);           // bandwidth cap in Mbps
   const stallMs = Number(q.stall || 0);          // one-time stall partway through the body
-  const stallAt = Math.floor(stat.size * 0.4);   // ~40% through, so it's a genuine mid-stream stall
+  const stallAt = Math.floor(length * 0.4);      // ~40% through this response, so it's a genuine mid-stream stall
   let stalled = false;
-  const dropAt = q.drop ? Math.floor(stat.size * 0.5) : -1;
+  const dropAt = q.drop ? Math.floor(length * 0.5) : -1;
   const bytesPerMs = capMbps > 0 ? (capMbps * 1_000_000 / 8) / 1000 : 0;
 
   req.on('close', () => stream.destroy());

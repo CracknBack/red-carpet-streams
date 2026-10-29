@@ -99,6 +99,14 @@ public class MainActivity extends Activity {
     private boolean audioDecoderSeenForCurrentTrack = false;
     private long keySeqLastMs = 0;
     private int keySeqCount = 0;
+    /* Set by the page's Bridge.setTyping() call (see index.html's focusin/focusout listener) --
+       dispatchKeyEvent's digit-key branch must not swallow number keys for the remote's "jump to
+       channel number" feature while a text <input> has real focus, or nothing with a digit in it
+       (an Xtream server URL, username, password, search term, PIN) can ever be typed via the
+       physical remote. Confirmed on-device before this existed: typing the owner's real account
+       username in produced a string with every digit silently stripped -- eaten here, every time,
+       not dropped by chance. */
+    private volatile boolean typingActive = false;
 
     @Override
     protected void onCreate(Bundle saved) {
@@ -278,7 +286,10 @@ public class MainActivity extends Activity {
                 toggleDebugOverlay();
             }
         }
-        int code = map(e.getKeyCode());
+        int rawCode = e.getKeyCode();
+        boolean isDigit = rawCode >= KeyEvent.KEYCODE_0 && rawCode <= KeyEvent.KEYCODE_9;
+        if (isDigit && typingActive) return super.dispatchKeyEvent(e);   /* let the WebView's own IME handle it */
+        int code = map(rawCode);
         if (code != 0) {
             if (e.getAction() == KeyEvent.ACTION_DOWN && (e.getRepeatCount() == 0 || code != 461)) js("window.__rcsKey&&__rcsKey(" + code + ")");
             return true;
@@ -580,5 +591,8 @@ public class MainActivity extends Activity {
             });
         }
         @JavascriptInterface public void exit() { ui.post(MainActivity.this::finish); }
+        /* Called from index.html's focusin/focusout listener whenever a text <input> gains or
+           loses real focus -- see typingActive's own comment for why this needs to exist at all. */
+        @JavascriptInterface public void setTyping(final boolean on) { typingActive = on; }
     }
 }
