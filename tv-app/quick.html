@@ -1185,6 +1185,10 @@ const NV = (() => {
     if (ev === 'loadedmetadata' || ev === 'playing') o.readyState = 4;
     et.dispatchEvent(new Event(ev));
   };
+  /* PLAYBACK_AUDIT.md D7: MainActivity.onPlayerError calls this just before the generic 'error'
+     event (__rcsVideo('error', ...)) fires, so by the time anything listening for 'error' runs,
+     the real Media3 error-code name is already sitting here to classify. */
+  window.__rcsError = codeName => { o._lastErrorCode = codeName; };
   return o;
 })();
 
@@ -7341,22 +7345,42 @@ class Streamer {
     this.stallT = setTimeout(() => { if (this.on && v.readyState < 3) this.next(); }, 20000);
   }
 }
+/* PLAYBACK_AUDIT.md D7: one clear message per error class instead of the single generic "won't play
+   right now" regardless of cause. codeName comes straight from Media3's own
+   PlaybackException.getErrorCodeName() via window.__rcsError (MainActivity.onPlayerError).
+   Deliberate limitation: a track that fails to attach with literally no error at all -- the E-AC3
+   finding in the audit, video plays, audio silently never starts, no PlaybackException ever fires
+   -- never reaches this classifier, since there's nothing here to classify. That needs its own
+   detection (comparing expected vs. actually-attached tracks after prepare), not attempted here. */
+function classifyPlaybackError(codeName) {
+  if (!codeName) return null;
+  if (codeName === 'ERROR_CODE_IO_BAD_HTTP_STATUS') return 'The provider’s server rejected this request. It may be temporarily down.';
+  if (codeName === 'ERROR_CODE_IO_FILE_NOT_FOUND') return 'This channel isn’t available right now (not found on the server).';
+  if (codeName === 'ERROR_CODE_IO_NO_PERMISSION' || codeName === 'ERROR_CODE_IO_CLEARTEXT_NOT_PERMITTED') return 'Access to this channel was refused by the device or the server.';
+  if (codeName.indexOf('ERROR_CODE_IO_NETWORK') === 0 || codeName === 'ERROR_CODE_TIMEOUT') return 'Can’t reach this channel right now. Check your connection.';
+  if (codeName.indexOf('ERROR_CODE_IO_') === 0) return 'A network problem stopped playback.';
+  if (codeName.indexOf('ERROR_CODE_AUDIO_TRACK') === 0) return 'This channel’s audio format isn’t supported on this device.';
+  if (codeName.indexOf('ERROR_CODE_DECODING_FORMAT') === 0 || codeName.indexOf('ERROR_CODE_DECODER_') === 0 || codeName === 'ERROR_CODE_DECODING_FAILED') return 'This channel uses a format the Firestick can’t decode.';
+  if (codeName.indexOf('ERROR_CODE_PARSING_') === 0) return 'This channel’s stream is in a format this app doesn’t understand.';
+  if (codeName === 'ERROR_CODE_BEHIND_LIVE_WINDOW') return 'Fell too far behind the live broadcast.';
+  return null;
+}
 /* Firestick version of Streamer: hands the link to Android's player. */
 class NativeStreamer {
   constructor(msg) {
-    this.msg = msg; this.on = false; this.att = []; this.tries = 0; this.stallT = 0;
-    NV.addEventListener('error', () => { if (this.on) this.next(); });
+    this.msg = msg; this.on = false; this.att = []; this.tries = 0; this.stallT = 0; this.lastErrorMsg = null;
+    NV.addEventListener('error', () => { this.lastErrorMsg = classifyPlaybackError(NV._lastErrorCode); if (this.on) this.next(); });
     NV.addEventListener('playing', () => { clearTimeout(this.stallT); if (this.on) this.msg(''); });
     NV.addEventListener('waiting', () => { if (this.on) this.msg('Buffering…'); });
   }
-  start(it) { const seen = new Set(); this.on = true; this.isLive = it.t === 'live'; this.att = urlsFor(it).filter(a => a.how !== 'hls' && !seen.has(a.url) && seen.add(a.url)); this.tries = 0; this.next(); }
+  start(it) { const seen = new Set(); this.on = true; this.isLive = it.t === 'live'; this.lastErrorMsg = null; this.att = urlsFor(it).filter(a => a.how !== 'hls' && !seen.has(a.url) && seen.add(a.url)); this.tries = 0; this.next(); }
   clear() { clearTimeout(this.stallT); try { window.RCS.stop(); } catch (e) {} NV.readyState = 0; NV._d = NaN; NV._t = 0; NV._p = true; }
   stop() { this.on = false; this.clear(); this.msg(''); document.documentElement.classList.remove('native'); }
   next() {
     this.clear();
     if (!this.on) return;
     if (this.tries >= this.att.length && this.onFail && this.onFail()) return;
-    if (this.tries >= this.att.length) { this.msg('This won’t play right now. It may be offline, or it uses a format the Firestick can’t decode.'); return; }
+    if (this.tries >= this.att.length) { this.msg(this.lastErrorMsg || 'This won’t play right now. It may be offline, or it uses a format the Firestick can’t decode.'); return; }
     const a = this.att[this.tries++];
     this.msg('Loading…');
     document.documentElement.classList.add('native');

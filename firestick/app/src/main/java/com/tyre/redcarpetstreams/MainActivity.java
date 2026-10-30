@@ -152,18 +152,22 @@ public class MainActivity extends Activity {
                 .setUserAgent("Mozilla/5.0 (Linux; Android) RedCarpetStreams")
                 .setConnectTimeoutMs(15000)
                 .setReadTimeoutMs(20000);
-        /* PLAYBACK_AUDIT.md Phase C finding: a ~3-4.5s rebuffer was observed landing almost immediately
-           after first frame, reproduced 5+ times across synthetic clips AND a real live HLS channel --
-           not one bad test file. Media3's own default start threshold (bufferForPlaybackMs ~2.5s) lets
-           playback begin before much of a cushion exists; on this device's weak CPU (Fire TV Stick HD,
-           1GB RAM, confirmed via B3's capability dump) that cushion drains almost immediately, into a
-           stall. Raising the start thresholds trades a little more time-to-first-frame for not stalling
-           right after it. Min/max buffer bounds are also set explicitly (Media3's own defaults of
-           50s/50s were never tuned for this device's actual RAM) rather than left as a guess. This is a
-           single profile, not separate live/VOD ones -- D4's full "separate profiles" recommendation is
-           a bigger follow-up, not attempted here. */
+        /* PLAYBACK_AUDIT.md D4: Media3's own defaults (50s min/max buffer) were never tuned for this
+           device's actual RAM (Fire TV Stick HD, ~1GB, confirmed via B3's capability dump) -- sized down
+           to bounds that are still generous for smooth playback without holding onto more buffered
+           media than this device can comfortably afford. The start/resume thresholds
+           (bufferForPlaybackMs/bufferForPlaybackAfterRebufferMs) are left at Media3's own defaults
+           deliberately: an earlier version of this comment raised them, reasoning from a "rebuffer right
+           after start" finding that turned out to be a bug in the measurement harness itself (it counted
+           ordinary first-load buffering as a rebuffer), not a real stall -- see the harness fix and the
+           Phase D report for the full story. Changing a user-facing timing number on the strength of a
+           measurement that was later retracted isn't something to leave in place by default; raise them
+           again only with real evidence, not as a precaution. Single profile, not separate live/VOD ones
+           -- D4's full "separate profiles" recommendation is a bigger follow-up, not attempted here. */
         LoadControl loadControl = new DefaultLoadControl.Builder()
-                .setBufferDurationsMs(15_000, 30_000, 4_000, 6_000)
+                .setBufferDurationsMs(15_000, 30_000,
+                        DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS,
+                        DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS)
                 .build();
         player = new ExoPlayer.Builder(this)
                 .setMediaSourceFactory(new DefaultMediaSourceFactory(new DefaultDataSource.Factory(this, http)))
@@ -205,13 +209,17 @@ public class MainActivity extends Activity {
                 keepScreenOn(playing);
             }
             @Override public void onPlayerError(PlaybackException e) {
+                /* PlaybackException has no errorCodeName field -- the name lookup is the static
+                   PlaybackException.getErrorCodeName(int), keyed off the numeric errorCode. Needed in
+                   every build now (not just debug): PLAYBACK_AUDIT.md D7 asks for a distinct message per
+                   error class, which needs the real code name on the JS side, not just a bare "error"
+                   event with no information attached. */
+                String codeName = PlaybackException.getErrorCodeName(e.errorCode);
                 if (BuildConfig.DEBUG) {
-                    /* PlaybackException has no errorCodeName field -- the name lookup is the static
-                       PlaybackException.getErrorCodeName(int), keyed off the numeric errorCode. */
-                    String codeName = PlaybackException.getErrorCodeName(e.errorCode);
                     lastError = codeName + " (" + e.errorCode + ")";
                     Log.w("RCS_PBLOG", "event=error code=" + codeName + " url=" + redact(String.valueOf(e.getMessage())));
                 }
+                js("window.__rcsError&&__rcsError(" + JSONObject.quote(codeName) + ")");
                 send("error");
             }
         });
