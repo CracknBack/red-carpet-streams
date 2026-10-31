@@ -26,13 +26,18 @@ android {
         versionName "${appVer}"
     }
 
-    /* The same signing key every build, so updates install over the top without losing your sign-in or favourites. */
+    /* The same signing key every build, so updates install over the top without losing your sign-in or
+       favourites. The keystore file and its password are NOT committed (rotated out 2026-10-31 after
+       both were found hardcoded in this public repo) -- CI writes rcs-release.p12 from the
+       RCS_KEYSTORE_B64 secret just before the build step, and the password comes from the
+       RCS_KEYSTORE_PASSWORD secret via this env var. A local build needs the same two set in the
+       shell first; there is deliberately no fallback default here. */
     signingConfigs {
         release {
             storeFile file('rcs-release.p12')
-            storePassword 'REDACTED-OLD-KEYSTORE-PASSWORD'
+            storePassword System.getenv('RCS_KEYSTORE_PASSWORD')
             keyAlias 'rcs'
-            keyPassword 'REDACTED-OLD-KEYSTORE-PASSWORD'
+            keyPassword System.getenv('RCS_KEYSTORE_PASSWORD')
             storeType 'pkcs12'
         }
     }
