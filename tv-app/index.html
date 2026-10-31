@@ -2648,15 +2648,24 @@ function plChannelRows(comp) {
 }
 /* ================= Premier League channels =================
    The broadcasters listed for a Premier League match (TheSportsDB's page for Everton v Chelsea), plus Sky Sports,
-   which shares the UK rights. The number is the order the groups are shown in. Names are matched to your own channels. */
+   which shares the UK rights. The number is the order the groups are shown in. Names are matched to your own channels.
+   2026-10-31 pass: added New Zealand (Sky Network Television holds exclusive NZ rights through 2033/34; "Sky Sport
+   Premier League" is channel 058, the dedicated 24/7 PL feed -- kalkinemedia.com, livesoccertv.com), South Africa's
+   SABC Sport (SuperSport sub-leases some matches to free-to-air SABC -- Sportcal), and Canada's "Premier League TV",
+   a second dedicated fuboTV channel alongside the existing Fubo Sports Network entry (fubo.tv's own 2026/27 guide).
+   Corrected India: Disney+ Hotstar merged into JioHotstar in India in Feb 2025, so "Disney+ Hotstar" no longer
+   exists as an on-air/app name there (Wikipedia; whatsondisneyplus.com) -- the Star Sports channel entries below
+   were independently confirmed still accurate (JioStar's 2025-28 Premier League deal keeps the Star Sports
+   branding; SportsPro). */
 const PL_CH = [
   /* [name, country, group order, language: 0 English, 1 not sure, 2 other] */
   ['TNT Sports 1', 'UK', 0, 0], ['TNT Sports Ultimate', 'UK', 0, 0], ['Sky Sports Premier League', 'UK', 0, 0], ['Sky Sports Main Event', 'UK', 0, 0], ['Sky Sports Football', 'UK', 0, 0],
   ['Premier Sports 1', 'IE', 0, 0], ['Premier Sports 2', 'IE', 0, 0],
-  ['USA Network', 'US', 1, 0], ['NBC', 'US', 1, 0], ['Peacock', 'US', 1, 0], ['Fubo Sports Network', 'CA', 1, 0], ['Universo', 'US', 1, 2], ['Telemundo', 'US', 1, 2], ['Stan Sport', 'AU', 2, 0],
-  ['SuperSport Premier League', 'ZA', 3, 0], ['SuperSport Football', 'ZA', 3, 0], ['Astro SuperSport', 'MY', 4, 1], ['Star Sports 1', 'IN', 4, 1],
+  ['USA Network', 'US', 1, 0], ['NBC', 'US', 1, 0], ['Peacock', 'US', 1, 0], ['Fubo Sports Network', 'CA', 1, 0], ['Premier League TV', 'CA', 1, 0], ['Universo', 'US', 1, 2], ['Telemundo', 'US', 1, 2],
+  ['Stan Sport', 'AU', 2, 0], ['Sky Sport Premier League', 'NZ', 2, 0],
+  ['SuperSport Premier League', 'ZA', 3, 0], ['SuperSport Football', 'ZA', 3, 0], ['SABC Sport', 'ZA', 3, 0], ['Astro SuperSport', 'MY', 4, 1], ['Star Sports 1', 'IN', 4, 1],
   ['beIN Sports 1 English', '', 3, 0], ['beIN Sports English', '', 3, 0], ['beIN Sports 1', '', 3, 1], ['beIN Sports 3', '', 3, 1], ['DAZN 1', '', 3, 1], ['DAZN 2', '', 3, 1], ['HBO Max', '', 3, 1], ['Canal+', '', 3, 2], ['Viaplay', '', 3, 2],
-  ['Disney+ Hotstar', 'IN', 4, 1], ['Star Sports 1 Select', 'IN', 4, 1], ['Star Sports 3', 'IN', 4, 1], ['Star Sports 2 Select', 'IN', 4, 1], ['Vidio', 'ID', 4, 2], ['FPT TV', 'VN', 4, 2],
+  ['JioHotstar', 'IN', 4, 1], ['Star Sports 1 Select', 'IN', 4, 1], ['Star Sports 3', 'IN', 4, 1], ['Star Sports 2 Select', 'IN', 4, 1], ['Vidio', 'ID', 4, 2], ['FPT TV', 'VN', 4, 2],
   ['Sky Sport Austria 1', 'AT', 5, 2], ['Sky Sport 8', '', 5, 2], ['Sky Sport Calcio', 'IT', 5, 2], ['Sky Sport 2', '', 5, 2], ['Sky Sport Arena', '', 5, 2], ['Nova Sports 4', 'GR', 5, 2], ['V Sport Premium', '', 5, 2], ['Setanta Sports', '', 5, 2], ['Diema Sport 2', 'BG', 5, 2], ['Spiler 1', '', 5, 2], ['Voyo', '', 5, 2], ['Idman TV', 'AZ', 5, 2]
 ];
 const PL_LANG = new Map();
@@ -2682,43 +2691,66 @@ function compCategoryChannels(comp, table, ev) {
   return [...out.values()].sort((a, b) => a.l - b.l || (isAppFeed(a.g) ? 1 : 0) - (isAppFeed(b.g) ? 1 : 0) || a.o - b.o || (QRK[b.g.ql] || 1.5) - (QRK[a.g.ql] || 1.5) || a.g.name.localeCompare(b.g.name, undefined, {numeric: true})).map(x => x.g);
 }
 function plCategoryChannels(ev) { PL_LANG.clear(); return compCategoryChannels('Premier League', PL_CH, ev); }
-/* UEFA Champions League 2026/27 broadcasters (UK: TNT Sports, Prime Video; US: Paramount+/CBS; Australia: Stan Sport; South Africa: SuperSport; Asia: beIN; Canada: DAZN) */
+/* UEFA Champions League 2026/27 broadcasters (UK: TNT Sports, Prime Video; US: Paramount+/CBS; Australia: Stan Sport;
+   South Africa: SuperSport; Asia: beIN; Canada and New Zealand: DAZN -- confirmed exclusive in both through 2026/27,
+   advanced-television.com/worldscreen.com/dazngroup.com -- country-tagged explicitly below alongside the existing
+   untagged DAZN entries so they group correctly instead of falling into the generic/international bucket; India:
+   Sony LIV -- confirmed 2026/27 India/South Asia rights holder, livesoccertv.com/latestly.com, not previously
+   listed here at all) */
 const CL_CH = [
   ['TNT Sports 1', 'UK', 0, 0], ['TNT Sports 2', 'UK', 0, 0], ['TNT Sports 3', 'UK', 0, 0], ['TNT Sports 4', 'UK', 0, 0], ['TNT Sports 5', 'UK', 0, 0], ['TNT Sports Ultimate', 'UK', 0, 0],
   ['CBS Sports Network', 'US', 1, 0], ['CBS Sports Golazo Network', 'US', 1, 0], ['CBS', 'US', 1, 0], ['Paramount+', 'US', 1, 0],
-  ['Stan Sport', 'AU', 2, 0], ['SuperSport Football', 'ZA', 3, 0],
+  ['Stan Sport', 'AU', 2, 0], ['DAZN', 'CA', 2, 1], ['DAZN', 'NZ', 2, 1], ['SuperSport Football', 'ZA', 3, 0], ['Sony LIV', 'IN', 5, 0],
   ['beIN Sports 1 English', '', 4, 0], ['beIN Sports English', '', 4, 0], ['beIN Sports 1', '', 4, 1], ['beIN Sports 2', '', 4, 1], ['beIN Sports 3', '', 4, 1],
   ['HBO Max', '', 4, 1], ['Prime Video', '', 4, 1], ['DAZN', '', 4, 1], ['DAZN 1', '', 4, 1], ['UEFA TV', '', 4, 1], ['TUDN', 'US', 5, 2], ['ViX', 'US', 5, 2]
 ];
-/* La Liga 2026/27: UK Premier Sports (+ Disney+ Saturday night), US ESPN, Australia beIN, South Africa SuperSport, Canada TSN */
+/* La Liga 2026/27: UK Premier Sports (+ Disney+ Saturday night), US ESPN, Australia beIN, South Africa SuperSport,
+   Canada TSN (re-verified 2026-10-31: Bell Media/TSN confirmed through 2028-29, matches what was already here --
+   livesoccertv.com/tsn's own listings; no change made) */
 const LL_CH = [
   ['Premier Sports 1', 'UK', 0, 0], ['Premier Sports 2', 'UK', 0, 0], ['LaLiga TV', 'UK', 0, 0], ['Disney+', '', 3, 1],
   ['ESPN', 'US', 1, 0], ['ESPN2', 'US', 1, 0], ['ESPN Deportes', 'US', 1, 2], ['TSN', 'CA', 1, 0],
   ['beIN Sports English', '', 2, 0], ['beIN Sports 1 English', '', 2, 0], ['beIN Sports 1', '', 2, 1], ['beIN Sports 2', '', 2, 1], ['beIN Sports 3', '', 2, 1],
   ['SuperSport LaLiga', 'ZA', 3, 0], ['SuperSport Football', 'ZA', 3, 0]
 ];
-/* Serie A 2026/27: UK DAZN (every match), TNT Sports (two a round), BBC Alba (one a round); US Paramount+ and CBS; Australia beIN; Canada Fubo; South Africa SuperSport */
+/* Serie A 2026/27: UK DAZN (every match), TNT Sports (two a round), BBC Alba (one a round); US Paramount+ and CBS;
+   Australia beIN; Canada Fubo and DAZN (a 2025 DAZN/Fubo distribution partnership for Canada -- kept the existing
+   Fubo entry and added DAZN alongside it rather than replacing, since the exact split wasn't clear from sources);
+   South Africa SuperSport; added India (Zee Entertainment/ZEE5, 2026-2031 deal) and Malaysia (Astro, via Astro GO --
+   same "Astro SuperSport" channel-name convention already used for Premier League) 2026-10-31, neither previously
+   listed here at all */
 const SA_CH = [
   ['DAZN', 'UK', 0, 1], ['DAZN 1', '', 0, 1], ['TNT Sports 1', 'UK', 0, 0], ['TNT Sports 2', 'UK', 0, 0], ['TNT Sports 3', 'UK', 0, 0], ['TNT Sports 4', 'UK', 0, 0], ['TNT Sports Ultimate', 'UK', 0, 0], ['BBC Alba', 'UK', 0, 0],
-  ['Paramount+', 'US', 1, 0], ['CBS Sports Network', 'US', 1, 0], ['CBS Sports Golazo Network', 'US', 1, 0], ['CBS', 'US', 1, 0], ['Fubo Sports Network', 'CA', 1, 0],
-  ['beIN Sports English', '', 2, 0], ['beIN Sports 1', '', 2, 1], ['beIN Sports 2', '', 2, 1], ['beIN Sports 3', '', 2, 1], ['SuperSport Football', 'ZA', 3, 0]
+  ['Paramount+', 'US', 1, 0], ['CBS Sports Network', 'US', 1, 0], ['CBS Sports Golazo Network', 'US', 1, 0], ['CBS', 'US', 1, 0], ['Fubo Sports Network', 'CA', 1, 0], ['DAZN', 'CA', 1, 1],
+  ['beIN Sports English', '', 2, 0], ['beIN Sports 1', '', 2, 1], ['beIN Sports 2', '', 2, 1], ['beIN Sports 3', '', 2, 1], ['ZEE5', 'IN', 2, 0], ['Astro SuperSport', 'MY', 2, 1], ['SuperSport Football', 'ZA', 3, 0]
 ];
-/* Bundesliga 2026/27: UK Sky Sports (Saturday 5:30pm), Prime Video (Sundays), BBC iPlayer (Fridays); US USA Network, Peacock, Telemundo, Universo; Australia and Singapore beIN */
+/* Bundesliga 2026/27: UK Sky Sports (Saturday 5:30pm), Prime Video (Sundays), BBC iPlayer (Fridays); US USA Network,
+   Peacock, Telemundo, Universo; Australia and Singapore beIN; added Canada (DAZN, confirmed main Bundesliga
+   broadcaster through 2027-28, bundesliga.com's own broadcaster page) 2026-10-31 -- a real gap, no Canadian
+   broadcaster was listed here at all before. New Zealand's beIN Bundesliga deal was confirmed to run only through
+   2025-26 (per the source found), so NOT adding an NZ entry here without a confirmed 2026/27 successor -- flagged
+   as an open gap, not guessed at. */
 const BL_CH = [
   ['Sky Sports Plus', 'UK', 0, 0], ['Sky Sports Main Event', 'UK', 0, 0], ['Sky Sports Football', 'UK', 0, 0], ['Prime Video', '', 0, 1],
-  ['USA Network', 'US', 1, 0], ['Peacock', 'US', 1, 0], ['Telemundo', 'US', 1, 2], ['Universo', 'US', 1, 2],
+  ['USA Network', 'US', 1, 0], ['Peacock', 'US', 1, 0], ['Telemundo', 'US', 1, 2], ['Universo', 'US', 1, 2], ['DAZN', 'CA', 1, 1],
   ['beIN Sports English', '', 2, 0], ['beIN Sports 1', '', 2, 1], ['beIN Sports 2', '', 2, 1], ['beIN Sports 3', '', 2, 1], ['beIN Sports MAX', '', 2, 1]
 ];
-/* Ligue 1 2026/27: UK Ligue 1+; US beIN Sports; South Africa SuperSport. Sources disagree about Australia (beIN or nobody). */
+/* Ligue 1 2026/27: UK Ligue 1+; US beIN Sports; South Africa SuperSport. Sources disagree about Australia (beIN or
+   nobody). Added Canada (beIN Sports Canada and beIN Sports Canada Espanol -- confirmed distinct regional feeds,
+   the existing beIN entries below were tagged 'US' only so a Canada-tagged beIN channel wouldn't have matched)
+   2026-10-31. */
 const L1_CH = [
-  ['Ligue 1+', 'UK', 0, 0], ['beIN Sports', 'US', 1, 0], ['beIN Sports XTRA', 'US', 1, 0], ['beIN Sports en Espanol', 'US', 1, 2], ['Fubo Sports Network', '', 1, 0],
+  ['Ligue 1+', 'UK', 0, 0], ['beIN Sports', 'US', 1, 0], ['beIN Sports', 'CA', 1, 0], ['beIN Sports XTRA', 'US', 1, 0], ['beIN Sports XTRA', 'CA', 1, 0], ['beIN Sports en Espanol', 'US', 1, 2], ['Fubo Sports Network', '', 1, 0],
   ['beIN Sports English', '', 2, 0], ['beIN Sports 1', '', 2, 1], ['beIN Sports 2', '', 2, 1], ['beIN Sports 3', '', 2, 1], ['SuperSport Football', 'ZA', 3, 0]
 ];
-/* Europa League 2026/27: UK TNT Sports and HBO Max (every game); US Paramount+ and CBS (English), TUDN and DAZN (Spanish); Australia Stan Sport; South Africa SuperSport; Canada and NZ DAZN; Asia beIN */
+/* Europa League 2026/27: UK TNT Sports and HBO Max (every game); US Paramount+ and CBS (English), TUDN and DAZN
+   (Spanish); Australia Stan Sport; South Africa SuperSport; Canada and NZ DAZN (both confirmed exclusive through
+   2026/27 -- cansme.ca, Ministry of Sport/NZ Herald/Sportcal -- country-tagged explicitly below, same reasoning
+   as CL_CH); Asia beIN */
 const EL_CH = [
   ['TNT Sports 1', 'UK', 0, 0], ['TNT Sports 2', 'UK', 0, 0], ['TNT Sports 3', 'UK', 0, 0], ['TNT Sports 4', 'UK', 0, 0], ['TNT Sports 5', 'UK', 0, 0], ['HBO Max', 'UK', 0, 1],
   ['Paramount+', 'US', 1, 0], ['CBS Sports Network', 'US', 1, 0], ['CBS Sports Golazo Network', 'US', 1, 0], ['CBS', 'US', 1, 0], ['TUDN', 'US', 5, 2], ['ViX', 'US', 5, 2],
-  ['Stan Sport', 'AU', 2, 0], ['SuperSport Football', 'ZA', 3, 0], ['DAZN', '', 3, 1], ['DAZN 1', '', 3, 1],
+  ['Stan Sport', 'AU', 2, 0], ['DAZN', 'CA', 2, 1], ['DAZN', 'NZ', 2, 1], ['SuperSport Football', 'ZA', 3, 0], ['DAZN', '', 3, 1], ['DAZN 1', '', 3, 1],
   ['beIN Sports English', '', 4, 0], ['beIN Sports 1 English', '', 4, 0], ['beIN Sports 1', '', 4, 1], ['beIN Sports 2', '', 4, 1], ['beIN Sports 3', '', 4, 1]
 ];
 /* services whose rights deals cover every match of a competition (from this season's published guides), so they show as sure, not "might" */
