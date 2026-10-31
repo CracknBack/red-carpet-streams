@@ -3659,8 +3659,16 @@ function* buildEventsG() {
       .sort((a, b) => a.lang - b.lang || (QRK[b.g.ql] || 1.5) - (QRK[a.g.ql] || 1.5) || a.g.name.localeCompare(b.g.name));
     ev.reps = reps.sort((a, b) => a.start - b.start || a.lang - b.lang);
     ev.start = Math.min(...ev.chans.map(c => c.start));
-    /* a real live event: a match on its first airing, or a listing that says live and names a competition */
-    ev.liveEvent = !isMatch && ev.live && /^(Formula 1|MotoGP)$/.test(compOf(items[0].title) || '') && !items.some(e => e.info.replay);
+    /* a real live event: a match on its first airing, or a listing that says live and names a competition.
+       Boxing/UFC added 2026-10-31: confirmed via a full pipeline trace that they hit the exact same
+       problem Formula 1/MotoGP were already rescued for below -- a fight-card channel's EPG title is
+       very often just "Boxing"/"UFC", near-identical to the channel's own name ("Boxing 1", "PPV UFC"),
+       which trips the channel-name-echo junk rule just below. Confirmed live: TheSportsDB's own Boxing/
+       UFC leagues each track exactly one marquee event at a time, so this client-side rescue is the
+       primary source of fight-card coverage for these two, not a backstop -- not just a nice-to-have.
+       Tennis/golf (ATP/WTA/PGA/European Tour) are structurally the same shape and may hit this too, but
+       that's unconfirmed -- don't add them here without the same evidence this fix was based on. */
+    ev.liveEvent = !isMatch && ev.live && /^(Formula 1|MotoGP|Boxing|UFC)$/.test(compOf(items[0].title) || '') && !items.some(e => e.info.replay);
     /* filler: placeholder titles, or a "programme" that is just the channel's own name */
     const tk = norm(items[0].title).replace(/ /g, '');
     ev.junk = !isMatch && (FILLER_RE.test(items[0].title) || NOT_MATCH_RE.test(items[0].title) || (FOOTBALL_COMPS.has(compOf(items[0].title) || '') && !ev.live) || items.some(e => [...e.groups].some(g => { const ck = norm(g.name).replace(/ /g, ''); return ck === tk || (tk.length > 3 && ck.indexOf(tk) >= 0) || (ck.length > 3 && tk.indexOf(ck) >= 0); })));
