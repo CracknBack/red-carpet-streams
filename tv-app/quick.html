@@ -1268,6 +1268,16 @@ const COUNTRIES = new Set(('AU NZ UK GB US USA CA IE FR DE IT ES PT NL BE CH AT 
   'SY IQ KU KURD CZ SK HU BG HR RS BA SI MK ME LT LV EE IS CY MT ASIA AFR CARIB EN').split(' '));
 const CMAP = {GB: 'UK', USA: 'US', ARAB: 'AR', ARA: 'AR', LATAM: 'LAT', ALB: 'AL', EXYU: 'EX-YU', KURD: 'KU'};
 const SAFE_TRAIL = new Set(['UK', 'US', 'AU', 'NZ', 'CA', 'IE']);
+/* Supplier-added streaming-platform short codes prefixed onto individual VOD/series titles --
+   distinct from SERIES_PLATFORMS further down (which classifies by the full category name, e.g.
+   "Apple TV+", not these abbreviations). Confirmed live 2026-10-31: NF (Netflix), A+ (Apple TV+),
+   DSC-S (Discovery), D+- (Disney+). Stripped the same way country/VIP tags are, just via its own
+   pattern since none of these fit the plain-letters-only shape the country-code loop below expects
+   (a bare "+" isn't a letter, and "DSC-S" has a 1-letter suffix after its hyphen, not the 2-letter
+   country-suffix shape). Literal, case-insensitive match only -- deliberately not a generic
+   short-prefix stripper, so it can't eat the start of a real title that happens to begin with a
+   short capitalised word. */
+const PROVIDER_TAG_RE = /^(NF|A\+|DSC-S|D\+-?)(?:\s*[|:»\-–—•·\/\\(])*\s*/i;
 const QRANK = {'8K': 5, '4K': 4, 'UHD': 4, 'FHD': 3, 'HD': 2, 'SD': 1, '2160P': 4, '1080P': 3, '720P': 2, '576P': 1, '480P': 1};
 const QLABEL = {'UHD': '4K', '2160P': '4K', '1080P': 'FHD', '720P': 'HD', '576P': 'SD', '480P': 'SD'};
 const QUAL_RE = /(^|[^A-Za-z0-9])(UHD|FHD|4K|8K|HD|SD|2160P|1080P|720P|576P|480P|HDCAM|CAMRIP|CAM|DV|DOLBY\s?VISION|ATMOS|HEVC|H\.?26[45]|HDR10\+?|HDR|RAW|VIP|(?:50|60)\s?FPS|MULTI\s?SUBS?)(?=$|[^A-Za-z0-9+])/gi;
@@ -1295,6 +1305,8 @@ function clean(raw, withYear, keepQual) {
     s = s.replace(/^[\s|:\-–—»«•·.,\/\\\[\]()]+/, '');
     const sv = s.match(/^(now\s?tv|now)\s*(?:[|:»\-–—•·\/\\\])]\s*)+/i);   /* service labels like "NOW:" */
     if (sv) { s = s.slice(sv[0].length); continue; }
+    const pv = s.match(PROVIDER_TAG_RE);
+    if (pv) { s = s.slice(pv[0].length); continue; }
     const m = s.match(/^([A-Za-z]{2,5}(?:-[A-Za-z]{2})?)(?:\s*[\])]|\s*(?=[|:»\-–—•·\/\\(])|\s*$)/);
     if (!m || m[1] !== m[1].toUpperCase()) break;
     const up = m[1].toUpperCase(), nd = up.replace('-', '');
