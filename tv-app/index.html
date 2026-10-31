@@ -1218,7 +1218,7 @@ function reloadAccountData() {
   Object.assign(recent, {live: [], series: []}, load(acctKey('sp_recent'), {}));
   prog = load(acctKey('sp_prog'), {}); recentQ = load(acctKey('sp_rq'), []);
 }
-const ui = Object.assign({fdKey: 'REDACTED-OLD-FOOTBALLDATA-KEY', orig: false, liveLayout: 'country', lang: 'en', sort: {live: 0, vod: 1, series: 1}, vol: 1, muted: false}, load('sp_ui', {}));
+const ui = Object.assign({fdKey: '', orig: false, liveLayout: 'country', lang: 'en', sort: {live: 0, vod: 1, series: 1}, vol: 1, muted: false}, load('sp_ui', {}));
 if (FIRE && ui.gpvOff === undefined) ui.gpvOff = true;     /* inside the Android app the game-page preview starts off: weak TV sticks play better without it (Settings can turn it on) */
 document.documentElement.classList.toggle('light', !!ui.light);
 const favs = Object.assign({live: [], vod: [], series: []}, load(acctKey('sp_favs'), {}));
@@ -2015,12 +2015,17 @@ function v2Events() {
 }
 
 /* ================= real fixtures (football-data.org) =================
-   With a free key, Premier League and UEFA Champions League fixtures come from football-data.org.
-   They decide what's on and when, and LIVE comes only from them. The TV guides are then used
-   only to find which English-language channels show each match. */
+   With a free key, fixtures for the competitions below come from football-data.org. They decide
+   what's on and when, and LIVE comes only from them. The TV guides are then used only to find which
+   English-language channels show each match. */
 const FD = {list: [], ts: 0, err: '', busy: false};
-const FD_COMPS = [['PL', 'Premier League'], ['CL', 'Champions League'], ['PD', 'La Liga'], ['SA', 'Serie A'], ['BL1', 'Bundesliga'], ['FL1', 'Ligue 1'], ['EL', 'Europa League', true]];
-/* the Europa League isn't in football-data.org's free plan, so it's tried and quietly skipped if the key doesn't include it */
+const FD_COMPS = [['PL', 'Premier League'], ['CL', 'Champions League'], ['PD', 'La Liga'], ['SA', 'Serie A'], ['BL1', 'Bundesliga'], ['FL1', 'Ligue 1'],
+  ['DED', 'Eredivisie', true], ['PPL', 'Primeira Liga', true], ['ELC', 'Championship', true], ['BSA', 'Brazilian Serie A', true], ['CLI', 'Copa Libertadores', true], ['EC', 'European Championship', true], ['WC', 'World Cup', true],
+  ['EL', 'Europa League', true]];
+/* marked `true` (optional): confirmed present on the free plan as of 2026-10-31, but not every key is
+   guaranteed the same entitlements (plans can change), so these are tried and quietly skipped on a
+   403/404 rather than surfacing an error -- same treatment Europa League already got, which is
+   confirmed absent from the free plan. */
 const FD_NAMES = new Set(FD_COMPS.filter(x => !x[2]).map(x => x[1]));
 const ymd = d => d.toISOString().slice(0, 10);
 async function loadFixtures(force) {
@@ -2801,14 +2806,24 @@ const COMPS = [
   ['Greek Super League', 'greek super league,greece league'], ['Turkish Super Lig', 'turkish super lig,super lig,turkey league'],
   ['Swiss Super League', 'swiss super league,switzerland league'], ['IndyCar', 'indycar,indy car,indy 500'], ['NASCAR', 'nascar,nascar cup'],
   ['ATP Tour', 'atp,atp tour,mens tennis'], ['WTA Tour', 'wta,wta tour,womens tennis'], ['PGA Tour', 'pga,pga tour,golf'],
-  ['European Tour', 'european tour,dp world tour'], ['UFC', 'ufc,mma,mixed martial arts'], ['Boxing', 'boxing,heavyweight,boxing match']
+  ['European Tour', 'european tour,dp world tour'], ['UFC', 'ufc,mma,mixed martial arts'], ['Boxing', 'boxing,heavyweight,boxing match'],
+  /* added 2026-10-31 alongside rcs-guide's resolve_v2.py LEAGUES -- same exact-match requirement as the
+     block above. Keywords deliberately narrow (not bare "championship"/"world cup") since those words
+     alone collide with boxing/MMA title fights, Cricket/Rugby World Cup, and other sports' own
+     "championship" events already covered by other COMPS entries. */
+  ['Championship', 'efl championship,sky bet championship,english football league championship'],
+  ['Brazilian Serie A', 'brasileirao,campeonato brasileiro,brazilian serie a,brazil serie a'],
+  ['Copa Libertadores', 'copa libertadores,libertadores'],
+  ['European Championship', 'uefa euro,european championship,euro 2028'],
+  ['World Cup', 'fifa world cup,world cup qualifier,world cup qualifying,wc 2026']
 ].map(([c, w]) => [c, w.split(',')]);
 /* look-alikes: women's and youth competitions, lower divisions and same-named leagues in other countries */
 const COMP_NOT = {
   'La Liga': /\b(la ?liga ?2|hypermotion|segunda|femenin\w*|women\w*|u19|u21|youth)\b/i,
   'Serie A': /\b(bras\w*|brazil\w*|ecuador\w*|serie ?b|serie ?c|women\w*|femminile|u19|u21|youth)\b/i,
   'Bundesliga': /\b(2\.? ?bundesliga|austria\w*|osterreich|frauen|women\w*|u19|u21|youth)\b/i,
-  'Ligue 1': /\bligue ?2\b|\b(women\w*|feminin\w*|u19|u21|youth)\b/i
+  'Ligue 1': /\bligue ?2\b|\b(women\w*|feminin\w*|u19|u21|youth)\b/i,
+  'World Cup': /\b(cricket|rugby|skiing|athletics|handball|volleyball|hockey|swim\w*|basketball|u19|u20|u21|youth|women\w*)\b/i
 };
 function compOf(text) {
   const t = ' ' + norm(text) + ' ';
@@ -2839,6 +2854,8 @@ const COMP_DISPLAY = {
   'Scottish Premiership': 'Scottish Football', 'League of Ireland': 'Irish Football', 'Austrian Bundesliga': 'Austrian Football',
   'Greek Super League': 'Greek Football', 'Turkish Super Lig': 'Turkish Football', 'Swiss Super League': 'Swiss Football',
   'A-League': 'Australian Soccer', 'AFL': 'Australian Rules Football', 'NRL': 'Rugby League (Australia)',
+  'Championship': 'English Football (Second Tier)', 'Brazilian Serie A': 'Brazilian Football', 'Copa Libertadores': 'South American Football (Champions)',
+  'European Championship': 'European International Football', 'World Cup': 'International Football',
   'Formula 1': 'Grand Prix Racing', 'MotoGP': 'Motorcycle Racing', 'IndyCar': 'American Open-Wheel Racing', 'NASCAR': 'American Stock Car Racing',
   'NBA': 'USA Basketball', 'NHL': 'USA Ice Hockey', 'MLB': 'USA Baseball', 'NFL': 'American Football',
   'ATP Tour': 'Men’s Tennis', 'WTA Tour': 'Women’s Tennis', 'PGA Tour': 'American Golf', 'European Tour': 'European Golf',
@@ -2855,7 +2872,7 @@ const PIN_COMPS = COMPS.map(([c]) => c);
 /* the Sports Hub icon row groups every competition under one icon per SPORT (not one per competition --
    that was 8 nearly-identical footballs). Order matches the owner's own reference mockup. */
 const SPORT_GROUPS = [
-  ['soccer', 'Soccer', 'lg-football.png', ['Premier League', 'Champions League', 'Europa League', 'FA Cup', 'League Cup', 'La Liga', 'Serie A', 'Ligue 1', 'Bundesliga', 'A-League', 'Eredivisie', 'Primeira Liga', 'Belgian Pro League', 'Scottish Premiership', 'League of Ireland', 'Austrian Bundesliga', 'Greek Super League', 'Turkish Super Lig', 'Swiss Super League']],
+  ['soccer', 'Soccer', 'lg-football.png', ['Premier League', 'Champions League', 'Europa League', 'FA Cup', 'League Cup', 'La Liga', 'Serie A', 'Ligue 1', 'Bundesliga', 'A-League', 'Eredivisie', 'Primeira Liga', 'Belgian Pro League', 'Scottish Premiership', 'League of Ireland', 'Austrian Bundesliga', 'Greek Super League', 'Turkish Super Lig', 'Swiss Super League', 'Championship', 'Brazilian Serie A', 'Copa Libertadores', 'European Championship', 'World Cup']],
   ['basketball', 'Basketball', 'lg-basketball.png', ['NBA']],
   ['icehockey', 'Ice Hockey', 'lg-ice-hockey.png', ['NHL']],
   ['baseball', 'Baseball', 'lg-baseball.png', ['MLB']],
@@ -6758,8 +6775,12 @@ function runSearch() {
 /* tsdbkey: deliberately not in this list any more -- now that guide-v2 (see loadGuideV2 above) resolves
    TheSportsDB server-side for every competition it covers, a per-device key is a hidden developer
    override, not something a normal user needs to find or set. The setting itself (ui.tsdbKey/loadTsdb)
-   is untouched, just no longer surfaced in Settings. */
-const SETS = HAS_MPV ? ['refresh', 'catlist', 'fdkey', 'pins', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'pcplayer', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'rcsguide', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'] : ['refresh', 'catlist', 'fdkey', 'pins', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'rcsguide', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'];
+   is untouched, just no longer surfaced in Settings.
+   fdkey: removed from this list for the same reason, now that guide-v2's LEAGUES covers every
+   football-data.org competition this app uses -- no user, including the owner, needs to find or paste
+   a football-data.org key on-device any more. ui.fdKey/loadFixtures/FD_COMPS are untouched and still
+   work if a key is ever set programmatically, just no longer surfaced in Settings. */
+const SETS = HAS_MPV ? ['refresh', 'catlist', 'pins', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'pcplayer', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'rcsguide', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'] : ['refresh', 'catlist', 'pins', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'rcsguide', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'];
 function renderSettings() {
   const u = userInfo || {};
   const exp = Number(u.exp_date) ? new Date(Number(u.exp_date) * 1000).toLocaleDateString() : 'No expiry date given';
@@ -6808,7 +6829,7 @@ function renderSettings() {
     pcplayer: ['Movies and series play in', ui.pcPlayer === 'mpv' ? 'Always mpv' : 'mpv when needed'], lang: ['Preferred language', LANGS[ui.lang]],
     layout: ['Live TV layout', ui.liveLayout === 'provider' ? 'Provider’s categories' : 'Country, then genre'], logos: ['Channel logos', ui.logos === 'provider' ? 'Provider’s only' : 'Best match'],
     names: ['Names', ui.orig ? 'Provider’s originals' : 'Tidied up'], signout: ['Sign out', '']};
-  const SEC = {refresh: 'Lists', fdkey: 'Sport', guidecheck: 'TV guide', pcplayer: 'Playback', lang: HAS_MPV ? '' : 'Playback', layout: 'Display', adult: 'Adult content', accounts: 'Account'};
+  const SEC = {refresh: 'Lists', pins: 'Sport', guidecheck: 'TV guide', pcplayer: 'Playback', lang: HAS_MPV ? '' : 'Playback', layout: 'Display', adult: 'Adult content', accounts: 'Account'};
   let h = '<div class="sgrid"><div class="sacct"><div class="slabel">Account</div>' + rows.map(r => '<div class="kv"><span>' + esc(r[0]) + '</span><span>' + esc(r[1]) + '</span></div>').join('') +
     '<p class="note">Lists are stored on this device so everything opens instantly. They update by themselves every 12 hours.</p></div><div class="slist" id="slist">';
   SETS.forEach((a, i) => {
@@ -6826,7 +6847,7 @@ function settingsAction(i) {
   else if (a === 'catlist') catList();
   else if (a === 'xgsky') { ui.xgSky = ui.xgSky === false; save('sp_ui', ui); renderMain(); toast('Updating the TV guide in the background…'); loadGuide(true); }
   else if (a === 'xguide') { ui.xgOff = !ui.xgOff; save('sp_ui', ui); renderMain(); toast('Updating the TV guide in the background…'); loadGuide(true); }
-  else if (a === 'fdkey') askText('Fixtures key', 'Paste the free key emailed to you by football-data.org. It fetches the real Premier League and Champions League fixtures. Leave it empty to remove it.', ui.fdKey || '', v => { ui.fdKey = v.trim(); save('sp_ui', ui); FD.list = []; FD.ts = 0; FD.err = ''; renderMain(); if (ui.fdKey) loadFixtures(true).then(() => renderMain()); });
+  else if (a === 'fdkey') askText('Fixtures key', 'Paste the free key emailed to you by football-data.org. It fetches real fixtures for the Premier League, Champions League and several other competitions. Leave it empty to remove it.', ui.fdKey || '', v => { ui.fdKey = v.trim(); save('sp_ui', ui); FD.list = []; FD.ts = 0; FD.err = ''; renderMain(); if (ui.fdKey) loadFixtures(true).then(() => renderMain()); });
   else if (a === 'lookup') askText('Online game lookup', 'Optional. Paste an Anthropic API key (from console.anthropic.com). When you open a game, the app asks Claude to search the web for which channels show it in your chosen countries, then matches the answer to your own channels. Only the team names, competition and date are sent. Set a monthly spending limit on the key. Leave it empty to turn this off.', ui.aiKey || '', v => { ui.aiKey = v.trim(); save('sp_ui', ui); LK.err = ''; renderMain(); });
   else if (a === 'lkco') askText('Countries to look up', 'The countries to look up for each game, separated by commas, for example: United Kingdom, United States, Australia, South Africa, Singapore. More countries means a slightly longer lookup.', lkCountries().join(', '), v => { const l = v.split(',').map(x => x.trim()).filter(Boolean).slice(0, 8); ui.lkCountries = l.length ? l : null; save('sp_ui', ui); renderMain(); });
   else if (a === 'pins') askText('Pinned channels', PIN_COMPS.map(c => compLabel(c) + ': ' + (pinnedChannels(c).map(g => disp(g)).join(', ') || 'none')).join('\n') + '\n\nTo pin a channel, highlight it in Live TV, Search or on a game page, press M (the ≡ button on a remote) and choose Pin. The same menu unpins it.\n\nPress OK or Back to close.', '', () => {}, true);
