@@ -1119,7 +1119,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.23.21';
+const APP_VERSION = '3.23.22';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 /* MainActivity's dispatchKeyEvent intercepts every digit keypress globally, for the remote's
    number-jump feature -- with no way for native code to know a text <input> currently has focus,
@@ -2829,6 +2829,14 @@ const ALL_MATCH = {
 function everyMatchIds(comp) { const set = new Set(); (ALL_MATCH[comp] || []).forEach(([n, cc]) => tsdbGroups(n, cc).forEach(g => set.add(g.id))); return set; }
 /* any other competition: the English football and sports channels in your lists that match its name or are known sports networks */
 const FOOTBALL_COMPS = new Set(['Premier League', 'Champions League', 'Europa League', 'FA Cup', 'League Cup', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1', 'A-League']);
+/* Trusts the channel's own real guide listing over a name/brand guess. Without this, a channel neither
+   named after the competition nor a recognised network (EN_NETWORKS) was never even considered here --
+   for Boxing, UFC, tennis, golf, cricket, rugby, and every other sport without its own dedicated pipeline
+   or curated table, that's most of them -- no matter what its actual EPG schedule showed. The EPG listing
+   used here is the same guide data loadExtraGuides/sportsEpgMap already connected to this channel, and
+   it's judged with the exact same competition keywords (COMPS/compOf) used everywhere else, so a channel
+   only qualifies this way if the guide itself names this competition, not a loose guess. */
+function epgShowsComp(g, comp) { return guideListFor(g, 40).some(x => compOf(x.title + ' ' + (x.desc || '')) === comp); }
 function genericCompChannels(comp, ev) {
   if (!DATA || !DATA.live) return [];
   const words = ((COMPS.find(c => c[0] === comp) || [null, []])[1]).map(w => ' ' + w + ' ');
@@ -2846,9 +2854,11 @@ function genericCompChannels(comp, ev) {
        for being tagged a non-English country). The weaker signals below -- a generic "football" mention,
        just sitting in a Sports category -- aren't specific enough to bypass the English requirement the
        same way, or "BF1"/"TF1"/"DF1" (none of which name Formula 1 at all) would start qualifying too. */
-    if (!named && !englishChannel(g)) continue;
+    const proven = !named && !englishChannel(g) && epgShowsComp(g, comp);
+    if (!named && !englishChannel(g) && !proven) continue;
     let sc = 0;
     if (named) sc += 5;
+    if (proven) sc += 5;
     if (FOOTBALL_COMPS.has(comp) && / (football|soccer|futbol|fussball|calcio) /.test(t)) sc += 3;
     /* This bonus used to only apply to football comps -- so Cricket, Rugby, AFL, NRL, NBA, NHL, MLB,
        NFL, tennis, golf, UFC and Boxing could only ever get a channel into their "usually shows this"
