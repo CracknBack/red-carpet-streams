@@ -1118,7 +1118,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.23.22';
+const APP_VERSION = '3.23.23';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 /* MainActivity's dispatchKeyEvent intercepts every digit keypress globally, for the remote's
    number-jump feature -- with no way for native code to know a text <input> currently has focus,
@@ -7338,10 +7338,16 @@ function setVolume(delta) {
 function toggleMute() { if (FIRE) return; ui.muted = !ui.muted; applyVolume(); save('sp_ui', ui); volMsg(); }
 applyVolume();
 
-function stopGuideDownload() { if (GUIDE_BUSY && GUIDE_AC) GUIDE_AC.abort(); }
+/* Used to abort the entire background guide download (the provider's own guide AND every free guide
+   still in flight, including Red Carpet) the instant anything started playing. Confirmed real case: the
+   owner's own diagnostics showed every free guide but one failing with "signal is aborted without
+   reason" on a normal play action -- losing a whole guide-build's network work, including the one
+   source all of tonight's matching fixes depend on, for no measurable benefit. streamXml already yields
+   to the main thread every 25ms (see its own comment), so the CPU-contention concern this existed for,
+   if any, is already handled without needing to kill the download outright. */
 function play(list, idx, fromStart, alts, startAt) {
   if (list && list[idx] && list[idx].isAdult && !adultOk()) { toast('That section is locked. Open it from the Adult category and enter your PIN.'); return; }
-  stopGuideDownload(); stopGamePreview();
+  stopGamePreview();
   if (idx < 0 || !list[idx]) return;
   stopPreview();
   P.list = list; P.idx = idx; P.back = S.screen === 'player' ? P.back : S.screen; P.fromStart = !!fromStart; P.alts = alts ? alts.slice() : null; P.startAt = startAt || 0;
