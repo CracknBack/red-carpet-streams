@@ -2191,11 +2191,23 @@ const REGION_OF = {UK: 'UK & Ireland', IE: 'UK & Ireland', US: 'North America', 
   AE: 'Middle East', QA: 'Middle East', SA: 'Middle East'};
 const REGION_ORDER = ['UK & Ireland', 'North America', 'Australia & NZ', 'Africa', 'Asia', 'Middle East', 'Other English'];
 const EN_NETWORKS = /\b(supersport|astro|sky sports?|tnt sports|premier sports|bt sport|espn|tsn|optus|stan sport|beins? sports? english|bein sports? en|fox sports?|usa network|nbc sports|cbs sports|peacock|dazn|viaplay)\b/i;
+/* The curated broadcaster tables (PL_CH etc., matched via chKey/tsdbGroups) already match on a
+   space-stripped key, so "Fox Sports"/"FoxSports"/"FOXSPORTS1" all resolve the same way. EN_NETWORKS
+   above never got that treatment -- it's a raw regex tested against the literal, unnormalised channel
+   text, so it requires an exact space ("fox sports") and silently never matches a provider that
+   concatenates its brand name ("FoxSports505"). That's the real bug behind "Fox Sports never shows up
+   for F1" and applies to every sport using genericCompChannels (anything without its own curated
+   table: F1, NBA, NHL, MLB, NFL, tennis, golf, UFC, Boxing...), for every network in this list, not
+   just Fox Sports. Built once from the same regex source (one list to maintain) by stripping spaces
+   the same way chKey does, so a provider's own concatenated naming now matches too, on top of -- not
+   instead of -- the original spaced form. */
+const EN_NETWORKS_SQUASHED = new RegExp(EN_NETWORKS.source.replace(/\)\\b$/, ')').replace(/ /g, ''), 'i');   /* drop only the TRAILING \b: "FOXSPORTS505" has no word break between the brand and its channel number, so requiring one there (like the spaced regex correctly does) would defeat the point here. Keep the LEADING \b so "dazn" still can't match hidden inside an unrelated word like "bedaznzled" -- only the suffix side needed loosening. */
+const isEnNetwork = g => EN_NETWORKS.test(g.raw + ' ' + g.name) || EN_NETWORKS_SQUASHED.test(chKey(g.raw) + chKey(g.name));
 const regionOf = g => REGION_OF[g.cc] || 'Other English';
 /* streaming services (not real TV channels): on IPTV they only exist as feeds the provider makes, which are often offline */
 const APP_RE = /\b(stan|peacock|hbo ?max|hotstar|disney\+?|dazn|viaplay|vidio|voyo|paramount\+?|fubo|fpt play|netflix|prime video|apple tv|hulu|sling)\b/i;
 const isAppFeed = g => APP_RE.test(String(g.raw || '') + ' ' + String(g.name || ''));
-function englishChannel(g) { const l = chLang(g); return l === 0 || (l === 1 && EN_NETWORKS.test(g.raw + ' ' + g.name)); }
+function englishChannel(g) { const l = chLang(g); return l === 0 || (l === 1 && isEnNetwork(g)); }
 /* La Liga, Serie A, the Bundesliga and Ligue 1 are mostly shown in their own language: those channels count for that league */
 const HOME_LANG = {'La Liga': 'es', 'Serie A': 'it', 'Bundesliga': 'de', 'Ligue 1': 'fr'};
 const LANG_NAME = {es: 'Spanish', it: 'Italian', de: 'German', fr: 'French'};
@@ -2519,6 +2531,11 @@ async function loadTsdb(force) {
 }
 setInterval(() => { if (ui.tsdbKey && S.screen !== 'player') loadTsdb(false); }, 30 * 60000);
 /* IPTV channels that match a channel name from a listing, in that listing's country */
+/* First words too generic to safely identify a brand on their own ("Premier Sports" -> "premier"
+   would also catch any channel starting with "Premier League ..."). Used only by tsdbGroups' last-
+   resort fallback below, which otherwise trusts a distinctive first word completely. */
+const BRAND_WORD_STOP = new Set(['the', 'sky', 'super', 'premier', 'sport', 'sports', 'tv', 'channel',
+  'world', 'star', 'prime', 'max', 'plus', 'one', 'first', 'live', 'usa', 'canal', 'setanta']);
 function tsdbGroups(chName, cc) {
   if (!DATA.live.tidx) { const m = new Map(); DATA.live.items.forEach(g => { const k = chKey(g.name); (m.get(k) || m.set(k, []).get(k)).push(g); }); DATA.live.tidx = m; }
   const k = chKey(chName);
@@ -2526,6 +2543,21 @@ function tsdbGroups(chName, cc) {
   let gs = DATA.live.tidx.get(k) || [];
   const near = (long, short) => { const i = long.indexOf(short); return i >= 0 && !(/\d$/.test(short) && /\d/.test(long[i + short.length] || '')); };   /* "TNT Sports 1" is not "TNT Sports 10" */
   if (!gs.length && k.length >= 7) DATA.live.tidx.forEach((arr, kk) => { if (kk.length >= 7 && (near(kk, k) || near(k, kk))) gs = gs.concat(arr); });
+  if (!gs.length) {
+    /* Last resort: some providers number a brand's own per-event feeds with just the bare brand word
+       ("STAN 13", "STAN 14" for the curated entry "Stan Sport") -- the full curated phrase never
+       appears in the channel's own name at all, so no amount of substring matching above finds it.
+       Match on the curated entry's own first word, as a whole word, against each candidate channel's
+       first word -- whole-word so "Stan" doesn't also catch an unrelated "Stanley Cup" channel, and
+       required to be reasonably distinctive (4+ letters, not in BRAND_WORD_STOP) so this can't fire on
+       something generic. Confirmed real case: "Stan Sport" in PL_CH never matched the user's actual
+       "STAN 13"/"STAN 14" channels through either tier above. */
+    const brandWord = norm(chName).split(' ')[0];
+    if (brandWord && brandWord.length >= 4 && !BRAND_WORD_STOP.has(brandWord)) {
+      if (!DATA.live.widx) { const m = new Map(); DATA.live.items.forEach(g => { const w = norm(g.name).split(' ')[0]; if (w) (m.get(w) || m.set(w, []).get(w)).push(g); }); DATA.live.widx = m; }
+      gs = DATA.live.widx.get(brandWord) || [];
+    }
+  }
   if (!cc) return gs;
   return gs.filter(g => !g.cc || g.cc === 'ZZ' || g.cc === cc || (cc === 'UK' && g.cc === 'IE'));
 }
@@ -2802,7 +2834,7 @@ function genericCompChannels(comp, ev) {
        category. Confirmed real-world case: a provider's whole Fox Sports Australia block (6-7
        channels) never once cleared the old sc>=4 bar, for any sport, because EN_NETWORKS' own +3
        alone fell one point short whenever the genre classifier didn't tag their category 'Sports'. */
-    if (EN_NETWORKS.test(g.raw + ' ' + g.name)) sc += 4;
+    if (isEnNetwork(g)) sc += 4;
     if (g.g === 'Sports') sc += 1;
     if (sc >= 4) out.push({g, sc});
   }
