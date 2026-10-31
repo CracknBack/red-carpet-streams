@@ -3159,7 +3159,12 @@ function pickFreeGuides(covered) {
 }
 /* the free guides shorten channel ids ("SkySp.PL.HD", "SkySpMainEvHD", "SkySp.Fball.HD"); spell them out so they match the real names */
 function expandEpgId(id) {
-  let t = String(id).replace(/\.[a-z]{2}$/i, '');
+  /* the ".cc" country code isn't always the last thing in the id -- a huge share of real ids are
+     "Base.cc@Quality" (confirmed: 317 channels in one guide pull alone, across dozens of unrelated
+     broadcasters/sports, not just one source) -- so anchoring the strip to end-of-string missed the
+     country code entirely whenever a quality suffix followed it, leaving it glued into the middle of
+     the candidate name where it broke every later match. */
+  let t = String(id).replace(/\.[a-z]{2}(?=@|$)/i, '');
   t = t.replace(/^SkySp(?=[.A-Z+0-9]|$)\.?/, 'Sky Sports ').replace(/^TNTS(?=[A-Z0-9])/, 'TNT Sports ');
   t = t.replace(/MainEv/g, ' Main Event ').replace(/BoxOff/g, ' Box Office ').replace(/Fball/g, ' Football ').replace(/(^|[.\s])PL(?=[.\s]|$)/g, '$1 Premier League ')
     .replace(/(^|[.\s])Cricket/g, '$1 Cricket').replace(/SkySp\+/g, 'Sky Sports Plus ');
@@ -3250,13 +3255,18 @@ async function loadExtraGuides(chans, chIdx, items, from, to, every, force) {
       }, bytes => { if (isSearchPage(S.page)) { GUIDE_MSG = 'Adding the free ' + name + ' guide… ' + (bytes / 1e6).toFixed(0) + ' MB read'; renderSearchHead(); } }, block => {
         const id = (block.match(/\bid="([^"]*)"/) || [])[1];
         if (!id) return;
-        /* the country the guide channel belongs to, from the end of its id (…uk, …au, …qa). A channel that names its country
-           only goes to your channels from that country, so one country's BEIN schedule can't land on another country's BEIN. */
-        const sfx = id.indexOf('.') > 0 ? (id.split('.').pop() || '').toLowerCase() : '';
+        /* the country the guide channel belongs to, from its id (…uk, …au, …qa -- usually at the end, but
+           a huge share of real ids put a quality suffix after it instead, "Base.cc@Quality", so this has
+           to look for the code before "@" too, not just at the very end (same bug as expandEpgId's id
+           stripping above; confirmed 317 channels in one guide pull alone hit this shape). A channel that
+           names its country only goes to your channels from that country, so one country's BEIN schedule
+           can't land on another country's BEIN -- that guarantee was silently not applying to any of
+           those 317 channels (sfx came out as e.g. "uk@hd", matching nothing, cc fell back to ''). */
+        const sfx = ((id.match(/\.([a-z]{2,3})(?=@|$)/i) || [])[1] || '').toLowerCase();
         let cc = XCC[sfx] || '';
         if (!cc && /^[a-z]{2,3}$/.test(sfx)) { const up = sfx.toUpperCase(), code = CMAP[up] || up; if (COUNTRIES.has(up) || COUNTRIES.has(code)) cc = code; }
         const names = [...block.matchAll(/<display-name[^>]*>([\s\S]*?)<\/display-name>/g)].map(m => xmlDec(m[1]));
-        names.push(id.replace(/\.[a-z]{2}$/i, '').replace(/[._]/g, ' '), expandEpgId(id));
+        names.push(id.replace(/\.[a-z]{2}(?=@|$)/i, '').replace(/[._]/g, ' '), expandEpgId(id));
         const gs = new Set();
         /* Used to be an exact chKey lookup only -- no tolerance at all for the guide's display name
            ("FOX SPORTS 506") not being byte-for-byte identical to however this provider happens to name
