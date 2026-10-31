@@ -2536,13 +2536,16 @@ setInterval(() => { if (ui.tsdbKey && S.screen !== 'player') loadTsdb(false); },
    resort fallback below, which otherwise trusts a distinctive first word completely. */
 const BRAND_WORD_STOP = new Set(['the', 'sky', 'super', 'premier', 'sport', 'sports', 'tv', 'channel',
   'world', 'star', 'prime', 'max', 'plus', 'one', 'first', 'live', 'usa', 'canal', 'setanta']);
+/* Shared by tsdbGroups and loadExtraGuides' free-guide channel matching -- both need the same
+   "is one chKey a near-match of another" containment check, so it's one function, not two copies
+   that could quietly drift apart. */
+const chKeyNear = (long, short) => { const i = long.indexOf(short); return i >= 0 && !(/\d$/.test(short) && /\d/.test(long[i + short.length] || '')); };   /* "TNT Sports 1" is not "TNT Sports 10" */
 function tsdbGroups(chName, cc) {
   if (!DATA.live.tidx) { const m = new Map(); DATA.live.items.forEach(g => { const k = chKey(g.name); (m.get(k) || m.set(k, []).get(k)).push(g); }); DATA.live.tidx = m; }
   const k = chKey(chName);
   if (!k) return [];
   let gs = DATA.live.tidx.get(k) || [];
-  const near = (long, short) => { const i = long.indexOf(short); return i >= 0 && !(/\d$/.test(short) && /\d/.test(long[i + short.length] || '')); };   /* "TNT Sports 1" is not "TNT Sports 10" */
-  if (!gs.length && k.length >= 7) DATA.live.tidx.forEach((arr, kk) => { if (kk.length >= 7 && (near(kk, k) || near(k, kk))) gs = gs.concat(arr); });
+  if (!gs.length && k.length >= 7) DATA.live.tidx.forEach((arr, kk) => { if (kk.length >= 7 && (chKeyNear(kk, k) || chKeyNear(k, kk))) gs = gs.concat(arr); });
   if (!gs.length) {
     /* Last resort: some providers number a brand's own per-event feeds with just the bare brand word
        ("STAN 13", "STAN 14" for the curated entry "Stan Sport") -- the full curated phrase never
@@ -3226,7 +3229,23 @@ async function loadExtraGuides(chans, chIdx, items, from, to, every, force) {
         const names = [...block.matchAll(/<display-name[^>]*>([\s\S]*?)<\/display-name>/g)].map(m => xmlDec(m[1]));
         names.push(id.replace(/\.[a-z]{2}$/i, '').replace(/[._]/g, ' '), expandEpgId(id));
         const gs = new Set();
-        names.forEach(n => (idx.get(chKey(n)) || []).forEach(g => { if (!cc || !g.cc || g.cc === 'ZZ' || g.cc === cc) gs.add(g.id); }));
+        /* Used to be an exact chKey lookup only -- no tolerance at all for the guide's display name
+           ("FOX SPORTS 506") not being byte-for-byte identical to however this provider happens to name
+           the same channel in the user's own playlist (a region tag, a quality suffix, different
+           spacing...). That's a real, generic gap: it silently drops the match for ANY channel on ANY
+           free/rcs guide source whose name isn't an exact match, not specific to one broadcaster.
+           Confirmed real case: rcs-guide's own published data already had "FOX SPORTS 506" with the
+           correct F1 Mexico GP listing, but it never reached the app because of this exact-match-only
+           lookup. Same proven near-match fallback as tsdbGroups, so this channel-matching problem gets
+           the one fix instead of yet another broadcaster-specific patch. */
+        names.forEach(n => {
+          const k = chKey(n);
+          let matched = idx.get(k) || [];
+          if (!matched.length && k.length >= 7) {
+            idx.forEach((arr, kk) => { if (kk.length >= 7 && (chKeyNear(kk, k) || chKeyNear(k, kk))) matched = matched.concat(arr); });
+          }
+          matched.forEach(g => { if (!cc || !g.cc || g.cc === 'ZZ' || g.cc === cc) gs.add(g.id); });
+        });
         if (gs.size) { ids.set(id, [...gs]); lim.set(id, Math.min(...[...gs].map(x => covered.has(x) ? (provMax.get(x) || 0) : 0))); count += gs.size; }
       });
       notes.push('Free ' + name + ' guide: ' + count + ' of your channels matched');
