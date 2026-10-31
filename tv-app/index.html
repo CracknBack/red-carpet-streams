@@ -2794,8 +2794,14 @@ function genericCompChannels(comp, ev) {
        whenever nothing had a confirmed matched game, even on a channel list with plenty of real
        Sky Sports/BT Sport/ESPN-type channels that do carry them. EN_NETWORKS is a recognised
        multi-sport broadcaster, not a football-specific one, so there's no real reason this signal
-       should only count for football -- applying it to every sport, not gating on FOOTBALL_COMPS. */
-    if (EN_NETWORKS.test(g.raw + ' ' + g.name)) sc += 3;
+       should only count for football -- applying it to every sport, not gating on FOOTBALL_COMPS.
+       Worth 4 on its own (not 3): a channel being a recognised major sports broadcaster (Fox Sports,
+       ESPN, Sky Sports...) is already strong evidence by itself -- it shouldn't also need the Sports
+       genre tag below to land correctly, which depends on how the provider happened to label its own
+       category. Confirmed real-world case: a provider's whole Fox Sports Australia block (6-7
+       channels) never once cleared the old sc>=4 bar, for any sport, because EN_NETWORKS' own +3
+       alone fell one point short whenever the genre classifier didn't tag their category 'Sports'. */
+    if (EN_NETWORKS.test(g.raw + ' ' + g.name)) sc += 4;
     if (g.g === 'Sports') sc += 1;
     if (sc >= 4) out.push({g, sc});
   }
