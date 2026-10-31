@@ -2405,9 +2405,9 @@ function collapseFeeds(list) {
   return out;
 }
 function candidateChannels(ev) {
-  if (ev.comp !== 'Premier League') return usualChannels(ev.comp);
+  if (ev.comp !== 'Premier League') return usualChannels(ev.comp, ev);
   if (ev.comp === 'Premier League') {
-    let l = plCategoryChannels();
+    let l = plCategoryChannels(ev);
     if (ukBlackout(ev)) l = l.filter(g => g.cc !== 'UK' && g.cc !== 'IE');   /* Saturday 3pm: not shown live in the UK */
     return l.slice(0, 16);
   }
@@ -2662,12 +2662,17 @@ const PL_CH = [
 ];
 const PL_LANG = new Map();
 /* channels for a competition: a known broadcaster table, your pins, and channels the guides have shown carrying it */
-function compCategoryChannels(comp, table) {
+function compCategoryChannels(comp, table, ev) {
   if (!DATA || !DATA.live) return [];
   const out = new Map();
   const eventish = /\s(v|vs\.?)\s|\d{4}-\d{2}-\d{2}|\b\d{1,2}[:.]\d{2}\b|\bnext\b|exclusive|matchday|\bmd\d\b|zone:/i;
   pinnedChannels(comp).forEach(g => out.set(g.id, {g, o: -1, l: -1}));
-  table.forEach(([name, cc, o, l]) => tsdbGroups(name, cc).forEach(g => { if (!out.has(g.id) && !eventish.test(g.raw + ' ' + g.name)) out.set(g.id, {g, o, l}); }));
+  table.forEach(([name, cc, o, l]) => tsdbGroups(name, cc).forEach(g => {
+    if (out.has(g.id)) return;
+    const text = g.raw + ' ' + g.name;
+    if (eventish.test(text) && !eventMatchesFixture(text, ev)) return;
+    out.set(g.id, {g, o, l});
+  }));
   const learned = LEARN.c[comp] || {};
   Object.keys(learned).forEach(id => {
     const g = DATA.live.byId.get(String(id));
@@ -2677,7 +2682,7 @@ function compCategoryChannels(comp, table) {
   /* English first, then not sure, then other languages; within each, UK, US, Australia, South Africa, international */
   return [...out.values()].sort((a, b) => a.l - b.l || (isAppFeed(a.g) ? 1 : 0) - (isAppFeed(b.g) ? 1 : 0) || a.o - b.o || (QRK[b.g.ql] || 1.5) - (QRK[a.g.ql] || 1.5) || a.g.name.localeCompare(b.g.name, undefined, {numeric: true})).map(x => x.g);
 }
-function plCategoryChannels() { PL_LANG.clear(); return compCategoryChannels('Premier League', PL_CH); }
+function plCategoryChannels(ev) { PL_LANG.clear(); return compCategoryChannels('Premier League', PL_CH, ev); }
 /* UEFA Champions League 2026/27 broadcasters (UK: TNT Sports, Prime Video; US: Paramount+/CBS; Australia: Stan Sport; South Africa: SuperSport; Asia: beIN; Canada: DAZN) */
 const CL_CH = [
   ['TNT Sports 1', 'UK', 0, 0], ['TNT Sports 2', 'UK', 0, 0], ['TNT Sports 3', 'UK', 0, 0], ['TNT Sports 4', 'UK', 0, 0], ['TNT Sports 5', 'UK', 0, 0], ['TNT Sports Ultimate', 'UK', 0, 0],
@@ -2728,13 +2733,14 @@ const ALL_MATCH = {
 function everyMatchIds(comp) { const set = new Set(); (ALL_MATCH[comp] || []).forEach(([n, cc]) => tsdbGroups(n, cc).forEach(g => set.add(g.id))); return set; }
 /* any other competition: the English football and sports channels in your lists that match its name or are known sports networks */
 const FOOTBALL_COMPS = new Set(['Premier League', 'Champions League', 'Europa League', 'FA Cup', 'League Cup', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1', 'A-League']);
-function genericCompChannels(comp) {
+function genericCompChannels(comp, ev) {
   if (!DATA || !DATA.live) return [];
   const words = ((COMPS.find(c => c[0] === comp) || [null, []])[1]).map(w => ' ' + w + ' ');
   const eventish = /\s(v|vs\.?)\s|\d{4}-\d{2}-\d{2}|\b\d{1,2}[:.]\d{2}\b|\bnext\b|exclusive|matchday|\bmd\d\b|zone:/i;
   const out = [];
   for (const g of DATA.live.items) {
-    if (eventish.test(g.raw + ' ' + g.name)) continue;
+    const gText = g.raw + ' ' + g.name;
+    if (eventish.test(gText) && !eventMatchesFixture(gText, ev)) continue;
     const t = ' ' + norm(g.raw + ' ' + g.name) + ' ';
     const named = words.some(w => t.indexOf(w) >= 0);
     /* A channel whose own name specifically names this competition is strong evidence on its own, in
@@ -2765,11 +2771,11 @@ function genericCompChannels(comp) {
   const pins = pinnedChannels(comp);
   return pins.concat(out.sort((a, b) => b.sc - a.sc || (isAppFeed(a.g) ? 1 : 0) - (isAppFeed(b.g) ? 1 : 0) || a.g.name.localeCompare(b.g.name, undefined, {numeric: true})).map(x => x.g).filter(g => !pins.some(p => p.id === g.id))).slice(0, 24);
 }
-function usualChannels(comp) {
-  if (comp === 'Premier League') return plCategoryChannels();
-  if (comp === 'Champions League') return compCategoryChannels(comp, CL_CH);
+function usualChannels(comp, ev) {
+  if (comp === 'Premier League') return plCategoryChannels(ev);
+  if (comp === 'Champions League') return compCategoryChannels(comp, CL_CH, ev);
   const t = {'Europa League': EL_CH, 'La Liga': LL_CH, 'Serie A': SA_CH, 'Bundesliga': BL_CH, 'Ligue 1': L1_CH}[comp];
-  return t ? compCategoryChannels(comp, t) : genericCompChannels(comp);
+  return t ? compCategoryChannels(comp, t, ev) : genericCompChannels(comp, ev);
 }
 
 /* ---------- teams and competitions ---------- */
@@ -2964,6 +2970,21 @@ function canonTeam(side) {
   const known = [...TEAM_OF.keys()].find(a => a.length > 4 && (' ' + n + ' ').indexOf(' ' + a + ' ') >= 0);
   if (known) return TEAM_OF.get(known);
   return side.replace(/\s+/g, ' ').trim();
+}
+/* Some providers structure their whole sports offering as one channel per match ("STAN 13 - Chelsea v
+   Manchester United ... 2026-10-31 22:30"), not a persistent named channel -- so its raw name always
+   trips the eventish-guide-junk filters in compCategoryChannels/genericCompChannels below. Used to
+   exclude those unconditionally, same as real EPG-row junk; now only exclude an eventish-looking name
+   when it ISN'T naming the fixture actually being looked at, so a provider's real per-match channel for
+   THIS game gets through while an unrelated "next up" listing still doesn't. */
+function eventMatchesFixture(text, ev) {
+  if (!ev || !ev.teams || ev.teams.length < 2) return false;
+  const t = ' ' + norm(text) + ' ';
+  return ev.teams.every(side => {
+    const canon = canonTeam(side);
+    const aliases = [norm(canon)].concat(TEAM_ALIASES.get(canon) || []);
+    return aliases.some(a => a.length > 2 && t.indexOf(' ' + a + ' ') >= 0);
+  });
 }
 /* Works out what a guide entry is: a match ("Arsenal v Chelsea") or a show ("Super Sunday"). */
 /* ---------- downloading the guide ---------- */
