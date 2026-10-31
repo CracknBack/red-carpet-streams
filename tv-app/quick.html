@@ -1119,7 +1119,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.23.23';
+const APP_VERSION = '3.23.24';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 /* MainActivity's dispatchKeyEvent intercepts every digit keypress globally, for the remote's
    number-jump feature -- with no way for native code to know a text <input> currently has focus,
@@ -2588,6 +2588,13 @@ function tsdbGroups(chName, cc) {
     if (brandWord && brandWord.length >= 4 && !BRAND_WORD_STOP.has(brandWord)) {
       if (!DATA.live.widx) { const m = new Map(); DATA.live.items.forEach(g => { const w = norm(g.name).split(' ')[0]; if (w) (m.get(w) || m.set(w, []).get(w)).push(g); }); DATA.live.widx = m; }
       gs = DATA.live.widx.get(brandWord) || [];
+      /* Unlike tier 2, this one was never gated at all -- confirmed real case: a curated table's literal
+         "Peacock" entry (BL_CH) matched every channel in a real ~49k-channel catalog that happened to
+         start with "Peacock" (100 of them), gluing one broadcaster's listings onto all of them. A small
+         same-brand numbering (Stan -> 2 feeds) is the case this tier exists for; a hundred unrelated
+         channels sharing a common first word is the same "too generic to guess" shape tier 2 already
+         refuses -- so refuse it here too instead of accepting everything. */
+      if (gs.length > 10) gs = [];
     }
   }
   if (!cc) return gs;
