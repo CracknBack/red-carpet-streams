@@ -1119,7 +1119,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.23.32';
+const APP_VERSION = '3.23.33';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 /* MainActivity's dispatchKeyEvent intercepts every digit keypress globally, for the remote's
    number-jump feature -- with no way for native code to know a text <input> currently has focus,
@@ -1909,7 +1909,7 @@ const B = {favs: {cats: [], cat: 0, catId: null, items: [], item: 0}, live: {cat
      content row's own remembered horizontal position, rows is the last-rendered row data itself
      (rowsKey() reads it so it doesn't have to recompute catRows() on every keypress). See catRows()/
      renderRows()/rowsKey() further down. */
-  vod: {cats: [], cat: 0, catId: null, items: [], item: 0, lv: 0, fold: '', row: 1, rpos: [0, 0, 0], rows: []}, series: {cats: [], cat: 0, catId: null, items: [], item: 0, lv: 0, fold: '', row: 1, rpos: [0, 0, 0], rows: []},
+  vod: {cats: [], cat: 0, catId: null, items: [], item: 0, lv: 0, fold: '', row: 1, rpos: [0, 0, 0], rows: [], rk: ''}, series: {cats: [], cat: 0, catId: null, items: [], item: 0, lv: 0, fold: '', row: 1, rpos: [0, 0, 0], rows: [], rk: ''},
   /* Home screen's "Continue watching" destination. A single fixed category (no provider fetch, no
      sidebar choice needed) whose one entry never changes, so ensureCats() never calls buildCats('cont')
      -- that function has no branch for an unknown page and assumes DATA[t] exists. showPage() instead
@@ -6117,7 +6117,7 @@ function renderBrowse() {
 /* The one item currently driving #b-hero -- set by renderHero(), read by the hero's Play/Versions
    click handlers (see below), since those buttons act on "whatever's focused right now" rather than
    carrying their own item reference. */
-let HERO_IT = null;
+let HERO_IT = null, heroBgT = 0, heroBgIt = null;
 function renderHero(t, rows, focRow) {
   let it = null;
   if (focRow > 0 && rows[focRow - 1]) {
@@ -6128,9 +6128,14 @@ function renderHero(t, rows, focRow) {
   }
   HERO_IT = it;
   const hero = $('b-hero');
-  if (!it) { hero.classList.add('hidden'); return; }
+  if (!it) { hero.classList.add('hidden'); clearTimeout(heroBgT); heroBgIt = null; return; }
   hero.classList.remove('hidden');
-  $('hero-bg').style.backgroundImage = it.icon ? "url('" + it.icon.replace(/'/g, '%27') + "')" : 'none';
+  /* The blurred hero backdrop is a full-screen filter repaint -- too costly to redo on every row-step
+     while scrolling fast. Coalesce it to whichever title the focus actually settles on. */
+  if (it !== heroBgIt) {
+    clearTimeout(heroBgT);
+    heroBgT = setTimeout(() => { heroBgIt = it; $('hero-bg').style.backgroundImage = it.icon ? "url('" + it.icon.replace(/'/g, '%27') + "')" : 'none'; }, 120);
+  }
   $('hero-title').textContent = disp(it);
   const nv = it.vers ? it.vers.length : 1;
   const meta = [it.year, it.rating ? it.rating.toFixed(1) + ' / 10' : '', nv > 1 ? nv + ' versions' : ''].filter(Boolean);
@@ -6141,8 +6146,12 @@ function renderHero(t, rows, focRow) {
   $('hero-versions').classList.toggle('hidden', nv <= 1);
 }
 function renderRows(t) {
-  const b = B[t], rows = catRows(t);
-  b.rows = rows;
+  const b = B[t], key = t + '|' + b.catId + '|' + ui.sort[t] + '|' + V + '|' + ui.orig;
+  /* catRows() sorts the WHOLE category (New releases/Top rated/All, each its own full sort) -- a few
+     thousand titles deep on a big library, way too costly to redo on every arrow-key press while just
+     scrolling a row. Recompute only when something that actually changes the rows did. */
+  if (key !== b.rk) { b.rows = catRows(t); b.rk = key; }
+  const rows = b.rows;
   const focRow = S.zone === 'items' ? b.row : -1;
   renderHero(t, rows, focRow);
   const m = rowMetrics();
