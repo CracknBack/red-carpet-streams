@@ -1118,7 +1118,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.23.24';
+const APP_VERSION = '3.23.25';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 /* MainActivity's dispatchKeyEvent intercepts every digit keypress globally, for the remote's
    number-jump feature -- with no way for native code to know a text <input> currently has focus,
@@ -2317,7 +2317,16 @@ function fixtureEvents() {
     cand.forEach(i => {
       const x = GUIDE.items[i], p = GUIDE.parsed[i], st = x[1], en = x[2] || st + 2 * 3600e3;
       const both = pairMatch(p.teams, home, away), one = p.teams.some(t => teamMatch(t, home) || teamMatch(t, away));
-      if (!both && !(one && Math.abs(st - kick) < 2 * 3600e3)) return;
+      /* "one" without "both" is weak evidence only when the entry's OTHER side is unnamed/ambiguous. When
+         p.known already recognises BOTH sides as specific real clubs (just the wrong pairing for this
+         fixture -- confirmed real case: junk/templated free-guide entries like "Liverpool vs Arsenal",
+         "Liverpool vs Wolves" etc. cycling every few hours, none of them this match), the entry
+         unambiguously names a different game, no matter how close its start time lands to this one's
+         kick-off. That 2-hour window was being satisfied almost by chance against a dense cycle of
+         unrelated fixtures, flooding popular/"glamour" teams with dozens of false channel matches while
+         less-mentioned teams stayed accurate -- the real cause of wildly inconsistent channel counts
+         between matches, not a channel-matching bug in any one tier. */
+      if (!both && !(one && p.known.length < 2 && Math.abs(st - kick) < 2 * 3600e3)) return;
       if (st < kick - 2 * 864e5 || st > kick + 7 * 864e5) return;
       const groups = epgMap.get(GUIDE.chans[x[0]]);
       if (!groups) return;
