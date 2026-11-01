@@ -1119,7 +1119,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.23.28';
+const APP_VERSION = '3.23.29';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 /* MainActivity's dispatchKeyEvent intercepts every digit keypress globally, for the remote's
    number-jump feature -- with no way for native code to know a text <input> currently has focus,
@@ -3903,14 +3903,17 @@ function* buildEventsG() {
     const byComp = new Map();
     out.forEach(ev => { if (!ev.chans.length) return; const k = ev.comp || ''; (byComp.get(k) || byComp.set(k, []).get(k)).push(ev); });
     v2.forEach(v => {
-      if (v.chans.length) return;
       const sides = sidesOf(v);
       if (!sides) return;
       const cands = byComp.get(v.comp) || [];
       const near = cands.filter(ev => Math.abs(ev.kick - v.kick) < 20 * 3600e3);
       const found = near.find(ev => sides.every(s => ev.text.indexOf(' ' + s + ' ') >= 0)) ||
         near.find(ev => sides.every(s => { const w = lastWord(s); return w.length > 3 && ev.text.indexOf(' ' + w + ' ') >= 0; }));
-      if (found) v.chans = found.chans;
+      /* Used to only use this when v.chans was already empty -- so the moment TheSportsDB had ANYTHING
+         (even one generic channel), the client's own independently-found matches (real provider feeds
+         literally named after this event) were discarded outright instead of adding to what TheSportsDB
+         already gave. Merge both, deduped, always. */
+      if (found && found.chans.length) { const have = new Set(v.chans.map(c => c.g.id)); found.chans.forEach(c => { if (!have.has(c.g.id)) { have.add(c.g.id); v.chans.push(c); } }); }
     });
   }
   if (FD.list.length) {
@@ -3925,10 +3928,21 @@ function* buildEventsG() {
     if (fxAll.length) {
       const fxById = new Map(fxAll.map(f => [String(f.key).replace(/^fx:/, ''), f]));
       v2.forEach(v => {
-        if (v.chans.length) return;
         const fid = (String(v.key).match(/:(\d+)$/) || [])[1];
         const match = fid && fxById.get(fid);
-        if (match && match.chans.length) v.chans = match.chans;
+        if (!match || !match.chans.length) return;
+        /* Used to only run when v.chans was already empty -- meaning as soon as TheSportsDB had ANY
+           channels at all for a match, fixtureEvents()'s own channel-name matching for that exact same
+           fixture (kind: 'name' -- real provider feeds literally named after the match, e.g. "STAN 31 --
+           Liverpool v Arsenal", "Peacock 022 -- Liverpool v. Arsenal") was thrown away entirely, not
+           merged. Confirmed real case: a real fixture's v2 event had 7 TheSportsDB-sourced channels
+           (most not even matching the catalog by name) while a live search of the same catalog turned up
+           19 real channels literally named after that match -- all discarded, because v.chans.length was
+           already nonzero. These are independent, often higher-confidence signals (the provider named
+           the channel after the exact match); merge them, deduped, always, rather than picking one source
+           over the other based on which happened to find something first. */
+        const have = new Set(v.chans.map(c => c.g.id));
+        match.chans.forEach(c => { if (!have.has(c.g.id)) { have.add(c.g.id); v.chans.push(c); } });
       });
     }
     EVENTS = v2.concat(fx, f1.filter(ev => !v2Comps.has(ev.comp)), out.filter(ev => !FD_NAMES.has(ev.comp) && !v2Comps.has(ev.comp) && !(f1.length && ev.comp === 'Formula 1') && !covered(ev)));
