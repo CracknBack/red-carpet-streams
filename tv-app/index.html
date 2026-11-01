@@ -2116,13 +2116,19 @@ function f1GuideChans(s) {
   const gi = (GUIDE && GUIDE.items) || [], chans = new Map(), reps = [];
   if (!gi.length) return {chans: [], reps};
   const epgMap = sportsEpgMap(true);
-  const toks = norm(s.race.replace(/grand prix/i, '') + ' ' + s.country + ' ' + s.locality).split(' ').filter(t => t.length >= 4);
   const isF1 = /formula (1|one)|\bf1\b|grand prix/, noSess = /qualifying|quali|practice|sprint|shootout|highlights|review|the f1 show|grid|ted s/;
+  /* Used to also require a location token (the race/city/country name) inside the listing text --
+     dropped 2026-11-02: this is almost certainly why a real session this morning only showed 2-3 of
+     10+ genuinely available channels. Plenty of providers' EPGs just print "Formula 1" or "Sky Sports
+     F1" with no circuit/city name in the actual programme text at all (the exact same generic-filler-
+     title problem already fixed in eventMatchesFixture for every other individual sport) -- the isF1
+     sport gate plus the session-type check below are already specific enough on their own; requiring
+     ALSO naming the Grand Prix was excluding real matches, not filtering out false ones. */
   for (const x of gi) {
     const st = x[1];
     if (Math.abs(st - s.start) > 3 * 864e5) continue;
     const t = norm(x[3] + ' ' + (x[4] || ''));
-    if (!isF1.test(t) || !toks.some(k => t.indexOf(k) >= 0)) continue;
+    if (!isF1.test(t)) continue;
     const ok = s.k === 'race' ? !noSess.test(t) : s.k === 'qual' ? /qualifying|quali/.test(t) && !/sprint/.test(t) : s.k === 'sprint' ? /sprint/.test(t) && !/qualifying|shootout/.test(t) : /sprint (qualifying|shootout)/.test(t);
     if (!ok) continue;
     const groups = epgMap.get(GUIDE.chans[x[0]]);
