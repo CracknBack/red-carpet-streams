@@ -1118,7 +1118,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.23.29';
+const APP_VERSION = '3.23.30';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 /* MainActivity's dispatchKeyEvent intercepts every digit keypress globally, for the remote's
    number-jump feature -- with no way for native code to know a text <input> currently has focus,
@@ -2343,6 +2343,15 @@ function fixtureEvents() {
     ((GUIDE && GUIDE.slotIdx && GUIDE.slotIdx.get(f.comp)) || []).forEach(i => {
       const x = gitems[i], st = x[1], en = x[2] || st + 2 * 3600e3;
       if (Math.abs(st - kick) > 20 * 60e3) return;
+      /* compOf()'s own Premier League alias list includes branding/show names, not just the competition
+         itself -- "Match of the Day", "Super Sunday", "Soccer Saturday", "Monday Night Football" are all
+         highlights/studio shows, not live coverage, and this whole branch has no team names to verify
+         against in the first place (that's the entire reason it exists). Without this check, any channel
+         whose EPG happens to carry one of those branded shows anywhere near a kick-off time -- a review
+         show, a preview segment, anything using the same marketing name -- got marked as directly
+         confirmed live coverage of a specific match it was never actually showing. Confirmed real case:
+         a channel reported as confirmed for a real fixture that does not actually show football. */
+      if (isHL(x[3], x[4], st, en)) return;
       (epgMap.get(GUIDE.chans[x[0]]) || []).forEach(g => {
         if (!langOk(g, f.comp) || chans.has(g.id)) return;
         chans.set(g.id, {g, epg: GUIDE.chans[x[0]], start: st, kick, stop: en, title: x[3], lang: leagueLang(g, f.comp), region: regionOf(g), src: x[5] === 'x' ? 'free' : 'provider', kind: sameSlot === 1 ? 'live' : 'slot'});
