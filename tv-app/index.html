@@ -1118,7 +1118,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.23.27';
+const APP_VERSION = '3.23.28';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 /* MainActivity's dispatchKeyEvent intercepts every digit keypress globally, for the remote's
    number-jump feature -- with no way for native code to know a text <input> currently has focus,
@@ -2685,7 +2685,14 @@ const LK_CC = {'united kingdom': 'UK', 'uk': 'UK', 'england': 'UK', 'ireland': '
 const lkCountries = () => ui.lkCountries && ui.lkCountries.length ? ui.lkCountries : ['United Kingdom', 'United States', 'Australia', 'South Africa', 'Singapore'];
 const lkKey = ev => 'lk:' + ev.key + ':' + lkCountries().join(',');
 async function runLookup(ev, force) {
-  if (!ui.aiKey || !ev.fixture || !ev.teams) return;
+  /* Used to require ev.teams -- which an F1 race, a tennis match, a golf tournament or a fight card
+     never has (f1Events()/TSDB-based events only ever set .label, no two named "teams"). That silently
+     blocked this entire feature -- the one thing in this app that can actually do real-time broadcaster
+     research, the same way a person just asking an AI with web search would -- for every sport except
+     football. Confirmed real case: F1's own TheSportsDB TV-listing data is genuinely this thin (2-3
+     broadcasters globally); a live web search for "F1 Mexico City Grand Prix TV channels" turns up 11
+     countries' worth in seconds. ev.label covers every event that isn't a two-team match. */
+  if (!ui.aiKey || !ev.fixture || (!ev.teams && !ev.label)) return;
   const key = lkKey(ev);
   let c = LK.cache.get(key);
   if (!c) { const sv = await idb.get(key); if (sv) { c = sv; LK.cache.set(key, c); } }
@@ -2702,9 +2709,9 @@ async function runLookup(ev, force) {
       body: JSON.stringify({
         model: LK_MODEL, max_tokens: 1800,
         tools: [{type: 'web_search_20250305', name: 'web_search', max_uses: 5}],
-        system: 'You find which TV channels and streaming services broadcast a specific football match in specific countries. Use web search. Only report channels that appear in search results for THIS match (check both teams and the date). Do not guess from general knowledge of broadcast rights. If you find nothing for a country, return an empty channel list for it. Reply with JSON only, no other text, in exactly this shape: {"match":"","countries":[{"country":"","channels":[{"name":"","type":"tv or streaming","language":"","confidence":"high, medium or low","source":"website"}],"notes":""}]}',
-        messages: [{role: 'user', content: 'Match: ' + ev.teams[0] + ' vs ' + ev.teams[1] + '\nCompetition: ' + ev.comp + '\nKick-off (UTC): ' + new Date(ev.kick).toISOString() + '\nCountries: ' + countries.join(', ') +
-          '\n\nFor each country list the channels showing it live. Use the name exactly as the broadcaster brands it (for example "TNT Sports 1" or "Sky Sports Main Event"). Give the commentary language, a confidence (high if two or more sources agree, medium if one source, low if sources conflict) and the source website. Use "notes" for anything important, such as the match not being shown live in that country.'}]
+        system: 'You find which TV channels and streaming services broadcast a specific sports event in specific countries. Use web search. Only report channels that appear in search results for THIS exact event (check the date, and' + (ev.teams ? ' both teams' : ' the exact event name -- not just the sport or competition in general') + '). Do not guess from general knowledge of broadcast rights. If you find nothing for a country, return an empty channel list for it. Reply with JSON only, no other text, in exactly this shape: {"match":"","countries":[{"country":"","channels":[{"name":"","type":"tv or streaming","language":"","confidence":"high, medium or low","source":"website"}],"notes":""}]}',
+        messages: [{role: 'user', content: (ev.teams ? 'Match: ' + ev.teams[0] + ' vs ' + ev.teams[1] : 'Event: ' + ev.label) + '\nCompetition: ' + ev.comp + '\nKick-off (UTC): ' + new Date(ev.kick).toISOString() + '\nCountries: ' + countries.join(', ') +
+          '\n\nFor each country list the channels showing it live. Use the name exactly as the broadcaster brands it (for example "TNT Sports 1" or "Sky Sports Main Event"). Give the commentary language, a confidence (high if two or more sources agree, medium if one source, low if sources conflict) and the source website. Use "notes" for anything important, such as the event not being shown live in that country.'}]
       })
     });
     clearTimeout(tm);
@@ -2730,14 +2737,16 @@ function lookupDone(ev) {
 /* the online answer, matched to your own channels */
 function lookupResolved(ev) {
   const c = LK.cache.get(lkKey(ev));
-  if (!c || !c.data || !ev.teams) return null;
-  const home = ev.teams[0], away = ev.teams[1], matched = [], unmatched = [], seen = new Set();
+  if (!c || !c.data || (!ev.teams && !ev.label)) return null;
+  const home = ev.teams && ev.teams[0], away = ev.teams && ev.teams[1], matched = [], unmatched = [], seen = new Set();
   (c.data.countries || []).forEach(co => {
     const cc = LK_CC[norm(co.country)] || '';
     (co.channels || []).forEach(ch => {
       if (!ch || !ch.name) return;
-      /* a channel named after a different match is not this match's channel */
-      const gs = tsdbGroups(ch.name, cc).filter(g => { const nt = nameTeams(g.raw || g.name); return !nt || pairMatch(nt, home, away); });
+      /* a channel named after a different match is not this match's channel -- only a meaningful check
+         for two-team events; an F1/tennis/golf/fighting event has no "other side" a channel's own name
+         could name instead, so there's nothing to filter against there. */
+      const gs = tsdbGroups(ch.name, cc).filter(g => { if (!home) return true; const nt = nameTeams(g.raw || g.name); return !nt || pairMatch(nt, home, away); });
       if (!gs.length) { unmatched.push({name: ch.name, country: co.country}); return; }
       gs.forEach(g => {
         if (seen.has(g.id)) return;
