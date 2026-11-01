@@ -1118,7 +1118,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.23.31';
+const APP_VERSION = '3.23.32';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 /* MainActivity's dispatchKeyEvent intercepts every digit keypress globally, for the remote's
    number-jump feature -- with no way for native code to know a text <input> currently has focus,
@@ -7636,7 +7636,9 @@ if (HAS_MPV) window.RCSPC.onMpv(d => {
   MPV.on = false; saveMpvProgress(); pmsg('');
   if (S.screen !== 'player') return;
   if (d.failed) {
-    if (P.alts && P.alts.length) {
+    /* Same change as main.onFail below: no more silently switching to a different live channel on
+       failure, only to another copy of the same movie/episode. */
+    if (P.alts && P.alts.length && !(P.alts[0] && P.alts[0].t === 'live')) {
       const nx = P.alts.shift();
       toast('That copy wouldn’t play. Trying ' + verLabel(nx) + ' instead.');
       P.list = [nx]; P.idx = 0; startStream(); return;
@@ -7770,13 +7772,15 @@ main.onFail = () => {
   if (EXT && !P.triedMpv && cur() && cur().t !== 'live') { P.triedMpv = true; const it = cur(); setTimeout(() => openExternal(it, P.resume), 0); return true; }
   if (HAS_MPV && !P.triedMpv && cur() && cur().t !== 'live') { P.triedMpv = true; const it = cur(); toast('The built-in player can’t play this. Opening it in mpv.'); setTimeout(() => playMpv(it, P.resume), 0); return true; }
   if (!P.alts || !P.alts.length) return false;
+  /* Used to silently switch to a different live channel when the current one failed to start -- reported
+     as unwanted: it changes what's playing without being asked, for a channel that might just be
+     buffering/slow rather than actually broken. No more auto-switching for live channels; the player
+     shows its normal "won't play right now" message instead, and the person picks something else
+     themselves if they want to. Non-live alternates (another copy of the same movie/episode) still
+     auto-switch -- that's a different, lower-stakes case (a quality variant of the exact same title, not
+     a jump to different content) and was never the complaint. */
+  if (P.alts[0] && P.alts[0].t === 'live') return false;
   const nx = P.alts.shift();
-  if (nx.t === 'live') {
-    toast('That channel wouldn’t play. Trying ' + disp(nx) + ' instead.');
-    const j = P.list.indexOf(nx); if (j >= 0) P.idx = j; else { P.list = [nx]; P.idx = 0; }
-    setTimeout(startStream, 0);
-    return true;
-  }
   toast('That copy wouldn’t play. Trying ' + verLabel(nx) + ' instead.');
   P.list = [nx]; P.idx = 0;
   setTimeout(startStream, 0);
