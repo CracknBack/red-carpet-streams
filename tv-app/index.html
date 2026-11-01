@@ -1118,7 +1118,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.23.26';
+const APP_VERSION = '3.23.27';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 /* MainActivity's dispatchKeyEvent intercepts every digit keypress globally, for the remote's
    number-jump feature -- with no way for native code to know a text <input> currently has focus,
@@ -2429,7 +2429,14 @@ function candidateChannels(ev) {
   if (ev.comp === 'Premier League') {
     let l = plCategoryChannels(ev);
     if (ukBlackout(ev)) l = l.filter(g => g.cc !== 'UK' && g.cc !== 'IE');   /* Saturday 3pm: not shown live in the UK */
-    return l.slice(0, 16);
+    /* Used to cut this to the first 16 for no real reason -- no other competition's own candidate list
+       (Champions League, La Liga, Serie A, Bundesliga, Ligue 1, all via compCategoryChannels/usualChannels
+       above) is capped at all. PL_CH has ~40 real, researched entries; English ones alone (UK, US, Canada,
+       Australia, New Zealand, South Africa) run past 16 once South Africa's three SuperSport/SABC entries
+       are counted. Confirmed real case: a genuine Premier League fixture's SuperSport/Stan Sport/Sky Sport
+       New Zealand/Fubo entries never even reached the candidate list, only the first page of mostly
+       UK/US ones did -- nothing to do with guide coverage or language, purely this arbitrary cut. */
+    return l;
   }
   return compChannels(ev.comp);
 }
@@ -6720,7 +6727,12 @@ function openGame(ev, fromHome) {
   if (ev.fixture && evState(ev, now) === 1 && ev.kick - now < 120 * 3600e3) {
     /* look ahead in each channel's own guide for a listing at kick-off that names the teams */
     GS.ok = new Set();
-    const cands = GS.list.filter(x => !x.hdr && !x.confirmed && x.kind !== 'online').slice(0, 18);
+    /* Raised from 18: with candidateChannels() no longer cutting Premier League's own candidate list to
+       16 (see above), a real fixture can easily have 30+ unconfirmed candidates -- capping the actual
+       kick-off confirmation check at 18 would mean some of them never get a chance to be confirmed at
+       all, regardless of whether their guide genuinely has the listing, for no better reason than where
+       they happened to sort in the list. */
+    const cands = GS.list.filter(x => !x.hdr && !x.confirmed && x.kind !== 'online').slice(0, 40);
     cands.forEach(x => fetchEpg(x.g, ev.kick - now < 36 * 3600e3 ? 30 : 90).then(list => {
       EPGCHK.set(x.g.id, {ts: Date.now(), list: list || []}); EPGVER++;
       if (GS.ev !== ev) return;
