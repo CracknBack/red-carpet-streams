@@ -2190,7 +2190,7 @@ const REGION_OF = {UK: 'UK & Ireland', IE: 'UK & Ireland', US: 'North America', 
   AU: 'Australia & NZ', NZ: 'Australia & NZ', MY: 'Asia', SG: 'Asia', HK: 'Asia', PH: 'Asia', IN: 'Asia', TH: 'Asia', ID: 'Asia',
   AE: 'Middle East', QA: 'Middle East', SA: 'Middle East'};
 const REGION_ORDER = ['UK & Ireland', 'North America', 'Australia & NZ', 'Africa', 'Asia', 'Middle East', 'Other English'];
-const EN_NETWORKS = /\b(supersport|astro|sky sports?|tnt sports|premier sports|bt sport|espn|tsn|optus|stan sport|beins? sports? english|bein sports? en|fox sports?|usa network|nbc sports|cbs sports|peacock|dazn|viaplay)\b/i;
+const EN_NETWORKS = /\b(supersport|astro|sky sports?|tnt sports|premier sports|bt sport|espn|tsn|optus|stan sport|beins? sports? english|bein sports? en|fox sports?|kayo|usa network|nbc sports|cbs sports|peacock|dazn|viaplay)\b/i;
 /* The curated broadcaster tables (PL_CH etc., matched via chKey/tsdbGroups) already match on a
    space-stripped key, so "Fox Sports"/"FoxSports"/"FOXSPORTS1" all resolve the same way. EN_NETWORKS
    above never got that treatment -- it's a raw regex tested against the literal, unnormalised channel
@@ -3188,14 +3188,33 @@ function canonTeam(side) {
    exclude those unconditionally, same as real EPG-row junk; now only exclude an eventish-looking name
    when it ISN'T naming the fixture actually being looked at, so a provider's real per-match channel for
    THIS game gets through while an unrelated "next up" listing still doesn't. */
+/* Events with no two-team pair (F1, MotoGP, NASCAR, golf, tennis, UFC/Boxing -- anything carrying only
+   .label/.comp, see v2Events()) used to always fail this check, so an eventish-named per-match channel
+   for one of these could never pass genericCompChannels' filter even when it was genuinely showing the
+   right race/tournament. Generic filler words in .label ("Grand Prix", "Open", "Championship") are
+   excluded from the match on purpose -- they're common enough to false-positive against an unrelated
+   eventish channel, unlike a specific track/venue word ("Martinsville", "Qatar") or the competition
+   name itself, which linear EPGs print as-is even when they drop the specific event name
+   ("Live: MotoGP", "PGA Tour Golf"). */
+const EVENT_LABEL_STOP = new Set(['grand', 'prix', 'open', 'tour', 'cup', 'championship', 'classic',
+  'invitational', 'masters', 'series', 'race', 'round', 'stage', 'world', 'international', 'national',
+  'event', 'fight', 'night', 'tournament']);
 function eventMatchesFixture(text, ev) {
-  if (!ev || !ev.teams || ev.teams.length < 2) return false;
+  if (!ev) return false;
   const t = ' ' + norm(text) + ' ';
-  return ev.teams.every(side => {
-    const canon = canonTeam(side);
-    const aliases = [norm(canon)].concat(TEAM_ALIASES.get(canon) || []);
-    return aliases.some(a => a.length > 2 && t.indexOf(' ' + a + ' ') >= 0);
-  });
+  if (ev.teams && ev.teams.length >= 2) {
+    return ev.teams.every(side => {
+      const canon = canonTeam(side);
+      const aliases = [norm(canon)].concat(TEAM_ALIASES.get(canon) || []);
+      return aliases.some(a => a.length > 2 && t.indexOf(' ' + a + ' ') >= 0);
+    });
+  }
+  if (ev.comp) { const c = norm(ev.comp); if (c && t.indexOf(' ' + c + ' ') >= 0) return true; }
+  if (ev.label) {
+    const words = norm(ev.label).split(' ').filter(w => w.length > 3 && !EVENT_LABEL_STOP.has(w));
+    if (words.some(w => t.indexOf(' ' + w + ' ') >= 0)) return true;
+  }
+  return false;
 }
 /* Works out what a guide entry is: a match ("Arsenal v Chelsea") or a show ("Super Sunday"). */
 /* ---------- downloading the guide ---------- */
