@@ -1118,7 +1118,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.23.30';
+const APP_VERSION = '3.23.31';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 /* MainActivity's dispatchKeyEvent intercepts every digit keypress globally, for the remote's
    number-jump feature -- with no way for native code to know a text <input> currently has focus,
@@ -3922,6 +3922,27 @@ function* buildEventsG() {
          literally named after this event) were discarded outright instead of adding to what TheSportsDB
          already gave. Merge both, deduped, always. */
       if (found && found.chans.length) { const have = new Set(v.chans.map(c => c.g.id)); found.chans.forEach(c => { if (!have.has(c.g.id)) { have.add(c.g.id); v.chans.push(c); } }); }
+    });
+    /* F1 (and anything else shaped like it -- MotoGP sessions etc.) never reaches the merge above at all:
+       the block right below (EVENTS = v2.concat(...)) drops every f1Events() entry outright wherever
+       v2Comps covers its competition ('Formula 1' is one of guide-v2's tracked comps), with no fallback,
+       because the merge above needs sidesOf() to find two named sides and an F1 session's label ("Mexico
+       City GP -- Qualifying") never has any -- so f1GuideChans()'s own channel matching, which reads the
+       real guide data directly and is independent of TheSportsDB, was being discarded completely, not
+       just de-prioritised. Confirmed real case: the live guide genuinely has a specific "Live: F1: Mexico
+       Qualifying" listing on a real channel that f1GuideChans() finds correctly; it never reached the
+       screen because the whole event carrying that match was thrown away before this file even ran.
+       Matched by competition and closest kick-off time instead, since that's the one thing both sources
+       agree on even when session labels don't share a format. */
+    const f1ByComp = new Map();
+    f1.forEach(ev => { const k = ev.comp || ''; (f1ByComp.get(k) || f1ByComp.set(k, []).get(k)).push(ev); });
+    v2.forEach(v => {
+      const cands = f1ByComp.get(v.comp) || [];
+      let best = null, bestDiff = Infinity;
+      cands.forEach(ev => { const d = Math.abs(ev.kick - v.kick); if (d < bestDiff) { bestDiff = d; best = ev; } });
+      if (!best || bestDiff > 30 * 60e3 || !best.chans.length) return;
+      const have = new Set(v.chans.map(c => c.g.id));
+      best.chans.forEach(c => { if (!have.has(c.g.id)) { have.add(c.g.id); v.chans.push(c); } });
     });
   }
   if (FD.list.length) {
