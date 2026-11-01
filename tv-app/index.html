@@ -1118,7 +1118,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.23.25';
+const APP_VERSION = '3.23.26';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 /* MainActivity's dispatchKeyEvent intercepts every digit keypress globally, for the remote's
    number-jump feature -- with no way for native code to know a text <input> currently has focus,
@@ -2560,6 +2560,10 @@ const chKeyNear = (long, short) => { const i = long.indexOf(short); return i >= 
    when exactly one distinct candidate qualifies. Ambiguous means "don't guess", not "attach to
    all of them". */
 const NEAR_IDX = new WeakMap();
+/* Set by nearMatchUnique whenever it found more than one plausible candidate and refused to guess --
+   the caller (tsdbGroups) reads this immediately afterward to record the ambiguity for a human to
+   resolve later, instead of the candidates just vanishing the way they always used to. */
+let NEAR_AMBIG = null;
 function nearMatchUnique(tidx, k) {
   let lenIdx = NEAR_IDX.get(tidx);
   if (!lenIdx) {
@@ -2567,22 +2571,76 @@ function nearMatchUnique(tidx, k) {
     tidx.forEach((arr, kk) => { const b = Math.floor(kk.length / 5); (lenIdx.get(b) || lenIdx.set(b, []).get(b)).push(kk); });
     NEAR_IDX.set(tidx, lenIdx);
   }
-  const b0 = Math.floor(k.length / 5);
-  let found = null;
+  const b0 = Math.floor(k.length / 5), hits = new Set();
   for (let b = b0 - 4; b <= b0 + 4; b++) {
     for (const kk of (lenIdx.get(b) || [])) {
       if (kk.length < 7 || kk === k) continue;
-      if (chKeyNear(kk, k) || chKeyNear(k, kk)) { if (found && found !== kk) return []; found = kk; }
+      if (chKeyNear(kk, k) || chKeyNear(k, kk)) hits.add(kk);
     }
   }
-  return found ? (tidx.get(found) || []) : [];
+  NEAR_AMBIG = null;
+  if (hits.size === 1) return tidx.get([...hits][0]) || [];
+  if (hits.size > 1) NEAR_AMBIG = [...hits];
+  return [];
+}
+/* ================= channel name handshake: a human-confirmed link between a guide/TheSportsDB/TSDB's
+   own name for a broadcaster and one of your actual channels =================
+   Why this doesn't already exist: the matching above (and loadExtraGuides' own copy of it, now merged
+   into this one function) only ever had two outcomes -- an exact or confidently-unique near match, or
+   silence. There was no third option: "I found some plausible candidates but won't guess," remembered
+   anywhere. Every miss, ambiguous or total, just evaporated and had to be rediscovered (and patched in
+   code, broadcaster by broadcaster) the next time someone happened to notice a channel wasn't working.
+   ALIAS.m is a real, human-confirmed identity map: "a guide calling a channel X means THIS channel in
+   your list" -- never a guess researched or typed in by Claude, only ever written once a person (or an
+   already-unambiguous automatic match) has actually confirmed it. Keyed by chKey(name), not by any
+   provider's internal channel id, on purpose: ids are account-specific and aren't even guaranteed
+   stable across a single account's own guide refreshes, let alone portable to a different Xtream
+   service (TREX, or any other panel) with a completely different catalog. A name-keyed alias simply
+   doesn't fire at all on an account where the names don't line up -- it can't misfire into matching the
+   wrong channel on an unfamiliar provider, it just quietly doesn't help there yet, same as today.
+   ALIAS.pend is a diagnostic list of real ambiguous misses seen along the way (candidates nearMatchUnique
+   actually found but wouldn't pick between) -- never auto-applied, only ever a hint for later. */
+const ALIAS = load('sp_alias', {m: {}, pend: {}});
+let aliasSaveT = 0;
+function saveAliasSoon() { clearTimeout(aliasSaveT); aliasSaveT = setTimeout(() => save('sp_alias', ALIAS), 1500); }
+function resolveAlias(k) {
+  const a = ALIAS.m[k];
+  if (!a) return null;
+  const g = a.id && DATA.live.byId.get(String(a.id));
+  if (g) return [g];
+  return (a.nk && DATA.live.tidx.get(a.nk)) || null;             /* the id moved (refresh/reselect) -- fall back to the name it was confirmed under */
+}
+function noteAmbiguous(k, label, candKeys) {
+  const cands = candKeys.slice(0, 6).map(kk => { const arr = DATA.live.tidx.get(kk) || []; return arr[0] ? {id: arr[0].id, name: disp(arr[0])} : null; }).filter(Boolean);
+  if (!cands.length) return;
+  ALIAS.pend[k] = {label, cands, ts: Date.now()};
+  const keys = Object.keys(ALIAS.pend);
+  if (keys.length > 200) keys.sort((a, b) => (ALIAS.pend[a].ts || 0) - (ALIAS.pend[b].ts || 0)).slice(0, keys.length - 200).forEach(kk => delete ALIAS.pend[kk]);
+  saveAliasSoon();
+}
+function confirmAlias(k, g) {
+  ALIAS.m[k] = {id: g.id, nk: chKey(g.name)};
+  delete ALIAS.pend[k];
+  save('sp_alias', ALIAS);
+  EPGMAP_CACHE[0] = EPGMAP_CACHE[1] = null; EVENTS = null;
+  loadGuide(true).catch(() => {});
 }
 function tsdbGroups(chName, cc) {
   if (!DATA.live.tidx) { const m = new Map(); DATA.live.items.forEach(g => { const k = chKey(g.name); (m.get(k) || m.set(k, []).get(k)).push(g); }); DATA.live.tidx = m; }
   const k = chKey(chName);
   if (!k) return [];
+  /* A confirmed alias skips the country check entirely, on purpose -- it's exactly the kind of case
+     where that check is most likely to be WRONG (a provider mistagging or blanking a channel's country
+     is a plausible reason the automatic match failed in the first place). Once a person has actually
+     looked at this exact pairing and confirmed it, re-applying the same heuristic that may have caused
+     the original miss would silently undo the fix it was created to provide. */
+  const aliased = resolveAlias(k);
+  if (aliased) return aliased;
   let gs = DATA.live.tidx.get(k) || [];
-  if (!gs.length && k.length >= 7) gs = nearMatchUnique(DATA.live.tidx, k);
+  if (!gs.length && k.length >= 7) {
+    gs = nearMatchUnique(DATA.live.tidx, k);
+    if (!gs.length && NEAR_AMBIG) noteAmbiguous(k, chName, NEAR_AMBIG);
+  }
   if (!gs.length) {
     /* Last resort: some providers number a brand's own per-event feeds with just the bare brand word
        ("STAN 13", "STAN 14" for the curated entry "Stan Sport") -- the full curated phrase never
@@ -3230,8 +3288,6 @@ async function loadExtraGuides(chans, chIdx, items, from, to, every, force) {
     const k = norm(y[3]);
     (every.get(chans[y[0]]) || []).forEach(g => { let m = pIdx.get(g.id); if (!m) pIdx.set(g.id, m = new Map()); (m.get(k) || m.set(k, []).get(k)).push(y[1]); });
   });
-  const idx = new Map();
-  for (const g of DATA.live.items) { const k = chKey(g.name); (idx.get(k) || idx.set(k, []).get(k)).push(g); }
   /* These used to run one at a time (await inside a for-of): with several free guide sources selected,
      their network+parse times simply added up -- a real, separate contributor to "it takes ages before
      Live Sports shows anything", on top of the memory issue fixed separately. Fetching them concurrently
@@ -3293,21 +3349,20 @@ async function loadExtraGuides(chans, chIdx, items, from, to, every, force) {
         const names = [...block.matchAll(/<display-name[^>]*>([\s\S]*?)<\/display-name>/g)].map(m => xmlDec(m[1]));
         names.push(id.replace(/\.[a-z]{2}(?=@|$)/i, '').replace(/[._]/g, ' '), expandEpgId(id));
         const gs = new Set();
-        /* Used to be an exact chKey lookup only -- no tolerance at all for the guide's display name
+        /* Used to keep its own separate exact-match-only index here, a second copy of exactly what
+           tsdbGroups already builds (DATA.live.tidx) -- no tolerance at all for the guide's display name
            ("FOX SPORTS 506") not being byte-for-byte identical to however this provider happens to name
            the same channel in the user's own playlist (a region tag, a quality suffix, different
            spacing...). That's a real, generic gap: it silently drops the match for ANY channel on ANY
            free/rcs guide source whose name isn't an exact match, not specific to one broadcaster.
            Confirmed real case: rcs-guide's own published data already had "FOX SPORTS 506" with the
            correct F1 Mexico GP listing, but it never reached the app because of this exact-match-only
-           lookup. Same proven near-match fallback as tsdbGroups, so this channel-matching problem gets
-           the one fix instead of yet another broadcaster-specific patch. */
-        names.forEach(n => {
-          const k = chKey(n);
-          let matched = idx.get(k) || [];
-          if (!matched.length && k.length >= 7) matched = nearMatchUnique(idx, k);
-          matched.forEach(g => { if (!cc || !g.cc || g.cc === 'ZZ' || g.cc === cc) gs.add(g.id); });
-        });
+           lookup. Routed through tsdbGroups itself now, the one shared chokepoint every other source
+           (TheSportsDB, guide-v2, curated tables, the AI lookup) already goes through -- so the near-match
+           fallback, the confirmed-alias handshake and the ambiguous-match diagnostics all apply here too,
+           instead of this one ingestion path quietly having its own separate, weaker copy of the same
+           logic that a future fix could fix in one place and forget to fix in the other. */
+        names.forEach(n => tsdbGroups(n, cc).forEach(g => gs.add(g.id)));
         if (gs.size) { ids.set(id, [...gs]); lim.set(id, Math.min(...[...gs].map(x => covered.has(x) ? (provMax.get(x) || 0) : 0))); count += gs.size; }
       });
       notes.push('Free ' + name + ' guide: ' + count + ' of your channels matched');
@@ -6973,7 +7028,39 @@ function runSearch() {
    football-data.org competition this app uses -- no user, including the owner, needs to find or paste
    a football-data.org key on-device any more. ui.fdKey/loadFixtures/FD_COMPS are untouched and still
    work if a key is ever set programmatically, just no longer surfaced in Settings. */
-const SETS = HAS_MPV ? ['refresh', 'catlist', 'pins', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'pcplayer', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'rcsguide', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'] : ['refresh', 'catlist', 'pins', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'rcsguide', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'];
+const SETS = HAS_MPV ? ['refresh', 'catlist', 'pins', 'chalias', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'pcplayer', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'rcsguide', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'] : ['refresh', 'catlist', 'pins', 'chalias', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'rcsguide', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'];
+/* ---------- Settings: fix a channel's guide match (see ALIAS, above tsdbGroups) ---------- */
+function searchLiveByName(q) {
+  const toks = norm(q).split(' ').filter(Boolean);
+  if (!toks.length) return [];
+  return DATA.live.items.filter(g => { const t = ' ' + norm(g.raw + ' ' + g.name) + ' '; return toks.every(tk => t.indexOf(' ' + tk) >= 0); })
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true})).slice(0, 25);
+}
+function pickChannelFor(label, k) {
+  const cands = searchLiveByName(label);
+  if (!cands.length) { toast('No channel in your list matches “' + label + '”. Try different or fewer words.'); return; }
+  openMenu(cands.map(g => ({l: disp(g) + (regionOf(g) !== 'Other English' ? '  ·  ' + regionOf(g) : ''), a: () => {
+    confirmAlias(k, g);
+    toast('Linked “' + label + '” to ' + disp(g) + '. Updating the TV guide…');
+  }})));
+}
+function askChannelName(label) {
+  askText('Fix a channel match', 'Type the broadcaster name a guide uses that isn’t matching correctly (for example “FOX SPORTS 506”). You’ll then pick which of your own channels is really showing it. Once linked, every guide and TheSportsDB listing under that name will use it, for every sport and every game, not just one.', label || '',
+    v => { if (v.trim()) pickChannelFor(v.trim(), chKey(v.trim())); });
+}
+/* ALIAS.pend lists real cases the automatic matching saw more than one plausible channel for and
+   refused to guess between -- offered first since there's already a short list to pick from, before
+   falling back to typing a name from scratch. Never auto-applied; only ever a human's call. */
+function openChannelAlias() {
+  const pend = Object.entries(ALIAS.pend).sort((a, b) => (b[1].ts || 0) - (a[1].ts || 0));
+  const items = pend.slice(0, 20).map(([k, p]) => ({l: '“' + p.label + '” — not sure which channel', a: () => {
+    const sub = p.cands.map(c => ({l: c.name, a: () => { confirmAlias(k, DATA.live.byId.get(String(c.id)) || {id: c.id, name: c.name, cc: ''}); toast('Linked “' + p.label + '” to ' + c.name + '. Updating the TV guide…'); }}));
+    sub.push({l: 'None of these — search by name instead', a: () => askChannelName(p.label)});
+    openMenu(sub);
+  }}));
+  items.push({l: pend.length ? 'Link a different channel by name…' : 'Link a channel by name…', a: () => askChannelName('')});
+  openMenu(items);
+}
 function renderSettings() {
   const u = userInfo || {};
   const exp = Number(u.exp_date) ? new Date(Number(u.exp_date) * 1000).toLocaleDateString() : 'No expiry date given';
@@ -7005,6 +7092,7 @@ function renderSettings() {
     lookup: ['Online game lookup', !ui.aiKey ? 'Off (needs a key)' : LK.err ? 'Problem: ' + LK.err.replace('Online lookup failed: ', '') : 'On'],
     lkco: ['Countries to look up', lkCountries().join(', ')],
     pins: ['Pinned channels', pinSummary()],
+    chalias: ['Fix a channel’s guide match', Object.keys(ALIAS.m).length + ' linked' + (Object.keys(ALIAS.pend).length ? ', ' + Object.keys(ALIAS.pend).length + ' flagged as unsure' : '')],
     tsdbkey: ['TheSportsDB key (optional)', !ui.tsdbKey ? 'Not set' : TSDB.err ? 'Problem: ' + TSDB.err.replace('TV listings couldn’t be updated: ', '') : TSDB.busy ? 'Downloading listings…' : TSDB.ts ? TSDB.list.length + ' TV listings · updated ' + clockStr(new Date(TSDB.ts)) : 'Saved'],
     region: ['Show channels from this region first', ui.region || 'UK & Ireland'],
     adult: ['Adult content PIN', !ui.pinH ? 'Not set: adult content stays hidden' : adultOk() ? 'Unlocked for now' : 'Set, locked'],
@@ -7044,6 +7132,7 @@ function settingsAction(i) {
   else if (a === 'lookup') askText('Online game lookup', 'Optional. Paste an Anthropic API key (from console.anthropic.com). When you open a game, the app asks Claude to search the web for which channels show it in your chosen countries, then matches the answer to your own channels. Only the team names, competition and date are sent. Set a monthly spending limit on the key. Leave it empty to turn this off.', ui.aiKey || '', v => { ui.aiKey = v.trim(); save('sp_ui', ui); LK.err = ''; renderMain(); });
   else if (a === 'lkco') askText('Countries to look up', 'The countries to look up for each game, separated by commas, for example: United Kingdom, United States, Australia, South Africa, Singapore. More countries means a slightly longer lookup.', lkCountries().join(', '), v => { const l = v.split(',').map(x => x.trim()).filter(Boolean).slice(0, 8); ui.lkCountries = l.length ? l : null; save('sp_ui', ui); renderMain(); });
   else if (a === 'pins') askText('Pinned channels', PIN_COMPS.map(c => compLabel(c) + ': ' + (pinnedChannels(c).map(g => disp(g)).join(', ') || 'none')).join('\n') + '\n\nTo pin a channel, highlight it in Live TV, Search or on a game page, press M (the ≡ button on a remote) and choose Pin. The same menu unpins it.\n\nPress OK or Back to close.', '', () => {}, true);
+  else if (a === 'chalias') openChannelAlias();
   else if (a === 'tsdbkey') askText('TheSportsDB key', 'Optional. A paid TheSportsDB key lets the app read their TV listings, which name the channels showing each match. Leave it empty to remove it.', ui.tsdbKey || '', v => { ui.tsdbKey = v.trim(); save('sp_ui', ui); TSDB.list = []; TSDB.ts = 0; TSDB.err = ''; renderMain(); if (ui.tsdbKey) loadTsdb(true).then(() => renderMain()); });
   else if (a === 'region') { const i = REGION_ORDER.indexOf(ui.region || 'UK & Ireland'); ui.region = REGION_ORDER[(i + 1) % (REGION_ORDER.length - 1)]; save('sp_ui', ui); renderMain(); }
   else if (a === 'teams') askShortcuts();
