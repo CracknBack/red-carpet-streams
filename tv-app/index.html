@@ -2111,42 +2111,45 @@ async function loadF1(force) {
   F1.busy = false; if (S.screen === 'home') renderHome();
   if (S.screen === 'main' && isSearchPage(S.page)) { Q.skey = ''; Q.gkey = ''; renderMain(); }
 }
-/* which channels the guides show carrying a session: a Formula 1 listing for that race, starting within an hour of the session */
-function f1GuideChans(s) {
-  const gi = (GUIDE && GUIDE.items) || [], chans = new Map(), reps = [];
-  if (!gi.length) return {chans: [], reps};
+/* Universal EPG-to-confirmed scanner: scans the user's OWN already-loaded EPG for a channel whose
+   real programme text matches this event within its time window, via the exact same rule
+   eventMatchesFixture already uses for the advisory "usual channels" list (team-pair match, or the
+   sport's own comp name/alias -- never a bare distinctive label word alone, see the false-positive
+   this was built to avoid in eventMatchesFixture's own comment). Replaces the old F1-only
+   f1GuideChans() (2026-11-02): F1 no longer gets its own qualifying/sprint/race session
+   disambiguation that function used to do -- any EPG listing naming "Formula 1"/"F1" inside this
+   session's time window now confirms it, same bar as every other sport. Works for any event carrying
+   the shared {comp, teams, start, stop} shape (f1Events, v2Events -- every league in guide-v2.json,
+   team and individual alike). Team sports with potentially thousands of fixtures in one list
+   (fixtureEvents(), football-data.org) keep their own indexed byTeam/nameChanIdx scan instead of
+   this for the documented performance reason already in that function's own comments -- this one
+   scans the whole guide per call, fine for "one visible/browsed event", not for a whole league at
+   once. */
+function guideChansForEvent(ev) {
+  const gi = (GUIDE && GUIDE.items) || [], chans = new Map(), reps = [], pres = [];
+  if (!gi.length) return {chans: [], reps, pres};
   const epgMap = sportsEpgMap(true);
-  const isF1 = /formula (1|one)|\bf1\b|grand prix/, noSess = /qualifying|quali|practice|sprint|shootout|highlights|review|the f1 show|grid|ted s/;
-  /* Used to also require a location token (the race/city/country name) inside the listing text --
-     dropped 2026-11-02: this is almost certainly why a real session this morning only showed 2-3 of
-     10+ genuinely available channels. Plenty of providers' EPGs just print "Formula 1" or "Sky Sports
-     F1" with no circuit/city name in the actual programme text at all (the exact same generic-filler-
-     title problem already fixed in eventMatchesFixture for every other individual sport) -- the isF1
-     sport gate plus the session-type check below are already specific enough on their own; requiring
-     ALSO naming the Grand Prix was excluding real matches, not filtering out false ones. */
   for (const x of gi) {
     const st = x[1];
-    if (Math.abs(st - s.start) > 3 * 864e5) continue;
-    const t = norm(x[3] + ' ' + (x[4] || ''));
-    if (!isF1.test(t)) continue;
-    const ok = s.k === 'race' ? !noSess.test(t) : s.k === 'qual' ? /qualifying|quali/.test(t) && !/sprint/.test(t) : s.k === 'sprint' ? /sprint/.test(t) && !/qualifying|shootout/.test(t) : /sprint (qualifying|shootout)/.test(t);
-    if (!ok) continue;
+    if (st < ev.start - 864e5 || st > ev.stop + 864e5) continue;
+    if (!eventMatchesFixture(x[3] + ' ' + (x[4] || ''), ev)) continue;
     const groups = epgMap.get(GUIDE.chans[x[0]]);
     if (!groups) continue;
     groups.forEach(g => {
-      const e = {g, epg: GUIDE.chans[x[0]], start: st, kick: s.start, stop: x[2] || st + s.dur, lang: chLang(g), region: regionOf(g), src: x[5] === 'x' ? 'free' : 'provider'};
-      if (Math.abs(st - s.start) <= 3600e3) { const o = chans.get(g.id); if (!o || st < o.start) chans.set(g.id, Object.assign(e, {kind: 'live'})); }
-      else if (st > s.start + 90 * 60e3) reps.push(Object.assign(e, {kind: 'replay', hl: isHL(x[3], x[4], st, x[2]) ? 1 : 0}));
+      const e = {g, epg: GUIDE.chans[x[0]], start: st, kick: ev.start, stop: x[2] || st + 2.25 * 3600e3, lang: chLang(g), region: regionOf(g), src: x[5] === 'x' ? 'free' : 'provider'};
+      if (st >= ev.start - 3 * 3600e3 && st <= ev.stop + 3600e3) { const o = chans.get(g.id); if (!o || st < o.start) chans.set(g.id, Object.assign(e, {kind: 'live'})); }
+      else if (st > ev.stop + 90 * 60e3) reps.push(Object.assign(e, {kind: 'replay', hl: isHL(x[3], x[4], st, x[2]) ? 1 : 0}));
+      else if (st < ev.start - 3 * 3600e3) pres.push(Object.assign(e, {kind: 'preview'}));
     });
   }
-  return {chans: [...chans.values()], reps};
+  return {chans: [...chans.values()], reps, pres};
 }
 function f1Events() {
   if (!F1.list.length) return [];
   const now = nowMs(), out = [];
   for (const s of F1.list) {
     if (s.start + s.dur < now - 3 * 864e5 || s.start > now + 14 * 864e5) continue;
-    const g = f1GuideChans(s);
+    const g = guideChansForEvent({comp: 'Formula 1', start: s.start, stop: s.start + s.dur});
     out.push({key: 'f1:' + s.id, fixture: true, f1: true, label: s.race.replace(/ Grand Prix$/i, ' GP') + ' · ' + s.label, comp: 'Formula 1', kick: s.start, start: s.start, stop: s.start + s.dur,
       liveEvent: true, isEvent: true, chans: g.chans, reps: g.reps, pres: [],
       text: ' ' + norm([s.race, s.circuit, s.locality, s.country, s.label, 'formula 1 f1 grand prix gp'].join(' ')) + ' '});
@@ -3196,14 +3199,20 @@ function canonTeam(side) {
 /* Events with no two-team pair (F1, MotoGP, NASCAR, golf, tennis, UFC/Boxing -- anything carrying only
    .label/.comp, see v2Events()) used to always fail this check, so an eventish-named per-match channel
    for one of these could never pass genericCompChannels' filter even when it was genuinely showing the
-   right race/tournament. Generic filler words in .label ("Grand Prix", "Open", "Championship") are
-   excluded from the match on purpose -- they're common enough to false-positive against an unrelated
-   eventish channel, unlike a specific track/venue word ("Martinsville", "Qatar") or the competition
-   name itself, which linear EPGs print as-is even when they drop the specific event name
-   ("Live: MotoGP", "PGA Tour Golf"). */
-const EVENT_LABEL_STOP = new Set(['grand', 'prix', 'open', 'tour', 'cup', 'championship', 'classic',
-  'invitational', 'masters', 'series', 'race', 'round', 'stage', 'world', 'international', 'national',
-  'event', 'fight', 'night', 'tournament']);
+   right race/tournament. Known on-air phrasings that don't literally contain the comp name as a
+   substring -- without these, requiring the sport identifier below would silently never match
+   correctly-worded real listings ("F1" for Formula 1; the European Tour has been branded "DP World
+   Tour" on air for years). Server-side mirror: resolve_v2.py's own COMP_TEXT_ALIASES. */
+const COMP_TEXT_ALIASES = {'Formula 1': ['f1'], 'European Tour': ['dp world tour']};
+/* Used to also accept a bare distinctive word from .label on its own (a location/event word with
+   generic filler like "Grand Prix"/"Open" excluded) -- removed 2026-11-02 after a confirmed real
+   false positive server-side doing the exact same thing: "Sky Sports Golf" matched a MotoGP fixture
+   purely because its listing mentioned "Malaysia" (that week's race location), even though Sky Sports
+   doesn't hold MotoGP's UK rights at all (TNT Sports does). A city/country name isn't sport-specific;
+   unrelated sports' events can share one in the same week. The sport's own name (or a known alias) is
+   the one thing in a non-team fixture that's actually diagnostic -- same rule as
+   resolve_v2.py's xmltv_text_matches, independently applied here since this file has no access to
+   that Python runtime. */
 function eventMatchesFixture(text, ev) {
   if (!ev) return false;
   const t = ' ' + norm(text) + ' ';
@@ -3214,12 +3223,9 @@ function eventMatchesFixture(text, ev) {
       return aliases.some(a => a.length > 2 && t.indexOf(' ' + a + ' ') >= 0);
     });
   }
-  if (ev.comp) { const c = norm(ev.comp); if (c && t.indexOf(' ' + c + ' ') >= 0) return true; }
-  if (ev.label) {
-    const words = norm(ev.label).split(' ').filter(w => w.length > 3 && !EVENT_LABEL_STOP.has(w));
-    if (words.some(w => t.indexOf(' ' + w + ' ') >= 0)) return true;
-  }
-  return false;
+  if (!ev.comp) return false;
+  const names = [ev.comp].concat(COMP_TEXT_ALIASES[ev.comp] || []);
+  return names.some(n => { const c = norm(n); return c && t.indexOf(' ' + c + ' ') >= 0; });
 }
 /* Works out what a guide entry is: a match ("Arsenal v Chelsea") or a show ("Super Sunday"). */
 /* ---------- downloading the guide ---------- */
@@ -3228,9 +3234,10 @@ function guideUrl() {
   return cfg.server + '/xmltv.php?username=' + encodeURIComponent(cfg.user) + '&password=' + encodeURIComponent(cfg.pass);
 }
 /* Which guide channel ids belong to sports channels, and which channels they map to.
-   buildEvents() and its helpers (fixtureEvents, f1GuideChans -- the latter once per F1 session) can
-   call this many times in a single pass, and it was rebuilding a map over every one of the account's
-   live channels (49,121 in the case this was reported against) from scratch each time: real wasted CPU
+   buildEvents() and its helpers (fixtureEvents, guideChansForEvent -- the latter once per browsed
+   individual-sport event) can call this many times in a single pass, and it was rebuilding a map
+   over every one of the account's live channels (49,121 in the case this was reported against) from
+   scratch each time: real wasted CPU
    and allocation on every call, not just the first. It only depends on DATA.live.items and GUIDE.xmap,
    both of which are replaced wholesale (never mutated in place) whenever they actually change, so a
    reference-equality cache is exact, not approximate -- one slot per 'all' value since both are used
@@ -3952,13 +3959,13 @@ function* buildEventsG() {
        the block right below (EVENTS = v2.concat(...)) drops every f1Events() entry outright wherever
        v2Comps covers its competition ('Formula 1' is one of guide-v2's tracked comps), with no fallback,
        because the merge above needs sidesOf() to find two named sides and an F1 session's label ("Mexico
-       City GP -- Qualifying") never has any -- so f1GuideChans()'s own channel matching, which reads the
-       real guide data directly and is independent of TheSportsDB, was being discarded completely, not
-       just de-prioritised. Confirmed real case: the live guide genuinely has a specific "Live: F1: Mexico
-       Qualifying" listing on a real channel that f1GuideChans() finds correctly; it never reached the
-       screen because the whole event carrying that match was thrown away before this file even ran.
-       Matched by competition and closest kick-off time instead, since that's the one thing both sources
-       agree on even when session labels don't share a format. */
+       City GP -- Qualifying") never has any -- so guideChansForEvent()'s own channel matching, which
+       reads the real guide data directly and is independent of TheSportsDB, was being discarded
+       completely, not just de-prioritised. Confirmed real case: the live guide genuinely has a specific
+       "Live: F1: Mexico Qualifying" listing on a real channel that guideChansForEvent() finds correctly;
+       it never reached the screen because the whole event carrying that match was thrown away before
+       this file even ran. Matched by competition and closest kick-off time instead, since that's the
+       one thing both sources agree on even when session labels don't share a format. */
     const f1ByComp = new Map();
     f1.forEach(ev => { const k = ev.comp || ''; (f1ByComp.get(k) || f1ByComp.set(k, []).get(k)).push(ev); });
     v2.forEach(v => {
@@ -3968,6 +3975,26 @@ function* buildEventsG() {
       if (!best || bestDiff > 30 * 60e3 || !best.chans.length) return;
       const have = new Set(v.chans.map(c => c.g.id));
       best.chans.forEach(c => { if (!have.has(c.g.id)) { have.add(c.g.id); v.chans.push(c); } });
+    });
+    /* Everything else guide-v2 tracks that ALSO has no two sides -- MotoGP, NASCAR, PGA Tour, European
+       Tour, and anything else shaped like a single-entity race/tournament rather than a head-to-head
+       match ("Malaysia GP", "Xfinity 500", "VidantaWorld Mexico Open"). These never had an f1Events()-
+       style independent schedule feeding f1ByComp above, so unlike F1 they got NO client-side EPG scan
+       at all until now -- guide-v2's own server-told channels (tsdbGroups-matched) were the only source,
+       exactly the gap this session's whole investigation started from. No separate schedule list needed:
+       guide-v2's own v2 entries already carry everything guideChansForEvent() needs (.comp/.start/.stop),
+       so this calls it directly against each one instead of building a new per-sport fetcher. Scoped to
+       sidesOf(v) === null so this never re-scans the guide for the hundreds of ordinary team-sport
+       fixtures the sides-based merge above already handles -- confirmed low volume in a real guide-v2.json
+       (dozens of individual-sport events, not hundreds). Adds to whatever guide-v2 already found rather
+       than replacing it -- two independent sources agreeing is exactly the "confirmed" bar this file's
+       server-side counterpart (resolve_v2.py) already documents, not a reason to prefer one over the other. */
+    v2.forEach(v => {
+      if (sidesOf(v)) return;
+      const g = guideChansForEvent(v);
+      if (!g.chans.length) return;
+      const have = new Set(v.chans.map(c => c.g.id));
+      g.chans.forEach(c => { if (!have.has(c.g.id)) { have.add(c.g.id); v.chans.push(c); } });
     });
   }
   if (FD.list.length) {
