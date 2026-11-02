@@ -1893,7 +1893,7 @@ class VView {
 }
 
 /* ================= app state ================= */
-const PAGES = [{id: 'sportshub', label: 'Sports Hub'}, {id: 'search', label: 'Search'}, {id: 'favs', label: 'Favourites'}, {id: 'live', label: 'Live TV'}, {id: 'vod', label: 'Movies'}, {id: 'series', label: 'Series'}, {id: 'settings', label: 'Settings'}];
+const PAGES = [{id: 'sportshub', label: 'Event Guide'}, {id: 'search', label: 'Search'}, {id: 'favs', label: 'Favourites'}, {id: 'live', label: 'Live TV'}, {id: 'vod', label: 'Movies'}, {id: 'series', label: 'Series'}, {id: 'settings', label: 'Settings'}];
 /* Sports Hub and Search share one underlying page (#page-search: the sport chips/fixture browser and
    the typed keyword search were always the same screen, chips just swapped between "sport shortcuts"
    and "result type filters" depending on whether Q.text was set -- see searchChips/resultList). Sports
@@ -1977,17 +1977,21 @@ let serverInfo = {};
    shapes the result exactly like fixtureEvents()'s output so it slots into the one place both get
    merged (buildEventsG). Every guide-v2 channel is "likely" confidence, never "confirmed" -- server-
    side resolution is still one source per claim; the app's own tap-time check (claimDoubt/EPGCHK)
-   is what actually confirms it, same as everything else. */
-const GUIDE_V2_URL = 'https://cracknback.github.io/rcs-guide/guide-v2.json';
+   is what actually confirms it, same as everything else.
+   Store-safe by default: this address is never built in. It comes only from Settings
+   ("guidev2" row, ui.guideV2Url) -- a private build can set its own default below if desired, but a
+   fresh install makes zero requests anywhere until the user pastes an address of their own. */
+const GUIDE_V2_URL_DEFAULT = '';   // e.g. 'https://your-own-pages-site/guide-v2.json' for a private build
+const guideV2Url = () => (ui.guideV2Url || GUIDE_V2_URL_DEFAULT || '').trim();
 let GUIDE_V2 = null, GUIDE_V2_BUSY = false;
 async function loadGuideV2(force) {
-  if (GUIDE_V2_BUSY) return;
-  const key = 'guidev2:' + GUIDE_V2_URL;
+  if (GUIDE_V2_BUSY || !guideV2Url()) return;
+  const key = 'guidev2:' + guideV2Url();
   if (!force && !GUIDE_V2) { const c = await idb.get(key); if (c) GUIDE_V2 = c.data; }
   if (!force && GUIDE_V2 && GUIDE_V2._ts && Date.now() - GUIDE_V2._ts < 20 * 60e3) return;
   GUIDE_V2_BUSY = true;
   try {
-    const r = await fetch(GUIDE_V2_URL + '?t=' + Date.now());
+    const r = await fetch(guideV2Url() + '?t=' + Date.now());
     if (!r.ok) throw new Error('error ' + r.status);
     const j = await r.json();
     const changed = JSON.stringify(j) !== JSON.stringify(GUIDE_V2 && Object.assign({}, GUIDE_V2, {_ts: undefined}));
@@ -3278,8 +3282,10 @@ function sportsEpgMap(all) {
 }
 /* ---------- free public guides (epgshare01), for channels the provider has no guide for ---------- */
 /* The Red Carpet guide: your own sports guide, built three times a day from the broadcasters' own listings (see the rcs-guide project).
-   Its address is set once in Settings, or put in RCS_GUIDE below before building the app. */
-const RCS_GUIDE = 'https://cracknback.github.io/rcs-guide/sports.xml.gz', RCS_LABEL = 'Red Carpet';
+   Store-safe by default: RCS_GUIDE is empty here, not built in -- its address is set only via
+   Settings ("rcsguide" row, ui.rcsGuide), so a fresh install makes zero requests to anywhere until
+   the user pastes one. A private build can still set a default below if desired. */
+const RCS_GUIDE = '', RCS_LABEL = 'Red Carpet';   // e.g. 'https://your-own-pages-site/sports.xml.gz' for a private build
 const rcsUrl = () => ui.rcsOff ? '' : (ui.rcsGuide || RCS_GUIDE || '').trim();
 const EPGS = 'https://epgshare01.online/epgshare01/epg_ripper_';
 /* the free country guides confirmed to exist; a country's guide is used when any of its sports channels has no guide */
@@ -4522,7 +4528,7 @@ function heroBgStyle() {
   return ' style="filter:saturate(1.12) brightness(1.06) contrast(1.03);background:linear-gradient(90deg,rgba(8,13,20,.92) 0%,rgba(8,13,20,.82) 28%,rgba(8,13,20,.52) 46%,rgba(8,13,20,.16) 64%,rgba(8,13,20,0) 84%),url(' + img + ') right center/cover no-repeat,#0a1019"';
 }
 function homeBanner() {
-  const sel = homeSportsList(), shown = sel.list, out = {title: 'Sports Hub', cards: [], n: shown.length, kind: sel.kind};
+  const sel = homeSportsList(), shown = sel.list, out = {title: 'Event Guide', cards: [], n: shown.length, kind: sel.kind};
   if (shown.length) out.cards.push({type: 'game', ev: shown[HOME.liveIdx % shown.length], kind: sel.kind});
   /* Sports Hub always stays Sports Hub -- it never borrows the hero slot to tease a movie/series
      resume. That has its own home now: the "Continue" tile in the carousel (homeTiles()). */
@@ -4823,7 +4829,11 @@ const QR = (() => {
    QR code, through a free relay (ntfy.sh), so the relay can't read what you typed. */
 const PK = {open: false, es: null, cb: null, key: null};
 const RELAY = 'https://ntfy.sh/';
-const phonePage = () => (ui.rcsGuide || RCS_GUIDE || 'https://cracknback.github.io/rcs-guide/sports.xml.gz').replace(/[^/]*$/, '') + 'type.html';
+/* type.html is a small utility page co-hosted on whichever Pages site serves the sports guide -- no
+   hardcoded fallback here either, same store-safe reasoning as RCS_GUIDE/guideV2Url above: without a
+   guide address configured in Settings, there's no known site to ask for it, so phone typing just
+   doesn't have anywhere to point rather than silently calling cracknback.github.io by default. */
+const phonePage = () => (ui.rcsGuide || RCS_GUIDE || guideV2Url()).replace(/[^/]*$/, '') + 'type.html';
 const b64u = u => btoa(String.fromCharCode.apply(null, Array.from(u))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const unb64u = t => Uint8Array.from(atob(String(t).trim().replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
 async function openPhone(label, cb) {
@@ -6948,7 +6958,7 @@ function pendingReason(x, ev) {
   return 'Pending: its guide doesn’t list this game';
 }
 /* a game's channels: tiles in three groups (showing now, going to show it, replays) */
-const SEC_TITLE = ['Showing now', 'Going to show it', 'Replays', 'Doubtful: the channel’s own guide shows something else', 'Possible, not confirmed'];
+const SEC_TITLE = ['Showing now', 'Going to show it', 'Replays', 'Doubtful: the channel’s own guide shows something else', 'Category Matches in Your Playlist (Unscheduled in EPG)'];
 function chanSection(x, ev, now) {
   if (x.kind === 'compch' || x.kind === 'likely') return 4;                  /* a guess: this channel usually carries the competition */
   if (!claimOk(ev, x)) return 3;
@@ -7172,7 +7182,7 @@ function runSearch() {
    football-data.org competition this app uses -- no user, including the owner, needs to find or paste
    a football-data.org key on-device any more. ui.fdKey/loadFixtures/FD_COMPS are untouched and still
    work if a key is ever set programmatically, just no longer surfaced in Settings. */
-const SETS = HAS_MPV ? ['refresh', 'catlist', 'pins', 'chalias', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'pcplayer', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'rcsguide', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'] : ['refresh', 'catlist', 'pins', 'chalias', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'rcsguide', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'];
+const SETS = HAS_MPV ? ['refresh', 'catlist', 'pins', 'chalias', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'pcplayer', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'rcsguide', 'guidev2', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'] : ['refresh', 'catlist', 'pins', 'chalias', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'rcsguide', 'guidev2', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'];
 /* ---------- Settings: fix a channel's guide match (see ALIAS, above tsdbGroups) ---------- */
 function searchLiveByName(q) {
   const toks = norm(q).split(' ').filter(Boolean);
@@ -7246,7 +7256,8 @@ function renderSettings() {
     avoidhevc: ['Avoid 4K and HEVC copies', ui.avoidHevc ? 'On' : 'Off'],
     gpv: ['Preview window on game pages', ui.gpvOff ? 'Off' : 'On'],
     epgfix: ['Guide time correction', manualFix() === null ? 'Automatic' + (EPG_AUTO ? ' (' + fmtFix(-EPG_AUTO).replace('ahead', 'was ahead').replace('behind', 'was behind') + ')' : ' (no correction needed)') : (manualFix() ? (manualFix() > 0 ? '+' : '−') + (Math.abs(manualFix()) >= 3600e3 ? Math.abs(manualFix()) / 3600e3 + ' hr' : Math.abs(manualFix()) / 60e3 + ' min') : 'None')],
-    rcsguide: ['Red Carpet sports guide', ui.rcsOff ? 'Off' : ui.rcsGuide ? 'On (your own address)' : 'On (built in)'],
+    rcsguide: ['Red Carpet sports guide', ui.rcsOff ? 'Off' : ui.rcsGuide ? 'On (your own address)' : 'Off (no address set)'],
+    guidev2: ['Resolved sports schedule (guide-v2)', ui.guideV2Url ? 'On (your own address)' : 'Off (no address set)'],
     maybe: ['Unconfirmed channels on game pages', ui.showMaybe ? 'Shown' : 'Hidden until you ask'],
     livefmt: ['Live stream format', LIVEFMT_LABEL[ui.liveFmt || 'auto']],
     xgsky: ['Community UK guide (Sky and TNT)', ui.xgSky === false ? 'Off' : 'On'],
@@ -7256,7 +7267,8 @@ function renderSettings() {
     names: ['Names', ui.orig ? 'Provider’s originals' : 'Tidied up'], signout: ['Sign out', '']};
   const SEC = {refresh: 'Lists', pins: 'Sport', guidecheck: 'TV guide', pcplayer: 'Playback', lang: HAS_MPV ? '' : 'Playback', layout: 'Display', adult: 'Adult content', accounts: 'Account'};
   let h = '<div class="sgrid"><div class="sacct"><div class="slabel">Account</div>' + rows.map(r => '<div class="kv"><span>' + esc(r[0]) + '</span><span>' + esc(r[1]) + '</span></div>').join('') +
-    '<p class="note">Lists are stored on this device so everything opens instantly. They update by themselves every 12 hours.</p></div><div class="slist" id="slist">';
+    '<p class="note">Lists are stored on this device so everything opens instantly. They update by themselves every 12 hours.</p>' +
+    '<p class="note">This app is a local media player and TV guide reader. It plays whatever playlist and guide addresses you provide; it does not host, provide or verify any media streams itself.</p></div><div class="slist" id="slist">';
   SETS.forEach((a, i) => {
     if (SEC[a]) h += '<div class="slabel">' + esc(SEC[a]) + '</div>';
     h += '<div class="srow' + (a === 'signout' ? ' danger' : '') + (S.zone === 'set' && S.setIdx === i ? ' focus' : '') + '" data-i="' + i + '"><span>' + esc(V_[a][0]) + '</span><span class="v">' + esc(V_[a][1]) + '</span></div>';
@@ -7313,7 +7325,8 @@ function settingsAction(i) {
   }
   else if (a === 'rcsguide') openMenu([
     {l: ui.rcsOff ? 'Turn the Red Carpet guide on' : 'Turn the Red Carpet guide off', a: () => { ui.rcsOff = !ui.rcsOff; save('sp_ui', ui); loadGuide(true); renderMain(); }},
-    {l: 'Use a different guide address…', a: () => askText('Red Carpet sports guide', 'Paste the address of a guide that ends in sports.xml.gz. Leave it empty to go back to the built-in one.', ui.rcsGuide || '', v => { ui.rcsGuide = v.trim(); ui.rcsOff = false; save('sp_ui', ui); loadGuide(true); renderMain(); })}]);
+    {l: 'Set the guide address…', a: () => askText('Red Carpet sports guide', 'Paste the address of a guide that ends in sports.xml.gz. Nothing is fetched until an address is set here. Leave it empty to turn this off.', ui.rcsGuide || '', v => { ui.rcsGuide = v.trim(); ui.rcsOff = false; save('sp_ui', ui); loadGuide(true); renderMain(); })}]);
+  else if (a === 'guidev2') askText('Resolved sports schedule (guide-v2)', 'Optional. Paste the address of a guide-v2.json file (your own rcs-guide build) to turn on multi-country broadcaster matching for leagues it covers. Nothing is fetched until an address is set here. Leave it empty to turn this off.', ui.guideV2Url || '', v => { ui.guideV2Url = v.trim(); save('sp_ui', ui); GUIDE_V2 = null; EVENTS = null; renderMain(); if (ui.guideV2Url) loadGuideV2(true).then(() => renderMain()); });
   else if (a === 'maybe') { ui.showMaybe = !ui.showMaybe; save('sp_ui', ui); renderMain(); }
   else if (a === 'gpv') { ui.gpvOff = !ui.gpvOff; save('sp_ui', ui); renderMain(); }
   else if (a === 'livefmt') { ui.liveFmt = LIVEFMT_ORDER[(LIVEFMT_ORDER.indexOf(ui.liveFmt || 'auto') + 1) % LIVEFMT_ORDER.length]; save('sp_ui', ui); renderMain(); }
