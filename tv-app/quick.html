@@ -2125,22 +2125,40 @@ async function loadF1(force) {
    (fixtureEvents(), football-data.org) keep their own indexed byTeam/nameChanIdx scan instead of
    this for the documented performance reason already in that function's own comments -- this one
    scans the whole guide per call, fine for "one visible/browsed event", not for a whole league at
-   once. */
-function guideChansForEvent(ev) {
-  const gi = (GUIDE && GUIDE.items) || [], chans = new Map(), reps = [], pres = [];
-  if (!gi.length) return {chans: [], reps, pres};
-  const epgMap = sportsEpgMap(true);
+   once -- made cheap enough for that by sportsGuideItems() below, not by narrowing what it covers. */
+/* Precomputed once per buildEvents() pass (reference-equality cached against GUIDE.items/GUIDE.xmap,
+   same pattern as EPGMAP_CACHE above), not once per sideless event: every guide item that actually
+   belongs to a sports channel, with its text pre-normalised once (norm() already memoises by string,
+   but this also skips the x[3]+' '+x[4] concat on every call) and its channel groups pre-resolved. A
+   489-event guide-v2 pass calling guideChansForEvent() once per sideless event (dozens, not hundreds
+   -- team sports never reach this function at all, see the comment above) then only pays a cheap
+   integer start/stop comparison per sports item, string matching only on actual time-window
+   survivors, instead of re-scanning and re-normalising the WHOLE guide (sports and non-sports alike)
+   from scratch on every single call. */
+const SPORTS_ITEMS_CACHE = [null];
+function sportsGuideItems() {
+  const c = SPORTS_ITEMS_CACHE[0];
+  if (c && c.items === (GUIDE && GUIDE.items) && c.xmap === (GUIDE && GUIDE.xmap)) return c.list;
+  const epgMap = sportsEpgMap(true), gi = (GUIDE && GUIDE.items) || [], list = [];
   for (const x of gi) {
-    const st = x[1];
-    if (st < ev.start - 864e5 || st > ev.stop + 864e5) continue;
-    if (!eventMatchesFixture(x[3] + ' ' + (x[4] || ''), ev)) continue;
-    const groups = epgMap.get(GUIDE.chans[x[0]]);
+    const epgId = GUIDE.chans[x[0]], groups = epgMap.get(epgId);
     if (!groups) continue;
-    groups.forEach(g => {
-      const e = {g, epg: GUIDE.chans[x[0]], start: st, kick: ev.start, stop: x[2] || st + 2.25 * 3600e3, lang: chLang(g), region: regionOf(g), src: x[5] === 'x' ? 'free' : 'provider'};
-      if (st >= ev.start - 3 * 3600e3 && st <= ev.stop + 3600e3) { const o = chans.get(g.id); if (!o || st < o.start) chans.set(g.id, Object.assign(e, {kind: 'live'})); }
-      else if (st > ev.stop + 90 * 60e3) reps.push(Object.assign(e, {kind: 'replay', hl: isHL(x[3], x[4], st, x[2]) ? 1 : 0}));
-      else if (st < ev.start - 3 * 3600e3) pres.push(Object.assign(e, {kind: 'preview'}));
+    list.push({epgId, groups, start: x[1], stop: x[2], title: x[3], desc: x[4], free: x[5] === 'x',
+      text: norm(x[3] + ' ' + (x[4] || ''))});
+  }
+  SPORTS_ITEMS_CACHE[0] = {items: GUIDE && GUIDE.items, xmap: GUIDE && GUIDE.xmap, list};
+  return list;
+}
+function guideChansForEvent(ev) {
+  const chans = new Map(), reps = [], pres = [];
+  for (const it of sportsGuideItems()) {
+    if (it.start < ev.start - 864e5 || it.start > ev.stop + 864e5) continue;
+    if (!eventMatchesFixture(it.text, ev)) continue;
+    it.groups.forEach(g => {
+      const e = {g, epg: it.epgId, start: it.start, kick: ev.start, stop: it.stop || it.start + 2.25 * 3600e3, lang: chLang(g), region: regionOf(g), src: it.free ? 'free' : 'provider'};
+      if (it.start >= ev.start - 3 * 3600e3 && it.start <= ev.stop + 3600e3) { const o = chans.get(g.id); if (!o || it.start < o.start) chans.set(g.id, Object.assign(e, {kind: 'live'})); }
+      else if (it.start > ev.stop + 90 * 60e3) reps.push(Object.assign(e, {kind: 'replay', hl: isHL(it.title, it.desc, it.start, it.stop) ? 1 : 0}));
+      else if (it.start < ev.start - 3 * 3600e3) pres.push(Object.assign(e, {kind: 'preview'}));
     });
   }
   return {chans: [...chans.values()], reps, pres};
