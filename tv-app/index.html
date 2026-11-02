@@ -7182,7 +7182,7 @@ function runSearch() {
    football-data.org competition this app uses -- no user, including the owner, needs to find or paste
    a football-data.org key on-device any more. ui.fdKey/loadFixtures/FD_COMPS are untouched and still
    work if a key is ever set programmatically, just no longer surfaced in Settings. */
-const SETS = HAS_MPV ? ['refresh', 'catlist', 'pins', 'chalias', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'pcplayer', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'rcsguide', 'guidev2', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'] : ['refresh', 'catlist', 'pins', 'chalias', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'rcsguide', 'guidev2', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'];
+const SETS = HAS_MPV ? ['refresh', 'catlist', 'pins', 'chalias', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'rcsguide', 'guidev2', 'pcplayer', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'] : ['refresh', 'catlist', 'pins', 'chalias', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'rcsguide', 'guidev2', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'];
 /* ---------- Settings: fix a channel's guide match (see ALIAS, above tsdbGroups) ---------- */
 function searchLiveByName(q) {
   const toks = norm(q).split(' ').filter(Boolean);
@@ -7260,12 +7260,12 @@ function renderSettings() {
     guidev2: ['Resolved sports schedule (guide-v2)', ui.guideV2Url ? 'On (your own address)' : 'Off (no address set)'],
     maybe: ['Unconfirmed channels on game pages', ui.showMaybe ? 'Shown' : 'Hidden until you ask'],
     livefmt: ['Live stream format', LIVEFMT_LABEL[ui.liveFmt || 'auto']],
-    xgsky: ['Community UK guide (Sky and TNT)', ui.xgSky === false ? 'Off' : 'On'],
+    xgsky: ['Supplemental UK XMLTV Guide', ui.xgSky === false ? 'Off' : 'On'],
     xguide: ['Free TV guides', ui.xgOff ? 'Off' : 'Automatic' + (GUIDE && GUIDE.xfiles && GUIDE.xfiles.length ? ' (' + GUIDE.xfiles.join(', ') + ')' : '')], teams: ['Search shortcuts', chipsList().map(chipLabel).join(', ') || 'None'],
     pcplayer: ['Movies and series play in', ui.pcPlayer === 'mpv' ? 'Always mpv' : 'mpv when needed'], lang: ['Preferred language', LANGS[ui.lang]],
     layout: ['Live TV layout', ui.liveLayout === 'provider' ? 'Provider’s categories' : 'Country, then genre'], logos: ['Channel logos', ui.logos === 'provider' ? 'Provider’s only' : 'Best match'],
     names: ['Names', ui.orig ? 'Provider’s originals' : 'Tidied up'], signout: ['Sign out', '']};
-  const SEC = {refresh: 'Lists', pins: 'Sport', guidecheck: 'TV guide', pcplayer: 'Playback', lang: HAS_MPV ? '' : 'Playback', layout: 'Display', adult: 'Adult content', accounts: 'Account'};
+  const SEC = {refresh: 'Lists', pins: 'Event Guide', guidecheck: 'TV guide', pcplayer: 'Playback', lang: HAS_MPV ? '' : 'Playback', layout: 'Display', adult: 'Adult content', accounts: 'Account'};
   let h = '<div class="sgrid"><div class="sacct"><div class="slabel">Account</div>' + rows.map(r => '<div class="kv"><span>' + esc(r[0]) + '</span><span>' + esc(r[1]) + '</span></div>').join('') +
     '<p class="note">Lists are stored on this device so everything opens instantly. They update by themselves every 12 hours.</p>' +
     '<p class="note">This app is a local media player and TV guide reader. It plays whatever playlist and guide addresses you provide; it does not host, provide or verify any media streams itself.</p></div><div class="slist" id="slist">';
