@@ -1138,7 +1138,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.23.37';
+const APP_VERSION = '3.23.38';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 /* MainActivity's dispatchKeyEvent intercepts every digit keypress globally, for the remote's
    number-jump feature -- with no way for native code to know a text <input> currently has focus,
@@ -1998,11 +1998,14 @@ let serverInfo = {};
    merged (buildEventsG). Every guide-v2 channel is "likely" confidence, never "confirmed" -- server-
    side resolution is still one source per claim; the app's own tap-time check (claimDoubt/EPGCHK)
    is what actually confirms it, same as everything else.
-   Store-safe by default: this address is never built in. It comes only from Settings
-   ("guidev2" row, ui.guideV2Url) -- a private build can set its own default below if desired, but a
-   fresh install makes zero requests anywhere until the user pastes an address of their own. */
+   Store-safe by default: this address is never built in for a Free-tier install -- a fresh install
+   makes zero requests anywhere until the user pastes an address of their own in Settings ("guidev2"
+   row, ui.guideV2Url). A Red Carpet Pro unlock is itself a deliberate, consentful action (unlike a
+   default-on free install), so it falls back to our own published guide-v2 build unless the owner has
+   already pasted a different address -- that's still a private build's own default below if desired. */
 const GUIDE_V2_URL_DEFAULT = '';   // e.g. 'https://your-own-pages-site/guide-v2.json' for a private build
-const guideV2Url = () => (ui.guideV2Url || GUIDE_V2_URL_DEFAULT || '').trim();
+const PRO_GUIDE_V2_URL = 'https://cracknback.github.io/rcs-guide/guide-v2.json';
+const guideV2Url = () => (ui.guideV2Url || GUIDE_V2_URL_DEFAULT || (isProUnlocked() ? PRO_GUIDE_V2_URL : '') || '').trim();
 let GUIDE_V2 = null, GUIDE_V2_BUSY = false;
 async function loadGuideV2(force) {
   if (GUIDE_V2_BUSY || !guideV2Url()) return;
@@ -2555,17 +2558,24 @@ async function proActivateOnline(key) {
     return {ok: false, error: (j && j.error) || 'That key wasn’t accepted.'};
   } catch (e) { return {ok: false, error: 'Couldn’t reach the licensing server. Check your connection and try again.'}; }
 }
+/* Unlocking/deactivating Pro changes what guideV2Url()/rcsUrl() resolve to (see PRO_GUIDE_V2_URL /
+   PRO_RCS_GUIDE above) whenever the owner hasn't already pasted a custom address of their own --
+   refresh those two sources right away so the switch is felt immediately, not just on the next poll. */
+function proApplyDefaultGuides() {
+  if (!ui.guideV2Url) { GUIDE_V2 = null; EVENTS = null; if (guideV2Url()) loadGuideV2(true).then(() => renderMain()); }
+  if (!ui.rcsGuide) loadGuide(true);
+}
 function proActivateMenu() {
   askText('Red Carpet Pro', 'Enter the license key from your Red Carpet Pro purchase receipt to unlock custom search shortcuts, channel pinning, manual guide channel matching and supplemental schedule feeds. Leave it empty to deactivate an existing key.', (ui.pro && ui.pro.key) || '', async v => {
     const k = v.trim();
-    if (!k) { ui.pro = null; save('sp_ui', ui); renderMain(); toast('Red Carpet Pro deactivated.'); return; }
+    if (!k) { ui.pro = null; save('sp_ui', ui); renderMain(); proApplyDefaultGuides(); toast('Red Carpet Pro deactivated.'); return; }
     if (k.toUpperCase() === PRO_TEST_KEY) {
       ui.pro = {key: k.toUpperCase(), mode: 'test', activatedAt: Date.now()}; save('sp_ui', ui); renderMain();
-      toast('Red Carpet Pro activated (test key).'); return;
+      proApplyDefaultGuides(); toast('Red Carpet Pro activated (test key).'); return;
     }
     toast('Checking your key…');
     const r = await proActivateOnline(k);
-    if (r.ok) { ui.pro = {key: k, mode: 'online', instanceId: r.instanceId, activatedAt: Date.now()}; save('sp_ui', ui); renderMain(); toast('Red Carpet Pro activated.'); }
+    if (r.ok) { ui.pro = {key: k, mode: 'online', instanceId: r.instanceId, activatedAt: Date.now()}; save('sp_ui', ui); renderMain(); proApplyDefaultGuides(); toast('Red Carpet Pro activated.'); }
     else toast(r.error);
   });
 }
@@ -3344,11 +3354,13 @@ function sportsEpgMap(all) {
 }
 /* ---------- free public guides (epgshare01), for channels the provider has no guide for ---------- */
 /* The Red Carpet guide: your own sports guide, built three times a day from the broadcasters' own listings (see the rcs-guide project).
-   Store-safe by default: RCS_GUIDE is empty here, not built in -- its address is set only via
-   Settings ("rcsguide" row, ui.rcsGuide), so a fresh install makes zero requests to anywhere until
-   the user pastes one. A private build can still set a default below if desired. */
+   Store-safe by default: RCS_GUIDE is empty here, not built in -- a Free-tier install makes zero
+   requests to anywhere until the user pastes one via Settings ("rcsguide" row, ui.rcsGuide). A Red
+   Carpet Pro unlock falls back to our own published guide (see guideV2Url's PRO_GUIDE_V2_URL comment
+   just above for why that's different from a default-on free install) unless overridden here too. */
 const RCS_GUIDE = '', RCS_LABEL = 'Red Carpet';   // e.g. 'https://your-own-pages-site/sports.xml.gz' for a private build
-const rcsUrl = () => ui.rcsOff ? '' : (ui.rcsGuide || RCS_GUIDE || '').trim();
+const PRO_RCS_GUIDE = 'https://cracknback.github.io/rcs-guide/sports.xml.gz';
+const rcsUrl = () => ui.rcsOff ? '' : (ui.rcsGuide || RCS_GUIDE || (isProUnlocked() ? PRO_RCS_GUIDE : '') || '').trim();
 const EPGS = 'https://epgshare01.online/epgshare01/epg_ripper_';
 /* the free country guides confirmed to exist; a country's guide is used when any of its sports channels has no guide */
 const XG_BY_CC = {UK: ['UK', EPGS + 'UK1.xml.gz'], IE: ['UK', EPGS + 'UK1.xml.gz'], US: ['US sports', EPGS + 'US_SPORTS1.xml.gz'],
@@ -7319,8 +7331,8 @@ function renderSettings() {
     avoidhevc: ['Avoid 4K and HEVC copies', ui.avoidHevc ? 'On' : 'Off'],
     gpv: ['Preview window on game pages', ui.gpvOff ? 'Off' : 'On'],
     epgfix: ['Guide time correction', manualFix() === null ? 'Automatic' + (EPG_AUTO ? ' (' + fmtFix(-EPG_AUTO).replace('ahead', 'was ahead').replace('behind', 'was behind') + ')' : ' (no correction needed)') : (manualFix() ? (manualFix() > 0 ? '+' : '−') + (Math.abs(manualFix()) >= 3600e3 ? Math.abs(manualFix()) / 3600e3 + ' hr' : Math.abs(manualFix()) / 60e3 + ' min') : 'None')],
-    rcsguide: ['Red Carpet sports guide', ui.rcsOff ? 'Off' : ui.rcsGuide ? 'On (your own address)' : 'Off (no address set)'],
-    guidev2: ['Resolved sports schedule (guide-v2)', ui.guideV2Url ? 'On (your own address)' : 'Off (no address set)'],
+    rcsguide: ['Red Carpet sports guide', ui.rcsOff ? 'Off' : ui.rcsGuide ? 'On (your own address)' : rcsUrl() ? 'On (Red Carpet Pro default)' : 'Off (no address set)'],
+    guidev2: ['Resolved sports schedule (guide-v2)', ui.guideV2Url ? 'On (your own address)' : guideV2Url() ? 'On (Red Carpet Pro default)' : 'Off (no address set)'],
     maybe: ['Unconfirmed channels on game pages', ui.showMaybe ? 'Shown' : 'Hidden until you ask'],
     livefmt: ['Live stream format', LIVEFMT_LABEL[ui.liveFmt || 'auto']],
     xgsky: ['Supplemental UK XMLTV Guide', ui.xgSky === false ? 'Off' : 'On'],

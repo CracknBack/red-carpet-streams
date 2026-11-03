@@ -4,6 +4,15 @@ name: Build Firestick app
 on:
   workflow_dispatch:
     inputs:
+      flavor:
+        description: 'Which applicationId(s) to build -- firestick keeps the original com.tyre.redcarpetstreams id/keystore continuity, player is the new com.redcarpetplayer.app commercial release'
+        required: false
+        default: player
+        type: choice
+        options:
+          - player
+          - firestick
+          - both
       build_type:
         description: 'Build type (debug has the PLAYBACK_AUDIT.md Phase B harness; release never does)'
         required: false
@@ -35,6 +44,14 @@ jobs:
       - name: Read the app version
         run: echo "VER=$(jq -r .version "$ROOT/tv-app/appinfo.json")" >> "$GITHUB_ENV"
 
+      - name: Work out which flavors to build
+        run: |
+          case "${{ inputs.flavor }}" in
+            both) echo "FLAVORS=firestick player" >> "$GITHUB_ENV" ;;
+            firestick) echo "FLAVORS=firestick" >> "$GITHUB_ENV" ;;
+            *) echo "FLAVORS=player" >> "$GITHUB_ENV" ;;
+          esac
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -53,31 +70,35 @@ jobs:
         if: inputs.build_type != 'debug'
         run: echo "${{ secrets.RCS_KEYSTORE_B64 }}" | base64 -d > "$ROOT/firestick/app/rcs-release.p12"
 
-      - name: Build
+      - name: Build and name each requested flavor
         env:
           RCS_KEYSTORE_PASSWORD: ${{ secrets.RCS_KEYSTORE_PASSWORD }}
         run: |
-          if [ "${{ inputs.build_type }}" = "debug" ]; then
-            gradle -p "$ROOT/firestick" assembleDebug --no-daemon
-            echo "APK_SRC=$ROOT/firestick/app/build/outputs/apk/debug/app-debug.apk" >> "$GITHUB_ENV"
-            echo "SUFFIX=-debug" >> "$GITHUB_ENV"
-          else
-            gradle -p "$ROOT/firestick" assembleRelease --no-daemon
-            echo "APK_SRC=$ROOT/firestick/app/build/outputs/apk/release/app-release.apk" >> "$GITHUB_ENV"
-            echo "SUFFIX=" >> "$GITHUB_ENV"
-          fi
-
-      - name: Name the file
-        run: cp "$APK_SRC" "RedCarpetStreams-${{ env.VER }}-build${{ github.run_number }}${{ env.SUFFIX }}.apk"
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          BT="${{ inputs.build_type }}"
+          SUFFIX=""; [ "$BT" = "debug" ] && SUFFIX="-debug"
+          TC="$(tr '[:lower:]' '[:upper:]' <<< ${BT:0:1})${BT:1}"   # release -> Release, debug -> Debug
+          for F in $FLAVORS; do
+            FC="$(tr '[:lower:]' '[:upper:]' <<< ${F:0:1})${F:1}"   # firestick -> Firestick, player -> Player
+            gradle -p "$ROOT/firestick" "assemble${FC}${TC}" --no-daemon
+            SRC="$ROOT/firestick/app/build/outputs/apk/$F/$BT/app-$F-$BT.apk"
+            if [ "$F" = "player" ]; then
+              OUT="RedCarpetPlayer-v${VER}-build${{ github.run_number }}${SUFFIX}.apk"
+            else
+              OUT="RedCarpetStreams-${VER}-build${{ github.run_number }}${SUFFIX}.apk"
+            fi
+            cp "$SRC" "$GITHUB_WORKSPACE/out/$OUT"
+            echo "Built $OUT"
+          done
 
       - uses: actions/upload-artifact@v4
         with:
-          name: RedCarpetStreams-${{ env.VER }}-build${{ github.run_number }}${{ env.SUFFIX }}
-          path: RedCarpetStreams-${{ env.VER }}-build${{ github.run_number }}${{ env.SUFFIX }}.apk
+          name: redcarpet-apks-build${{ github.run_number }}
+          path: out/*.apk
 
-      - name: Publish as a release (easy to download on your phone)
+      - name: Publish as a release (easy to download on your phone, or to generate a Downloader code from)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: firestick-${{ github.run_number }}
-          name: Red Carpet Streams ${{ env.VER }} (build ${{ github.run_number }}${{ env.SUFFIX }})
-          files: RedCarpetStreams-${{ env.VER }}-build${{ github.run_number }}${{ env.SUFFIX }}.apk
+          name: Red Carpet ${{ env.VER }} (build ${{ github.run_number }})
+          files: out/*.apk

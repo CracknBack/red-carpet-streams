@@ -19,11 +19,26 @@ android {
     }
 
     defaultConfig {
-        applicationId 'com.tyre.redcarpetstreams'
         minSdk 25
         targetSdk 34
         versionCode runNumber
         versionName "${appVer}"
+    }
+
+    /* Two applicationIds from the one source tree, so the commercial Android TV/Google TV release
+       (com.redcarpetplayer.app, matching www.redcarpetplayer.store) doesn't expose the legacy
+       "tyre"/"redcarpetstreams" naming, WITHOUT touching the id any Fire TV box already has installed.
+       firestick keeps the original id and keystore continuity exactly as before -- only player is new. */
+    flavorDimensions = ['distribution']
+    productFlavors {
+        firestick {
+            dimension 'distribution'
+            applicationId 'com.tyre.redcarpetstreams'
+        }
+        player {
+            dimension 'distribution'
+            applicationId 'com.redcarpetplayer.app'
+        }
     }
 
     /* The same signing key every build, so updates install over the top without losing your sign-in or
@@ -47,10 +62,10 @@ android {
             minifyEnabled false
             signingConfig signingConfigs.release
         }
-        /* A separate package ID (com.tyre.redcarpetstreams.debug) so a debug build -- different
-           signing key, since AGP auto-generates a debug keystore -- installs side by side with the
-           release app instead of conflicting with it. Without this, `adb install` on a debug APK
-           would fail outright, or force uninstalling the release app first and losing its sign-in
+        /* A separate package ID (each flavor's own applicationId plus ".debug") so a debug build --
+           different signing key, since AGP auto-generates a debug keystore -- installs side by side
+           with the release app instead of conflicting with it. Without this, `adb install` on a debug
+           APK would fail outright, or force uninstalling the release app first and losing its sign-in
            and favourites (see the signing-key comment above). PLAYBACK_AUDIT.md Phase B harness
            only runs in this build type. */
         debug {
