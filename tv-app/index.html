@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Red Carpet Streams</title>
+<title>Red Carpet Player</title>
 <link rel="icon" href="icon.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600&family=Barlow+Condensed:wght@500;700&display=swap">
 <style>
@@ -81,6 +81,7 @@ input{width:100%;background:var(--panel);border:.2rem solid var(--line);border-r
 #main.slim .ri::before{content:'';position:absolute;left:0;top:.5rem;bottom:.5rem;width:.35rem;border-radius:0 .2rem .2rem 0}
 #main.slim .ri.active::before,#main.slim .ri.focus::before{background:var(--amber)}
 #main.slim #rail-logo{width:4.8rem;margin:-1rem auto 2rem}
+#main.slim #rail-logo .rc-word{display:none}
 #main.slim #clock{font-size:1.45rem;padding-left:0;width:100%;text-align:center;white-space:nowrap}
 #main.slim #rail{padding-left:0}
 #clock{margin-top:auto;padding-left:2rem;font-size:2.6rem;color:var(--amber)}
@@ -192,7 +193,8 @@ h2{font-size:3rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overfl
 @media (orientation:portrait){#home{background:linear-gradient(180deg,rgba(8,13,20,.15),rgba(8,13,20,.55) 55%,rgba(8,13,20,.8)),url(home-bg-portrait.jpg) center/cover no-repeat,var(--bg)}}
 .hwrap{position:absolute;top:0;left:0;right:0;bottom:5rem;padding:2.4rem 6rem 0;display:flex;flex-direction:column}
 .hhead{position:relative;display:flex;justify-content:center;align-items:flex-start}
-.hlogo{height:16.5rem;margin-top:2.2rem;width:auto;filter:drop-shadow(0 1rem 2.4rem rgba(0,0,0,.5))}
+.hlogo{width:11rem;margin-top:2.2rem;filter:drop-shadow(0 1rem 2.4rem rgba(0,0,0,.5))}
+.hlogo .rc-word{font-size:2.6rem;margin-top:.5rem}
 .hclock{position:absolute;right:0;top:.6rem;text-align:right}
 .htime{font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-size:7rem;font-weight:700;color:#fff;line-height:1}
 .hdate{font-size:2.2rem;color:var(--text);margin-top:.6rem}
@@ -260,7 +262,6 @@ h2{font-size:3rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overfl
    opens whichever one game is currently featured. Needs the usual native-button reset since nothing
    about how it looks should change just because the tag did. */
 .hhub-brand{appearance:none;background:none;border:none;padding:0;margin:0;font:inherit;text-align:left;cursor:pointer;display:flex;align-items:center;gap:1.1rem;min-width:0;border-radius:.6rem}
-.hhub-brand.focus{box-shadow:0 0 0 .2rem var(--amber);outline:none}
 .hhub-sh{width:5.4rem;height:5.4rem;flex:none;filter:drop-shadow(0 .2rem .5rem rgba(0,0,0,.65))}
 .hhub-title{font-size:3.4rem;letter-spacing:.1em;color:#E9CBA0;text-transform:uppercase;font-weight:700;text-shadow:0 .2rem .8rem rgba(0,0,0,.9);white-space:nowrap}
 /* the sport-icon row stays in the DOM (so its own focus/scroll state survives) but collapses to zero
@@ -280,7 +281,7 @@ h2{font-size:3rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overfl
 .hhub-sports .spslot{flex:none;display:flex;flex-direction:column;align-items:center;gap:.5rem;cursor:pointer;color:#E9CBA0;text-align:center;transition:transform .2s ease,opacity .2s ease}
 .hhub-sports .spslot.c0{transform:scale(1.25)}
 .hhub-sports .spslot.c0.focus{color:#fff}
-.hhub-sports .spslot.c0.focus .hb-logo img{filter:drop-shadow(0 0 .7rem rgba(231,185,111,.75))}
+.hhub-sports .spslot.c0.focus .hb-logo img{filter:drop-shadow(0 0 .4rem rgba(231,185,111,.45))}
 .hhub-sports .spslot.c1{opacity:.6}
 .hhub-sports .spslot.c2{opacity:.32}
 .hhub-sports .spslot.c3{opacity:.12}
@@ -364,7 +365,7 @@ html.phone .csec{grid-template-columns:repeat(2,1fr)}
 html.phone .htiles{grid-template-columns:repeat(3,1fr);gap:1.2rem;margin-top:2rem}
 html.phone .htile .hico{width:9rem;height:9rem}
 html.phone .htiles{grid-template-columns:repeat(3,1fr);gap:1.2rem}
-html.phone .hlogo{height:8rem}
+html.phone .hlogo{width:7rem}
 html.phone .hwrap{bottom:0;padding:2rem 3rem 0}
 /* find a game */
 #page-games{display:flex;flex-direction:column}
@@ -530,6 +531,8 @@ mark{background:none;color:var(--amber);font-weight:600}
 .srow.focus{background:var(--focus-bg);border-left-color:var(--amber)}
 .srow.focus .v{color:var(--amber)}
 .srow.danger{color:#FFB4A8}
+.srow .v.gold{color:#D9AE6B}
+.srow.focus .v.gold{color:#D9AE6B}
 .acct{display:table;margin-bottom:4rem}
 .acct div{display:table-row}
 .acct span{display:table-cell;padding:.8rem 4rem .8rem 0}
@@ -580,9 +583,24 @@ html.light .pbar{background:rgba(120,70,20,.18)}
 .toast{position:fixed;top:3rem;left:50%;transform:translateX(-50%);background:var(--raise);padding:1.4rem 2.8rem;border-radius:.8rem;border:.1rem solid var(--line);z-index:11}
 #numjump{position:fixed;top:4rem;right:5rem;font-size:8rem;font-weight:700;color:var(--amber);background:rgba(10,17,26,.9);padding:1rem 3rem;border-radius:1rem;z-index:12;line-height:1}
 /* logo + splash */
+.logo{text-align:center}
 .logo img{display:block;width:100%;height:auto}
+.rc-word{font-weight:800;line-height:1.1;white-space:nowrap;font-family:'Barlow Condensed','Barlow',sans-serif}
+/* Matches the real hand-illustrated wordmark (logo.png): deep maroon fill with a thin gold
+   outline and a soft drop shadow, not a flat gradient -- confirmed by zooming into the actual
+   artwork 2026-11-03 after a flat-gradient-only first attempt looked wrong next to it. */
+.rc-red{
+  display:block;letter-spacing:.015em;
+  background:linear-gradient(180deg,#B8313A 0%,#7A101C 55%,#5C0D16 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  -webkit-text-stroke:.05em #D9AE6B;
+  text-shadow:0 .07em .09em rgba(0,0,0,.5);
+}
+.rc-gold{display:block;background:linear-gradient(180deg,#F3E5AB 0%,#D9AE6B 55%,#A97C3E 100%);-webkit-background-clip:text;background-clip:text;color:transparent;font-size:.46em;font-weight:700;letter-spacing:.22em;margin-top:.15em}
 #login-logo{grid-column:1;grid-row:1 / span 10;width:34rem;filter:drop-shadow(0 1.2rem 3rem rgba(160,28,42,.3))}
+#login-logo .rc-word{font-size:3.6rem;margin-top:.4rem}
 #rail-logo{width:9rem;margin:-1rem auto 2rem}
+#rail-logo .rc-word{font-size:1.15rem;margin-top:.2rem}
 /* live preview */
 #preview{display:none;width:38rem;flex:none;flex-direction:column;padding-top:.6rem}
 #page-browse.collapsed #cats{display:none}
@@ -903,6 +921,8 @@ html.light .chip.on{color:#3A1D18}
 html.light .chip .cx:hover{color:#8A5A1C}
 html.light .gmsearch{background:rgba(252,248,238,0.85)}
 html.light .srow.danger{color:#8A5A1C}
+html.light .srow .v.gold{color:#8A5A1C}
+html.light .srow.focus .v.gold{color:#8A5A1C}
 html.light .hints::before{background:linear-gradient(90deg,rgba(231,185,111,.7),rgba(160,28,42,.6) 30%,rgba(252,248,238,0.80) 70%)}
 html.light #video{background:#FCF8EE}
 html.light .pmsg{background:rgba(252,248,238,0.88)}
@@ -987,7 +1007,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 <body>
 <div id="login" class="screen hidden">
   <div class="login-box">
-    <h1 class="logo" id="login-logo"><img src="logo.png" alt="Red Carpet Streams"></h1>
+    <h1 class="logo" id="login-logo"><img src="logo-mark.png" alt=""><div class="rc-word"><span class="rc-red">RED CARPET</span><span class="rc-gold">PLAYER</span></div></h1>
     <div class="lmode" id="lmode"><button class="lm" data-m="xtream">Xtream Codes</button><button class="lm" data-m="m3u">M3U playlist</button></div>
     <p class="lede" id="lede"></p>
     <label class="field" id="f-server"><span>Server address</span><input id="in-server" type="text" placeholder="http://example.com:8080" autocomplete="off" spellcheck="false"></label>
@@ -1003,7 +1023,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 </div>
 
 <div id="main" class="screen hidden">
-  <nav id="rail"><div class="logo" id="rail-logo"><img src="logo.png" alt="Red Carpet Streams"></div><div id="rail-items"></div><div id="clock"></div></nav>
+  <nav id="rail"><div class="logo" id="rail-logo"><img src="logo-mark.png" alt=""><div class="rc-word"><span class="rc-red">RED CARPET</span><span class="rc-gold">PLAYER</span></div></div><div id="rail-items"></div><div id="clock"></div></nav>
 
   <section id="page-browse" class="page hidden">
     <div id="cats" class="list"></div>
@@ -1058,9 +1078,9 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 <div id="home" class="screen hidden">
   <div class="hspot" aria-hidden="true"><i class="hs-glow l"></i><i class="hs-glow r"></i><i class="hs-beam l"></i><i class="hs-beam r"></i><i class="hs-pool"></i></div>
   <div class="hwrap">
-    <div class="hhead"><img src="logo.png" class="hlogo" alt=""><div class="hclock"><div id="h-time" class="htime"></div><div id="h-date" class="hdate"></div><div id="h-sub" class="hsub"></div></div><button id="h-theme" class="htheme" type="button" aria-label="Switch between light and dark"><span class="th-sun"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.3 5.3l1.9 1.9M16.8 16.8l1.9 1.9M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9"/></svg></span><span class="th-moon"><svg viewBox="0 0 24 24"><path d="M20.2 14.6A8.6 8.6 0 0 1 9.4 3.8a8.6 8.6 0 1 0 10.8 10.8z"/></svg></span></button></div>
+    <div class="hhead"><div class="logo hlogo"><img src="logo-mark.png" alt=""><div class="rc-word"><span class="rc-red">RED CARPET</span><span class="rc-gold">PLAYER</span></div></div><div class="hclock"><div id="h-time" class="htime"></div><div id="h-date" class="hdate"></div><div id="h-sub" class="hsub"></div></div><button id="h-theme" class="htheme" type="button" aria-label="Switch between light and dark"><span class="th-sun"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.3 5.3l1.9 1.9M16.8 16.8l1.9 1.9M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9"/></svg></span><span class="th-moon"><svg viewBox="0 0 24 24"><path d="M20.2 14.6A8.6 8.6 0 0 1 9.4 3.8a8.6 8.6 0 1 0 10.8 10.8z"/></svg></span></button></div>
     <div id="h-tiles" class="hcar"></div>
-    <div id="h-strip-wrap" class="hstrip"><div id="hhub" class="hhub"><div class="hhub-head"><button id="h-brand" class="hhub-brand" type="button"><img class="hhub-sh" src="sh-badge.png" alt=""><div id="h-strip-title" class="hhub-title"></div></button></div><div id="h-strip" class="hhub-game"></div><div class="hsport-toggle-row"><button id="h-sport-toggle" class="hsport-toggle" type="button"><span class="hst-car">▾</span>Sport Selector</button></div><div id="h-find" class="hhub-sports"></div></div></div>
+    <div id="h-strip-wrap" class="hstrip"><div id="hhub" class="hhub"><div class="hhub-head"><button id="h-brand" class="hhub-brand" type="button"><img class="hhub-sh" src="sh-badge.png" alt=""><div id="h-strip-title" class="hhub-title"></div></button></div><div id="h-strip" class="hhub-game"></div><div class="hsport-toggle-row"><button id="h-sport-toggle" class="hsport-toggle" type="button"><span class="hst-car">▾</span>Your Event</button></div><div id="h-find" class="hhub-sports"></div></div></div>
   </div>
   <div id="h-ver" class="hver"></div>
   <footer id="hhints" class="hints"></footer>
@@ -1118,7 +1138,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 'use strict';
 
 /* ================= basics ================= */
-const APP_VERSION = '3.23.33';
+const APP_VERSION = '3.23.37';
 const FIRE = !!window.RCS;   /* true inside the Firestick app */
 /* MainActivity's dispatchKeyEvent intercepts every digit keypress globally, for the remote's
    number-jump feature -- with no way for native code to know a text <input> currently has focus,
@@ -2517,6 +2537,46 @@ function fixtureList(ev) {
 }
 
 
+/* ================= Red Carpet Pro license =================
+   One-time $9.99 purchase via a Merchant of Record (Lemon Squeezy). A real purchase hands the buyer a
+   Lemon Squeezy license key, verified here against their /v1/licenses/activate endpoint. PRO_TEST_KEY
+   is a fixed local key for testing the Free/Pro split on-device before that webhook is connected. */
+const PRO_TEST_KEY = 'RCP-TEST-0000-DEV';
+function isProUnlocked() { return !!(ui.pro && ui.pro.key); }
+async function proActivateOnline(key) {
+  try {
+    const res = await fetch('https://api.lemonsqueezy.com/v1/licenses/activate', {
+      method: 'POST',
+      headers: {'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'},
+      body: new URLSearchParams({license_key: key, instance_name: 'Red Carpet Player'})
+    });
+    const j = await res.json().catch(() => null);
+    if (j && j.activated) return {ok: true, instanceId: j.instance && j.instance.id};
+    return {ok: false, error: (j && j.error) || 'That key wasn’t accepted.'};
+  } catch (e) { return {ok: false, error: 'Couldn’t reach the licensing server. Check your connection and try again.'}; }
+}
+function proActivateMenu() {
+  askText('Red Carpet Pro', 'Enter the license key from your Red Carpet Pro purchase receipt to unlock custom search shortcuts, channel pinning, manual guide channel matching and supplemental schedule feeds. Leave it empty to deactivate an existing key.', (ui.pro && ui.pro.key) || '', async v => {
+    const k = v.trim();
+    if (!k) { ui.pro = null; save('sp_ui', ui); renderMain(); toast('Red Carpet Pro deactivated.'); return; }
+    if (k.toUpperCase() === PRO_TEST_KEY) {
+      ui.pro = {key: k.toUpperCase(), mode: 'test', activatedAt: Date.now()}; save('sp_ui', ui); renderMain();
+      toast('Red Carpet Pro activated (test key).'); return;
+    }
+    toast('Checking your key…');
+    const r = await proActivateOnline(k);
+    if (r.ok) { ui.pro = {key: k, mode: 'online', instanceId: r.instanceId, activatedAt: Date.now()}; save('sp_ui', ui); renderMain(); toast('Red Carpet Pro activated.'); }
+    else toast(r.error);
+  });
+}
+function proUpsell(feature) {
+  openMenu([
+    {l: feature + ' is a Red Carpet Pro feature ($9.99 one-time).', a: () => {}},
+    {l: 'Enter a Red Carpet Pro license key…', a: proActivateMenu},
+    {l: 'Not now', a: () => {}}
+  ]);
+}
+
 /* ================= pinned channels (yours) ================= */
 /* PIN_COMPS is defined below, once COMPS exists (a const can't be used before its own declaration runs). */
 function pinList(c) { ui.pins = ui.pins || {}; return ui.pins[c] || (ui.pins[c] = []); }
@@ -2524,6 +2584,7 @@ const pinIdx = (c, g) => pinList(c).findIndex(p => String(p.id) === String(g.id)
 const isPinned = (c, g) => pinIdx(c, g) >= 0;
 function togglePin(c, g) {
   const l = pinList(c), i = pinIdx(c, g);
+  if (i < 0 && !isProUnlocked()) { proUpsell('Pinning channels'); return; }
   if (i >= 0) l.splice(i, 1); else l.push({id: g.id, n: chKey(g.name)});
   save('sp_ui', ui); Q.skey = ''; resView.reset();
   toast((i >= 0 ? 'Unpinned ' : 'Pinned ') + disp(g) + (i >= 0 ? ' from ' : ' to ') + c + '.');
@@ -3155,6 +3216,7 @@ function parseShortcut(x) {
   return 'team:' + (TEAM_OF.get(n) || x.trim());
 }
 function askShortcuts() {
+  if (!isProUnlocked()) { proUpsell('Custom search shortcuts'); return; }
   askText('Search shortcuts', 'Your shortcuts, separated by commas. Leagues and teams both work, for example: Premier League, La Liga, F1, Arsenal. To delete one, remove it from the list. Leave it empty to restore the defaults.',
     chipsList().map(chipLabel).join(', '), v => {
       const out = [];
@@ -4543,7 +4605,6 @@ setInterval(() => {
 function renderHome() {
   const d = new Date(nowMs());
   $('home').classList.toggle('stripfocus', HOME.zone === 'hbtoggle' || HOME.zone === 'sports' || HOME.zone === 'brand');
-  $('h-brand').classList.toggle('focus', HOME.zone === 'brand');
   $('hhub').classList.toggle('focus', HOME.zone === 'brand');
   $('h-theme').classList.toggle('focus', HOME.zone === 'theme');
   $('h-theme').querySelector('.th-sun').classList.toggle('on', !!ui.light);
@@ -4582,7 +4643,7 @@ function renderHome() {
      either way; say what's actually true and point at the way out (Sport Selector still shows
      everything for a sport, unfiltered, regardless of what's pinned). */
   let b = hb.n ? '' : (stillBuilding ? '<div class="hb-game idle"' + bg + '><div class="hb-building"><span class="hbd"></span>Building your sports guide…</div></div>' :
-    '<div class="hb-game idle"' + bg + '><div class="hb-building">Nothing from your priority list right now — browse everything via Sport Selector below.</div></div>');
+    '<div class="hb-game idle"' + bg + '><div class="hb-building">Nothing from your priority list right now — browse everything via Your Event below.</div></div>');
   hb.cards.forEach((c, i) => {
     if (c.type === 'game') {
       const ev = c.ev, nowT = nowMs();
@@ -7182,7 +7243,7 @@ function runSearch() {
    football-data.org competition this app uses -- no user, including the owner, needs to find or paste
    a football-data.org key on-device any more. ui.fdKey/loadFixtures/FD_COMPS are untouched and still
    work if a key is ever set programmatically, just no longer surfaced in Settings. */
-const SETS = HAS_MPV ? ['refresh', 'catlist', 'pins', 'chalias', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'rcsguide', 'guidev2', 'pcplayer', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'] : ['refresh', 'catlist', 'pins', 'chalias', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'rcsguide', 'guidev2', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'];
+const SETS = HAS_MPV ? ['pro', 'refresh', 'catlist', 'pins', 'chalias', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'rcsguide', 'guidev2', 'pcplayer', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'] : ['pro', 'refresh', 'catlist', 'pins', 'chalias', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'rcsguide', 'guidev2', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'];
 /* ---------- Settings: fix a channel's guide match (see ALIAS, above tsdbGroups) ---------- */
 function searchLiveByName(q) {
   const toks = norm(q).split(' ').filter(Boolean);
@@ -7206,6 +7267,7 @@ function askChannelName(label) {
    refused to guess between -- offered first since there's already a short list to pick from, before
    falling back to typing a name from scratch. Never auto-applied; only ever a human's call. */
 function openChannelAlias() {
+  if (!isProUnlocked()) { proUpsell('Fixing a channel’s guide match'); return; }
   const pend = Object.entries(ALIAS.pend).sort((a, b) => (b[1].ts || 0) - (a[1].ts || 0));
   const items = pend.slice(0, 20).map(([k, p]) => ({l: '“' + p.label + '” — not sure which channel', a: () => {
     const sub = p.cands.map(c => ({l: c.name, a: () => { confirmAlias(k, DATA.live.byId.get(String(c.id)) || {id: c.id, name: c.name, cc: ''}); toast('Linked “' + p.label + '” to ' + c.name + '. Updating the TV guide…'); }}));
@@ -7240,6 +7302,7 @@ function renderSettings() {
     ['App version', APP_VERSION]
   ].concat(CLOCK.skew ? [['Device clock', 'Off by ' + Math.round(Math.abs(CLOCK.skew) / 60000) + ' minutes; the app corrects for it']] : []);
   const V_ = {
+    pro: ['Red Carpet Pro', isProUnlocked() ? 'Activated' + (ui.pro.mode === 'test' ? ' (test key)' : '') : 'Free Edition — tap to enter a license key'],
     refresh: ['Update lists now', 'Last updated ' + upd + (GUIDE && GUIDE.ts ? ' · guide ' + clockStr(new Date(GUIDE.ts)) : '')], guidecheck: ['Check the TV guide', 'See what the guide contains'],
     catlist: ['Copy category list', 'Movies/Series category names, for reorganising them'],
     fdkey: ['Fixtures key (football-data.org)', !ui.fdKey ? 'Not set' : FD.err ? 'Problem: ' + FD.err.replace('Fixtures couldn’t be updated: ', '') : FD.ts ? FD.list.length + ' games · updated ' + clockStr(new Date(FD.ts)) : 'Saved'],
@@ -7265,13 +7328,13 @@ function renderSettings() {
     pcplayer: ['Movies and series play in', ui.pcPlayer === 'mpv' ? 'Always mpv' : 'mpv when needed'], lang: ['Preferred language', LANGS[ui.lang]],
     layout: ['Live TV layout', ui.liveLayout === 'provider' ? 'Provider’s categories' : 'Country, then genre'], logos: ['Channel logos', ui.logos === 'provider' ? 'Provider’s only' : 'Best match'],
     names: ['Names', ui.orig ? 'Provider’s originals' : 'Tidied up'], signout: ['Sign out', '']};
-  const SEC = {refresh: 'Lists', pins: 'Event Guide', guidecheck: 'TV guide', pcplayer: 'Playback', lang: HAS_MPV ? '' : 'Playback', layout: 'Display', adult: 'Adult content', accounts: 'Account'};
+  const SEC = {pro: 'Red Carpet Pro', refresh: 'Lists', pins: 'Event Guide', guidecheck: 'TV guide', pcplayer: 'Playback', lang: HAS_MPV ? '' : 'Playback', layout: 'Display', adult: 'Adult content', accounts: 'Account'};
   let h = '<div class="sgrid"><div class="sacct"><div class="slabel">Account</div>' + rows.map(r => '<div class="kv"><span>' + esc(r[0]) + '</span><span>' + esc(r[1]) + '</span></div>').join('') +
     '<p class="note">Lists are stored on this device so everything opens instantly. They update by themselves every 12 hours.</p>' +
     '<p class="note">This app is a local media player and TV guide reader. It plays whatever playlist and guide addresses you provide; it does not host, provide or verify any media streams itself.</p></div><div class="slist" id="slist">';
   SETS.forEach((a, i) => {
     if (SEC[a]) h += '<div class="slabel">' + esc(SEC[a]) + '</div>';
-    h += '<div class="srow' + (a === 'signout' ? ' danger' : '') + (S.zone === 'set' && S.setIdx === i ? ' focus' : '') + '" data-i="' + i + '"><span>' + esc(V_[a][0]) + '</span><span class="v">' + esc(V_[a][1]) + '</span></div>';
+    h += '<div class="srow' + (a === 'signout' ? ' danger' : '') + (S.zone === 'set' && S.setIdx === i ? ' focus' : '') + '" data-i="' + i + '"><span>' + esc(V_[a][0]) + '</span><span class="v' + (a === 'pro' && isProUnlocked() ? ' gold' : '') + '">' + esc(V_[a][1]) + '</span></div>';
   });
   $('page-settings').innerHTML = h + '</div></div>';
   const f = document.querySelector('#slist .srow.focus');
@@ -7323,10 +7386,11 @@ function settingsAction(i) {
       {l: 'Move times back 30 minutes', a: () => setFix(-1800e3)},
       {l: 'Move times forward 30 minutes', a: () => setFix(1800e3)}]);
   }
-  else if (a === 'rcsguide') openMenu([
+  else if (a === 'rcsguide') { if (!isProUnlocked()) { proUpsell('Supplemental schedule feeds'); return; } openMenu([
     {l: ui.rcsOff ? 'Turn the Red Carpet guide on' : 'Turn the Red Carpet guide off', a: () => { ui.rcsOff = !ui.rcsOff; save('sp_ui', ui); loadGuide(true); renderMain(); }},
-    {l: 'Set the guide address…', a: () => askText('Red Carpet sports guide', 'Paste the address of a guide that ends in sports.xml.gz. Nothing is fetched until an address is set here. Leave it empty to turn this off.', ui.rcsGuide || '', v => { ui.rcsGuide = v.trim(); ui.rcsOff = false; save('sp_ui', ui); loadGuide(true); renderMain(); })}]);
-  else if (a === 'guidev2') askText('Resolved sports schedule (guide-v2)', 'Optional. Paste the address of a guide-v2.json file (your own rcs-guide build) to turn on multi-country broadcaster matching for leagues it covers. Nothing is fetched until an address is set here. Leave it empty to turn this off.', ui.guideV2Url || '', v => { ui.guideV2Url = v.trim(); save('sp_ui', ui); GUIDE_V2 = null; EVENTS = null; renderMain(); if (ui.guideV2Url) loadGuideV2(true).then(() => renderMain()); });
+    {l: 'Set the guide address…', a: () => askText('Red Carpet sports guide', 'Paste the address of a guide that ends in sports.xml.gz. Nothing is fetched until an address is set here. Leave it empty to turn this off.', ui.rcsGuide || '', v => { ui.rcsGuide = v.trim(); ui.rcsOff = false; save('sp_ui', ui); loadGuide(true); renderMain(); })}]); }
+  else if (a === 'guidev2') { if (!isProUnlocked()) { proUpsell('Supplemental schedule feeds'); return; } askText('Resolved sports schedule (guide-v2)', 'Optional. Paste the address of a guide-v2.json file (your own rcs-guide build) to turn on multi-country broadcaster matching for leagues it covers. Nothing is fetched until an address is set here. Leave it empty to turn this off.', ui.guideV2Url || '', v => { ui.guideV2Url = v.trim(); save('sp_ui', ui); GUIDE_V2 = null; EVENTS = null; renderMain(); if (ui.guideV2Url) loadGuideV2(true).then(() => renderMain()); }); }
+  else if (a === 'pro') proActivateMenu();
   else if (a === 'maybe') { ui.showMaybe = !ui.showMaybe; save('sp_ui', ui); renderMain(); }
   else if (a === 'gpv') { ui.gpvOff = !ui.gpvOff; save('sp_ui', ui); renderMain(); }
   else if (a === 'livefmt') { ui.liveFmt = LIVEFMT_ORDER[(LIVEFMT_ORDER.indexOf(ui.liveFmt || 'auto') + 1) % LIVEFMT_ORDER.length]; save('sp_ui', ui); renderMain(); }

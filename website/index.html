@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Red Carpet Player — 4K Live TV &amp; Event Guide Player</title>
+<meta name="description" content="Red Carpet Player unifies your own M3U/M3U8 playlists, network tuner APIs and XMLTV schedules on Android TV, Fire TV, and Google TV — with instant local channel caching and real-time Event Guide matching.">
+<link rel="canonical" href="https://www.redcarpetplayer.store/">
+<meta property="og:title" content="Red Carpet Player — 4K Live TV &amp; Event Guide Player">
+<meta property="og:description" content="Red Carpet Player unifies your own M3U/M3U8 playlists, network tuner APIs and XMLTV schedules on Android TV, Fire TV, and Google TV — with instant local channel caching and real-time Event Guide matching.">
+<meta property="og:url" content="https://www.redcarpetplayer.store/">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://www.redcarpetplayer.store/img/hero-art.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Red Carpet Player — 4K Live TV &amp; Event Guide Player">
+<meta name="twitter:description" content="Red Carpet Player unifies your own M3U/M3U8 playlists, network tuner APIs and XMLTV schedules on Android TV, Fire TV, and Google TV — with instant local channel caching and real-time Event Guide matching.">
+<meta name="twitter:image" content="https://www.redcarpetplayer.store/img/hero-art.jpg">
+<link rel="icon" type="image/png" href="icons/logo-mark-square.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Barlow+Condensed:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-1:#080B12; --bg-2:#0D1322;
+    --crimson:#9E2A2B; --crimson-hover:#B83334; --crimson-deep:#8B1E24;
+    --gold:#D4AF37; --gold-light:#F3E5AB;
+    --ink:#E2E8F0; --muted:#94A3B8;
+    --card:#111726; --card-border:rgba(212,175,55,.18);
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; min-height:100vh; color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    background:
+      radial-gradient(60rem 42rem at 85% -8%, rgba(139,30,36,.28), transparent 60%),
+      radial-gradient(50rem 38rem at -5% 15%, rgba(212,175,55,.14), transparent 55%),
+      radial-gradient(90rem 70rem at 50% 115%, rgba(139,30,36,.14), transparent 60%),
+      radial-gradient(120% 120% at 50% -10%, var(--bg-2), var(--bg-1) 60%);
+    background-attachment:fixed;
+  }
+  h1,h2,h3,.lockup-name{font-family:'Plus Jakarta Sans',system-ui,sans-serif}
+  a{color:inherit}
+  .wrap{max-width:1280px;margin:0 auto;padding:0 2rem}
+  .gold-text{background:linear-gradient(135deg,var(--gold-light),var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .muted{color:var(--muted)}
+  .eyebrow{font-size:.78rem;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);font-weight:700}
+
+  /* ---------- Nav ---------- */
+  header.site-nav{
+    position:sticky;top:0;z-index:50;
+    background:rgba(8,11,18,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border-bottom:1px solid rgba(212,175,55,.14);
+  }
+  .nav-row{display:flex;align-items:center;justify-content:space-between;height:4.5rem}
+  .lockup{display:flex;align-items:center;gap:.7rem;text-decoration:none}
+  .lockup-mark{height:2.6rem;width:auto;flex:none}
+  .lockup-name{font-weight:800;letter-spacing:.02em;font-size:1.25rem;white-space:nowrap;font-family:'Barlow Condensed',sans-serif;text-transform:uppercase}
+  .lockup-name i{
+    font-style:normal;
+    background:linear-gradient(180deg,#B8313A 0%,#7A101C 55%,#5C0D16 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    -webkit-text-stroke:.035em #D9AE6B;
+    text-shadow:0 .05em .07em rgba(0,0,0,.5);
+  }
+  .lockup-name b{font-weight:800;background:linear-gradient(180deg,var(--gold-light),var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .nav-links{display:flex;align-items:center;gap:2.1rem;font-size:.92rem;font-weight:600}
+  .nav-links a,.nav-links button{text-decoration:none;color:var(--muted);transition:color .15s ease;background:none;border:none;font:inherit;cursor:pointer;padding:0}
+  .nav-links a:hover,.nav-links button:hover{color:var(--gold-light)}
+  .nav-cta{
+    padding:.6rem 1.2rem;border-radius:999px;font-weight:700;font-size:.85rem;
+    background:var(--crimson);border:1px solid var(--gold);color:#fff;text-decoration:none;
+    box-shadow:0 .3rem 1rem rgba(158,42,43,.35);
+  }
+  .nav-cta:hover{background:var(--crimson-hover)}
+  .nav-burger{display:none;background:none;border:1px solid rgba(212,175,55,.3);border-radius:.5rem;color:var(--gold-light);width:2.4rem;height:2.4rem;cursor:pointer}
+
+  /* ---------- Hero (cinematic widescreen banner, real artwork) ---------- */
+  .hero{
+    position:relative;overflow:hidden;min-height:30rem;display:flex;align-items:center;
+    background:
+      linear-gradient(90deg, rgba(8,11,18,1) 0%, rgba(8,11,18,.97) 40%, rgba(8,11,18,.75) 62%, rgba(8,11,18,.3) 82%),
+      url('img/hero-art.jpg') center right / cover no-repeat;
+    border-bottom:1px solid rgba(212,175,55,.16);
+  }
+  .hero-inner{position:relative;z-index:1;max-width:34rem;padding:3rem 0}
+  .hero h1{font-size:2.5rem;line-height:1.08;letter-spacing:.01em;margin:.9rem 0 1.05rem;text-transform:uppercase;font-weight:800;text-shadow:0 .2rem 1rem rgba(0,0,0,.6)}
+  .hero p.sub{font-size:1.02rem;line-height:1.55;color:var(--muted);max-width:30rem;margin:0 0 1.8rem;text-shadow:0 .15rem .6rem rgba(0,0,0,.7)}
+  .cta-row{display:flex;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:1.3rem}
+  .btn-primary{
+    display:inline-flex;align-items:center;gap:.6rem;
+    background:var(--crimson);border:1px solid var(--gold);color:#fff;
+    font-weight:800;letter-spacing:.03em;font-size:.95rem;text-transform:uppercase;
+    padding:1rem 1.6rem;border-radius:.7rem;text-decoration:none;cursor:pointer;
+    box-shadow:0 .6rem 1.8rem rgba(158,42,43,.4);transition:background .15s ease,transform .15s ease;
+  }
+  .btn-primary:hover{background:var(--crimson-hover);transform:translateY(-1px)}
+  .btn-primary svg{width:1.15rem;height:1.15rem}
+  .code-pill{
+    display:inline-flex;align-items:center;gap:.7rem;
+    background:rgba(212,175,55,.08);border:1px solid var(--card-border);border-radius:999px;
+    padding:.55rem .6rem .55rem 1.1rem;font-size:.85rem;
+  }
+  .code-pill .lbl{color:var(--muted);font-weight:600}
+  .code-pill .code{font-family:'Inter',monospace;letter-spacing:.14em;color:var(--gold-light);font-weight:700}
+  .code-pill button{
+    display:flex;align-items:center;justify-content:center;
+    width:2.1rem;height:2.1rem;border-radius:999px;border:1px solid var(--card-border);
+    background:rgba(255,255,255,.03);color:var(--gold-light);cursor:pointer;
+  }
+  .code-pill button svg{width:1rem;height:1rem}
+  .code-pill button.copied{color:#8de3a4;border-color:#8de3a4}
+  .release-meta{font-size:.76rem;color:var(--muted);opacity:.75;margin:0 0 1.1rem}
+  .platform-pills{display:flex;flex-wrap:wrap;gap:.9rem 1.6rem;font-size:.84rem;color:var(--muted)}
+  .platform-pills .grp{display:flex;align-items:center;gap:.55rem}
+  .platform-pills .grp b{color:var(--ink);font-weight:700}
+  .chip{padding:.28rem .7rem;border-radius:999px;border:1px solid var(--card-border);background:rgba(255,255,255,.02);font-weight:600;color:var(--ink)}
+
+  /* ---------- Category strip: single row, no card chrome ---------- */
+  .section{padding:3.2rem 0}
+  .section-tight{padding:2.6rem 0 3rem}
+  .section-head{text-align:center;max-width:36rem;margin:0 auto 2.2rem}
+  .section-head h2{font-size:1.6rem;text-transform:uppercase;letter-spacing:.02em;margin:.4rem 0 .5rem}
+  .section-head p{color:var(--muted);line-height:1.6;font-size:.92rem}
+  .cat-row{display:grid;grid-template-columns:repeat(8,1fr);gap:1rem}
+  .cat-item{
+    display:flex;flex-direction:column;align-items:center;gap:.7rem;text-align:center;
+    transition:transform .15s ease,opacity .15s ease;
+  }
+  .cat-item:hover{transform:translateY(-3px)}
+  .cat-item img{width:2.9rem;height:2.9rem}
+  .cat-item span{font-size:.74rem;font-weight:700;color:var(--ink);line-height:1.25}
+
+  /* ---------- Feature strip: icon-left, text-right, 3 columns ---------- */
+  .feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2rem}
+  .feat-item{display:flex;align-items:flex-start;gap:1rem}
+  .feat-icon{
+    flex:none;width:3rem;height:3rem;border-radius:.7rem;
+    display:flex;align-items:center;justify-content:center;
+    background:rgba(212,175,55,.08);border:1px solid rgba(212,175,55,.3);
+  }
+  .feat-icon svg{width:1.5rem;height:1.5rem;color:var(--gold)}
+  .feat-item h3{font-size:1.02rem;margin:.1rem 0 .4rem;color:var(--gold-light);font-weight:800;letter-spacing:.01em}
+  .feat-item p{color:var(--muted);font-size:.84rem;line-height:1.5;margin:0}
+
+  /* ---------- Pricing ---------- */
+  .pricing-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.6rem;max-width:52rem;margin:0 auto}
+  .price-card{
+    border-radius:var(--radius);border:1px solid var(--card-border);background:var(--card);
+    padding:2.2rem 1.9rem;display:flex;flex-direction:column;gap:1.1rem;
+  }
+  .price-card.pro{border-color:rgba(212,175,55,.55);box-shadow:0 0 0 1px rgba(212,175,55,.12),0 1.5rem 3rem rgba(158,42,43,.18)}
+  .price-tier{font-size:.78rem;letter-spacing:.16em;text-transform:uppercase;font-weight:800;color:var(--muted)}
+  .price-card.pro .price-tier{color:var(--gold)}
+  .price-amount{font-size:2.1rem;font-weight:800}
+  .price-amount span{font-size:.95rem;color:var(--muted);font-weight:600}
+  .price-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.65rem;font-size:.88rem;color:var(--ink)}
+  .price-list li{display:flex;align-items:flex-start;gap:.6rem}
+  .price-list svg{width:1rem;height:1rem;flex:none;margin-top:.15rem;color:var(--gold)}
+  .ack-row{display:flex;align-items:flex-start;gap:.6rem;font-size:.78rem;color:var(--muted);line-height:1.5;margin-top:.3rem}
+  .ack-row input{margin-top:.2rem;accent-color:var(--crimson)}
+  .btn-pro{
+    margin-top:.3rem;width:100%;padding:.85rem 1rem;border-radius:.65rem;border:1px solid var(--gold);
+    background:var(--crimson);color:#fff;font-weight:800;letter-spacing:.02em;text-transform:uppercase;font-size:.85rem;cursor:pointer;
+    transition:opacity .15s ease,background .15s ease;
+  }
+  .btn-pro:disabled{opacity:.4;cursor:not-allowed}
+  .btn-pro:not(:disabled):hover{background:var(--crimson-hover)}
+  .btn-free{
+    margin-top:.3rem;width:100%;padding:.85rem 1rem;border-radius:.65rem;border:1px solid var(--card-border);
+    background:transparent;color:var(--ink);font-weight:700;letter-spacing:.02em;text-transform:uppercase;font-size:.85rem;cursor:pointer;
+  }
+
+  /* ---------- Install Guide ---------- */
+  .install-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.6rem;max-width:64rem;margin:0 auto}
+  .install-card{border-radius:var(--radius);border:1px solid var(--card-border);background:var(--card);padding:1.9rem 1.8rem;position:relative}
+  .install-num{
+    display:flex;align-items:center;justify-content:center;width:2.6rem;height:2.6rem;border-radius:999px;
+    background:var(--crimson);border:1px solid var(--gold);color:#fff;font-weight:800;font-size:1.05rem;margin-bottom:1.1rem;
+  }
+  .install-card h3{font-size:1.02rem;margin:0 0 .6rem;text-transform:uppercase;letter-spacing:.01em;color:var(--gold-light)}
+  .install-card p{margin:0;font-size:.88rem;color:var(--muted);line-height:1.55}
+  .install-card code{background:rgba(212,175,55,.12);border:1px solid rgba(212,175,55,.3);color:var(--gold-light);padding:.1rem .4rem;border-radius:.3rem;font-weight:700;letter-spacing:.05em}
+
+  /* ---------- Device Compatibility ---------- */
+  .device-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:1.6rem;max-width:64rem;margin:0 auto}
+  .device-col{border-radius:var(--radius);padding:1.8rem 1.9rem;border:1px solid var(--card-border)}
+  .device-col.yes{background:linear-gradient(160deg,rgba(60,140,90,.1),rgba(255,255,255,.02));border-color:rgba(90,180,120,.35)}
+  .device-col.no{background:linear-gradient(160deg,rgba(158,42,43,.12),rgba(255,255,255,.02));border-color:rgba(158,42,43,.35)}
+  .device-col-head{display:flex;align-items:center;gap:.6rem;margin-bottom:1.3rem}
+  .device-col-head svg{width:1.4rem;height:1.4rem;flex:none}
+  .device-col.yes .device-col-head svg{color:#5fcf8c}
+  .device-col.no .device-col-head svg{color:#E5483F}
+  .device-col-head h3{margin:0;font-size:1.05rem;text-transform:uppercase;letter-spacing:.02em}
+  .device-row{display:flex;gap:.7rem;padding:.7rem 0;border-top:1px solid rgba(255,255,255,.06)}
+  .device-row:first-of-type{border-top:none}
+  .device-row svg{width:1rem;height:1rem;flex:none;margin-top:.2rem}
+  .device-col.yes .device-row svg{color:#5fcf8c}
+  .device-col.no .device-row svg{color:#E5483F}
+  .device-row b{display:block;font-size:.9rem;color:var(--ink);font-weight:700;margin-bottom:.15rem}
+  .device-row span{font-size:.8rem;color:var(--muted);line-height:1.4}
+  .device-callout{
+    grid-column:1 / -1;display:flex;align-items:center;gap:1rem;margin-top:.4rem;
+    padding:1.1rem 1.4rem;border-radius:var(--radius);background:rgba(212,175,55,.08);border:1px solid rgba(212,175,55,.3);
+  }
+  .device-callout svg{width:1.6rem;height:1.6rem;flex:none;color:var(--gold)}
+  .device-callout p{margin:0;font-size:.88rem;color:var(--ink);line-height:1.5}
+  .device-callout b{color:var(--gold-light)}
+
+  /* ---------- Screens: real 1920x1080 app screenshots in widescreen TV frames ---------- */
+  .screen-grid{display:grid;grid-template-columns:1fr 1fr;gap:2.4rem;max-width:72rem;margin:0 auto}
+  .tv-frame{
+    border-radius:1rem;border:1px solid rgba(212,175,55,.3);
+    background:linear-gradient(160deg,#1a1410,#0A0B0E);
+    padding:.9rem .9rem 1.1rem;box-shadow:0 2rem 4rem rgba(0,0,0,.5),0 0 0 1px rgba(0,0,0,.4);
+  }
+  .tv-screen{border-radius:.5rem;overflow:hidden;background:#000;border:1px solid rgba(0,0,0,.6)}
+  .tv-screen img{display:block;width:100%;height:auto}
+  .tv-stand{width:5rem;height:.5rem;background:rgba(212,175,55,.25);border-radius:999px;margin:.9rem auto 0}
+  .screen-cap{text-align:center;font-size:.86rem;color:var(--muted);margin-top:.9rem}
+  .screen-cap b{color:var(--gold-light);font-weight:700}
+
+  /* ---------- Footer: single line ---------- */
+  footer{border-top:1px solid rgba(212,175,55,.14);padding:1.3rem 0}
+  .footer-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.8rem 1.6rem}
+  .footer-disclaimer{font-size:.74rem;line-height:1.4;color:var(--muted);margin:0;max-width:56rem}
+  .footer-links{display:flex;gap:1.3rem;flex-wrap:wrap;font-size:.76rem;flex:none}
+  .footer-links a,.footer-links button{background:none;border:none;color:var(--muted);text-decoration:none;cursor:pointer;font:inherit;padding:0;white-space:nowrap}
+  .footer-links a:hover,.footer-links button:hover{color:var(--gold-light)}
+
+  /* ---------- Modals ---------- */
+  .modal-overlay{
+    position:fixed;inset:0;background:rgba(5,6,10,.72);backdrop-filter:blur(4px);
+    display:none;align-items:center;justify-content:center;z-index:100;padding:1.5rem;
+  }
+  .modal-overlay.open{display:flex}
+  .modal-box{
+    width:100%;max-width:38rem;max-height:80vh;overflow-y:auto;
+    background:var(--bg-2);border:1px solid rgba(212,175,55,.3);border-radius:var(--radius);
+    padding:2rem 2.1rem;box-shadow:0 2rem 5rem rgba(0,0,0,.6);
+  }
+  .modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.1rem}
+  .modal-head h3{margin:0;font-size:1.3rem;text-transform:uppercase}
+  .modal-close{background:none;border:1px solid var(--card-border);color:var(--muted);width:2.1rem;height:2.1rem;border-radius:999px;cursor:pointer}
+  .modal-box p,.modal-box li{color:var(--muted);font-size:.88rem;line-height:1.7}
+  .modal-box a{color:var(--gold-light);text-decoration:underline}
+  .modal-updated{font-size:.74rem;color:var(--gold);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin:-.4rem 0 1rem}
+  .modal-box h4{color:var(--gold-light);font-size:.92rem;margin:1.3rem 0 .5rem;text-transform:uppercase;letter-spacing:.04em}
+  .modal-box ul{padding-left:1.1rem}
+
+  @media (max-width: 900px){
+    .nav-links{display:none}
+    .nav-links.mobile-open{display:flex;flex-direction:column;position:absolute;top:4.5rem;left:0;right:0;background:var(--bg-1);padding:1.2rem 2rem;border-bottom:1px solid var(--card-border)}
+    .nav-burger{display:flex;align-items:center;justify-content:center}
+    .hero{background-position:70% center}
+    .hero-inner{max-width:100%}
+    .hero h1{font-size:2.1rem}
+    .cat-row{grid-template-columns:repeat(4,1fr);row-gap:1.6rem}
+    .screen-grid{grid-template-columns:1fr}
+    .device-grid{grid-template-columns:1fr}
+    .install-grid{grid-template-columns:1fr}
+    .feat-grid{grid-template-columns:1fr}
+    .pricing-grid{grid-template-columns:1fr}
+    .footer-row{flex-direction:column;align-items:flex-start}
+  }
+</style>
+</head>
+<body>
+
+<header class="site-nav">
+  <div class="wrap nav-row">
+    <a class="lockup" href="#top">
+      <img class="lockup-mark" src="icons/logo-mark.png" alt="Red Carpet Player">
+      <span class="lockup-name"><i>RED CARPET</i> <b>PLAYER</b></span>
+    </a>
+    <nav class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#event-guide">Event Guide</a>
+      <a href="#install-guide">Setup &amp; Downloader</a>
+      <button type="button" onclick="openModal('support')">Support</button>
+    </nav>
+    <a class="nav-cta" href="#setup">Get the App</a>
+    <button class="nav-burger" aria-label="Menu" onclick="document.querySelector('.nav-links').classList.toggle('mobile-open')">☰</button>
+  </div>
+</header>
+
+<main id="top">
+  <!-- ========== HERO (cinematic, real artwork + real logo) ========== -->
+  <section class="hero">
+    <div class="wrap hero-inner">
+      <span class="eyebrow">Bring-Your-Own-Playlist Player</span>
+      <h1>The Ultimate <span class="gold-text">4K Live TV</span> &amp; Event Guide Player</h1>
+      <p class="sub">All your personal M3U/M3U8 playlists, network tuner APIs, and XMLTV schedules — unified on Android TV. Instant local channel caching and real-time Event Guide matching, entirely on your own device.</p>
+
+      <div class="cta-row" id="setup">
+        <a class="btn-primary" href="#" id="download-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+          Download Now
+        </a>
+        <div class="code-pill">
+          <span class="lbl">Downloader Code</span>
+          <span class="code" id="dl-code">000000</span>
+          <button type="button" id="copy-code-btn" aria-label="Copy downloader code" onclick="copyDownloaderCode()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <p class="release-meta">Latest Release: v3.23 · Direct Android TV APK · Requires Android 7.0+ (API 24+)</p>
+
+      <div class="platform-pills">
+        <div class="grp"><b>For TV:</b><span class="chip">Google TV</span><span class="chip">Android TV</span><span class="chip">Fire TV</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== CATEGORY STRIP: single row ========== -->
+  <section class="section section-tight" id="event-guide">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Event Guide</span>
+        <h2>Smart EPG <span class="gold-text">Category Filtering</span></h2>
+      </div>
+      <div class="cat-row">
+        <div class="cat-item">
+          <img src="icons/lg-football.png" alt="" loading="lazy">
+          <span>Soccer / Football</span>
+        </div>
+        <div class="cat-item">
+          <img src="icons/lg-basketball.png" alt="" loading="lazy">
+          <span>Basketball</span>
+        </div>
+        <div class="cat-item">
+          <img src="icons/lg-american-football.png" alt="" loading="lazy">
+          <span>American Football</span>
+        </div>
+        <div class="cat-item">
+          <img src="icons/lg-ice-hockey.png" alt="" loading="lazy">
+          <span>Ice Hockey</span>
+        </div>
+        <div class="cat-item">
+          <img src="icons/lg-boxing.png" alt="" loading="lazy">
+          <span>Boxing</span>
+        </div>
+        <div class="cat-item">
+          <img src="icons/lg-mma.png" alt="" loading="lazy">
+          <span>MMA / Combat</span>
+        </div>
+        <div class="cat-item">
+          <img src="icons/lg-cricket.png" alt="" loading="lazy">
+          <span>Cricket</span>
+        </div>
+        <div class="cat-item">
+          <img src="icons/lg-motor-racing.png" alt="" loading="lazy">
+          <span>Motorsport</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== SCREENS: real-UI-style mockups, same markup/colours as the app, generic placeholder data ========== -->
+  <section class="section section-tight" id="screens">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">See It In Action</span>
+        <h2>The Real <span class="gold-text">Interface</span></h2>
+      </div>
+      <div class="screen-grid">
+        <div>
+          <div class="tv-frame">
+            <div class="tv-screen"><img src="assets/screenshot-home.png" alt="Red Carpet Player home screen" loading="lazy"></div>
+          </div>
+          <div class="tv-stand"></div>
+          <p class="screen-cap"><b>Home</b> — your library tiles and the live Event Guide banner, right where you land.</p>
+        </div>
+        <div>
+          <div class="tv-frame">
+            <div class="tv-screen"><img src="assets/screenshot-eventguide.png" alt="Red Carpet Player Event Guide screen" loading="lazy"></div>
+          </div>
+          <div class="tv-stand"></div>
+          <p class="screen-cap"><b>Event Guide</b> — fixtures matched automatically against your own playlist, by category.</p>
+        </div>
+        <div>
+          <div class="tv-frame">
+            <div class="tv-screen"><img src="assets/screenshot-livetv.png" alt="Red Carpet Player Live TV channel browser" loading="lazy"></div>
+          </div>
+          <div class="tv-stand"></div>
+          <p class="screen-cap"><b>Live TV</b> — your whole playlist, cached locally and searchable instantly.</p>
+        </div>
+        <div>
+          <div class="tv-frame">
+            <div class="tv-screen"><img src="assets/screenshot-player.png" alt="Red Carpet Player live video playback with on-screen channel info" loading="lazy"></div>
+          </div>
+          <div class="tv-stand"></div>
+          <p class="screen-cap"><b>Live Playback</b> — real video, with the channel and programme info overlay on demand.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== DEVICE COMPATIBILITY ========== -->
+  <section class="section section-tight" id="devices">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Before You Download</span>
+        <h2>Supported <span class="gold-text">Devices</span></h2>
+        <p>Red Carpet Player installs directly as an APK. That only works on Android-based TV platforms — here's exactly what does and doesn't run it.</p>
+      </div>
+      <div class="device-grid">
+        <div class="device-col yes">
+          <div class="device-col-head">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+            <h3>Supported — Direct APK / Downloader</h3>
+          </div>
+          <div class="device-row">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+            <div><b>Google TV</b><span>Chromecast with Google TV 4K, Google TV Streamer, Sony, TCL, Hisense</span></div>
+          </div>
+          <div class="device-row">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+            <div><b>Android TV Boxes</b><span>NVIDIA Shield TV, Xiaomi, Formuler, Mecool</span></div>
+          </div>
+          <div class="device-row">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+            <div><b>Amazon Fire TV</b><span>Fire TV Stick 4K, Fire TV Stick 4K Max, Fire TV Cube</span></div>
+          </div>
+        </div>
+        <div class="device-col no">
+          <div class="device-col-head">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            <h3>Not Supported Natively</h3>
+          </div>
+          <div class="device-row">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            <div><b>Samsung Smart TVs</b><span>Tizen OS</span></div>
+          </div>
+          <div class="device-row">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            <div><b>LG Smart TVs</b><span>webOS</span></div>
+          </div>
+          <div class="device-row">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            <div><b>Apple TV</b><span>tvOS</span></div>
+          </div>
+          <div class="device-row">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            <div><b>Roku</b></div>
+          </div>
+          <div class="device-row">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            <div><b>iOS / iPhone</b></div>
+          </div>
+        </div>
+        <div class="device-callout">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/></svg>
+          <p><b>Using a Samsung or LG TV?</b> Plug in any $40 Fire TV Stick 4K or Google TV device to run Red Carpet Player at full 60fps.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== INSTALL GUIDE ========== -->
+  <section class="section section-tight" id="install-guide">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Setup &amp; Downloader</span>
+        <h2>How To <span class="gold-text">Install</span></h2>
+        <p>Three steps on your TV device — no sideloading tools, no computer required.</p>
+      </div>
+      <div class="install-grid">
+        <div class="install-card">
+          <div class="install-num">1</div>
+          <h3>Open Downloader on Your TV</h3>
+          <p>Install the free <b>Downloader by AFTVnews</b> app from the Google Play Store or Amazon Appstore on your TV device.</p>
+        </div>
+        <div class="install-card">
+          <div class="install-num">2</div>
+          <h3>Enter Code <code>000000</code></h3>
+          <p>Enter our 6-digit Downloader code (or download the .apk directly to a USB drive) and press Go to install Red Carpet Player.</p>
+        </div>
+        <div class="install-card">
+          <div class="install-num">3</div>
+          <h3>Connect Your Playlist</h3>
+          <p>Launch Red Carpet Player, open Settings, and enter your own M3U URL, network tuner address, or XMLTV guide source.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== FEATURE STRIP: icon-left, text-right, 3 columns ========== -->
+  <section class="section section-tight" id="features">
+    <div class="wrap">
+      <div class="feat-grid">
+        <div class="feat-item">
+          <div class="feat-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M8 3v4"/><path d="M16 3v4"/><path d="M7 14h3"/><path d="M14 14h3"/></svg>
+          </div>
+          <div>
+            <h3>Dynamic Event Guide</h3>
+            <p>Cross-references public fixture schedules against your local XMLTV guide and playlist categories automatically.</p>
+          </div>
+        </div>
+        <div class="feat-item">
+          <div class="feat-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/></svg>
+          </div>
+          <div>
+            <h3>Instant Local Engine</h3>
+            <p>Caches tens of thousands of channels on-device, so live TV, search, and guide switching open in milliseconds.</p>
+          </div>
+        </div>
+        <div class="feat-item">
+          <div class="feat-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
+          </div>
+          <div>
+            <h3>Custom EPG &amp; Addon Sync</h3>
+            <p>Attach supplemental XMLTV or JSON schedule feeds to fill in missing provider guide data, under your control.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== PRICING ========== -->
+  <section class="section section-tight" id="pricing">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Licensing</span>
+        <h2>Simple, <span class="gold-text">Honest</span> Pricing</h2>
+        <p>Red Carpet Player is a standalone playback and guide utility. You bring the playlist — we just make it fast and organised.</p>
+      </div>
+      <div class="pricing-grid">
+        <div class="price-card">
+          <span class="price-tier">Free</span>
+          <div class="price-amount">$0</div>
+          <ul class="price-list">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Bring your own M3U/M3U8 playlist or network tuner API</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Local channel caching</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Standard Event Guide matching</li>
+          </ul>
+          <button class="btn-free" type="button" onclick="document.getElementById('download-btn').scrollIntoView({behavior:'smooth'})">Download Free</button>
+        </div>
+        <div class="price-card pro">
+          <span class="price-tier">Red Carpet Pro — Software License</span>
+          <div class="price-amount">$9.99 <span class="currency">USD · one-time</span></div>
+          <ul class="price-list">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Everything in the Free tier</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Smart EPG Channel Auto-Match &amp; Manual Guide Re-mapping</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Pinned Channels, Custom Category Reordering &amp; Search Shortcuts</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Multi-Source XMLTV &amp; Supplemental Schedule Merging</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Lifetime v3.x Software Updates (Up to 5 Personal TV Devices)</li>
+          </ul>
+          <label class="ack-row">
+            <input type="checkbox" id="ack-check" onchange="document.getElementById('pro-btn').disabled = !this.checked">
+            I understand Red Carpet Player is an empty media player utility that includes NO TV channels, playlists, or media streams, and that software license purchases are non-refundable due to lack of third-party content.
+          </label>
+          <button class="btn-pro" id="pro-btn" type="button" disabled>Get Red Carpet Pro</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap footer-row">
+    <p class="footer-disclaimer">© 2026 Red Carpet Player — a neutral, content-free local media player &amp; XMLTV schedule reader. We do not provide, host, sell, or include any media streams, channels, or playlists; you supply your own legally acquired playlist or tuner feed.</p>
+    <div class="footer-links">
+      <a href="#privacy" onclick="openModal('privacy')">Privacy Policy</a>
+      <a href="#terms" onclick="openModal('terms')">Terms of Use</a>
+      <a href="#dmca" onclick="openModal('dmca')">DMCA / Copyright Notice</a>
+      <a href="#support" onclick="openModal('support')">Support</a>
+      <a href="mailto:support@redcarpetplayer.store">support@redcarpetplayer.store</a>
+    </div>
+  </div>
+</footer>
+
+<!-- ========== MODALS ========== -->
+<div class="modal-overlay" id="modal-privacy" onclick="if(event.target===this) closeModal('privacy')">
+  <div class="modal-box">
+    <div class="modal-head"><h3>Privacy Policy</h3><button class="modal-close" onclick="closeModal('privacy')" aria-label="Close">✕</button></div>
+    <p class="modal-updated">Last Updated: November 2026</p>
+    <p>Red Carpet Player is designed around local-first storage. This policy explains exactly what stays on your device and what, if anything, ever leaves it.</p>
+    <h4>On-Device Storage Only</h4>
+    <ul>
+      <li>All playlist URLs, usernames, passwords, and provider API credentials you enter are stored only in your device's local storage (localStorage / IndexedDB).</li>
+      <li>Your cached channel list, guide data, and search index are built and kept entirely on-device.</li>
+      <li>None of the above is transmitted to, or stored on, any server operated by us.</li>
+    </ul>
+    <h4>What the app contacts on your behalf</h4>
+    <ul>
+      <li>The player connects directly from your device to the playlist or network tuner endpoint you provide, and to any optional third-party XMLTV/EPG address you choose to add in Settings — never through a server we control.</li>
+      <li>Optional public fixture-schedule lookups (used only to label events in the guide) are read-only and contain no personal data.</li>
+    </ul>
+    <h4>Pro License Checkout &amp; Activation</h4>
+    <ul>
+      <li>If you purchase Red Carpet Pro, payment is handled entirely by an external, PCI-compliant Merchant of Record — we never see or store your card details. That processor collects your billing email and payment details to issue a license key.</li>
+      <li>The app itself only ever sees and verifies that pseudonymous license key, locally, to unlock Pro features. It is not linked to any profile or account on our side.</li>
+    </ul>
+    <h4>What we don't do</h4>
+    <ul>
+      <li>We don't operate a central account system, analytics pipeline, or ad network inside the app.</li>
+    </ul>
+    <h4>Contact</h4>
+    <ul>
+      <li><a href="mailto:support@redcarpetplayer.store">support@redcarpetplayer.store</a></li>
+    </ul>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-terms" onclick="if(event.target===this) closeModal('terms')">
+  <div class="modal-box">
+    <div class="modal-head"><h3>Terms of Use</h3><button class="modal-close" onclick="closeModal('terms')" aria-label="Close">✕</button></div>
+    <p class="modal-updated">Last Updated: November 2026</p>
+    <p>By installing or using Red Carpet Player, you agree to the following:</p>
+    <h4>1. Software Utility Only (No Content Included)</h4>
+    <ul>
+      <li>Red Carpet Player is strictly an unconfigured client-side media player and XMLTV schedule reader. It renders whatever playlist and guide addresses you provide, and does not host, provide, sell, index, or verify any media stream, channel, or playlist content.</li>
+    </ul>
+    <h4>2. User Responsibility &amp; Nominative Fair Use</h4>
+    <ul>
+      <li>Users must hold lawful rights to any playlist or tuner feed they connect to the player in their own jurisdiction.</li>
+      <li>Public event titles and competition names displayed in the Event Guide are used strictly for factual, nominative EPG schedule indexing, and imply no endorsement by or affiliation with any sports league or broadcaster.</li>
+    </ul>
+    <h4>3. Pro Software License &amp; Refund Policy</h4>
+    <ul>
+      <li>Because the Free tier allows complete verification of device and playlist compatibility before purchasing, Red Carpet Pro license fees are strictly for unlocking local software features and are non-refundable for claims that the app lacks television channels or streams.</li>
+    </ul>
+    <h4>4. Disclaimer of Warranties &amp; Limitation of Liability</h4>
+    <ul>
+      <li>The software is provided "AS IS" without warranty of any kind. Our maximum aggregate liability is strictly limited to the software license fee paid ($9.99 USD/AUD), subject to any non-excludable statutory guarantees under the Australian Consumer Law.</li>
+    </ul>
+    <h4>5. Governing Law</h4>
+    <ul>
+      <li>These terms are governed by the laws of the State of Victoria, Australia.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-dmca" onclick="if(event.target===this) closeModal('dmca')">
+  <div class="modal-box">
+    <div class="modal-head"><h3>DMCA / Copyright Notice</h3><button class="modal-close" onclick="closeModal('dmca')" aria-label="Close">✕</button></div>
+    <p>Red Carpet Player hosts, proxies, or transmits zero media streams or playlists. All media playback occurs directly between your device and the address you supply.</p>
+    <h4>Trademarks</h4>
+    <ul>
+      <li>Any team, league, competition, or event names that may appear in a user's own guide data are used solely for factual, descriptive EPG indexing of publicly scheduled events, and remain the property of their respective owners.</li>
+    </ul>
+    <h4>Reporting a concern</h4>
+    <ul>
+      <li>Because we do not host or control any media content, copyright concerns about a specific stream should be directed to the provider of that playlist or feed, not to us.</li>
+      <li>If you believe the player software itself infringes a right you hold, contact us directly: <a href="mailto:legal@redcarpetplayer.store">legal@redcarpetplayer.store</a></li>
+    </ul>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-support" onclick="if(event.target===this) closeModal('support')">
+  <div class="modal-box">
+    <div class="modal-head"><h3>Support</h3><button class="modal-close" onclick="closeModal('support')" aria-label="Close">✕</button></div>
+    <p>Reach us directly at <a href="mailto:support@redcarpetplayer.store">support@redcarpetplayer.store</a>.</p>
+    <h4>Do you provide channels?</h4>
+    <ul><li>No. Red Carpet Player is a standalone media player utility — you supply your own M3U/M3U8 playlist, network tuner address, or XMLTV guide source.</li></ul>
+    <h4>How do I activate Pro on my TV?</h4>
+    <ul><li>Enter your license key in Settings.</li></ul>
+    <h4>Why won't it install on my Samsung/LG TV?</h4>
+    <ul><li>Tizen (Samsung) and webOS (LG) don't run Android APKs. Use a $40 Fire Stick 4K or Google TV device instead — see Supported Devices above.</li></ul>
+  </div>
+</div>
+
+<script>
+  function copyDownloaderCode(){
+    const code = document.getElementById('dl-code').textContent.trim();
+    const btn = document.getElementById('copy-code-btn');
+    const mark = () => { btn.classList.add('copied'); setTimeout(() => btn.classList.remove('copied'), 1400); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(mark).catch(() => {});
+    } else {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = code; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+        mark();
+      } catch (e) {}
+    }
+  }
+  function openModal(name){ document.getElementById('modal-' + name).classList.add('open'); document.body.style.overflow = 'hidden'; }
+  function closeModal(name){ document.getElementById('modal-' + name).classList.remove('open'); document.body.style.overflow = ''; }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') ['privacy','terms','dmca','support'].forEach(closeModal);
+  });
+
+  // Direct-link support for payment-processor / merchant-onboarding requirements: loading
+  // https://www.redcarpetplayer.store/#privacy (or #terms / #dmca / #support) opens that modal
+  // immediately, both on first load and if the hash changes while the page is already open.
+  const MODAL_HASHES = ['privacy', 'terms', 'dmca', 'support'];
+  function openModalFromHash(){
+    const name = location.hash.replace('#', '');
+    if (MODAL_HASHES.includes(name)) openModal(name);
+  }
+  document.addEventListener('DOMContentLoaded', openModalFromHash);
+  window.addEventListener('hashchange', openModalFromHash);
+</script>
+</body>
+</html>
