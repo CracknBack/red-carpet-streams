@@ -1238,7 +1238,7 @@ function reloadAccountData() {
   Object.assign(recent, {live: [], series: []}, load(acctKey('sp_recent'), {}));
   prog = load(acctKey('sp_prog'), {}); recentQ = load(acctKey('sp_rq'), []);
 }
-const ui = Object.assign({fdKey: '', orig: false, liveLayout: 'country', lang: 'en', sort: {live: 0, vod: 1, series: 1}, vol: 1, muted: false}, load('sp_ui', {}));
+const ui = Object.assign({fdKey: '', orig: false, liveLayout: 'provider', lang: 'en', sort: {live: 0, vod: 1, series: 1}, vol: 1, muted: false}, load('sp_ui', {}));
 if (FIRE && ui.gpvOff === undefined) ui.gpvOff = true;     /* inside the Android app the game-page preview starts off: weak TV sticks play better without it (Settings can turn it on) */
 document.documentElement.classList.toggle('light', !!ui.light);
 const favs = Object.assign({live: [], vod: [], series: []}, load(acctKey('sp_favs'), {}));
@@ -5809,9 +5809,11 @@ function buildLiveCats() {
       .concat(c.glist.map(([g, a]) => ({id: 'g:' + c.cc + ':' + g, name: g, n: a.length})));
     b.lv = 0;
   }
-  const pl = plCategoryChannels(), cl = compCategoryChannels('Champions League', CL_CH);
-  const more = ['Europa League', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1'].map(c => ({id: '__c:' + c, name: c, n: usualChannels(c).length})).filter(c => c.n);
-  return [{id: '__fav', name: 'Favourites'}, {id: '__recent', name: 'Recently watched'}].concat(pl.length ? [{id: '__pl', name: 'Premier League', n: pl.length}] : [], cl.length ? [{id: '__cl', name: 'Champions League', n: cl.length}] : [], more, [{id: '__all', name: 'All channels', n: L.items.length}])
+  /* Live TV's category sidebar is kept a clean pass-through of the user's own playlist/geo grouping --
+     no broadcaster- or league-name category tabs here (that matching, PL_CH/CL_CH/compCategoryChannels,
+     stays exclusive to the Event Guide, where it only ever labels channels already in the user's own
+     account; see its own definitions above). */
+  return [{id: '__fav', name: 'Favourites'}, {id: '__recent', name: 'Recently watched'}, {id: '__all', name: 'All channels', n: L.items.length}]
     .concat(L.geo.map(c => ({id: 'c:' + c.cc, name: c.name, n: c.items.length, kind: 'country', cc: c.cc})));
 }
 function drillIn() {
@@ -5849,9 +5851,6 @@ function specialList(t, id) {
   if (id === '__adult') return adultOk() ? sortItems(t, d.adult || []) : [];
   if (id === '__fav') return uniq(favs[t].map(get));
   if (id === '__recent') return uniq(recent.live.map(get));
-  if (id === '__pl' && t === 'live') return plCategoryChannels();
-  if (id === '__cl' && t === 'live') return compCategoryChannels('Champions League', CL_CH);
-  if (String(id).startsWith('__c:') && t === 'live') return usualChannels(id.slice(4));
   if (id === '__cont') {
     if (t === 'series') return uniq(recent.series.map(get));
     return uniq(Object.keys(prog).filter(k => k[0] === 'v').sort((a, b) => prog[b].ts - prog[a].ts).map(k => get(k.slice(1))));
@@ -5912,7 +5911,7 @@ function rowWindow(items, focus) {
   const offset = Math.max(0, Math.min(focus - 1, Math.max(0, items.length - ROW_PERPAGE)));
   return {start: offset, list: items.slice(offset, offset + ROW_PERPAGE + 1)};
 }
-const sortable = c => c && !['__fav', '__recent', '__cont', '__new', '__newrel', '__top', '__langs', '__prov', 'up', '__all', '__pl', '__cl'].includes(c.id) && !String(c.id).startsWith('__c:') && !String(c.id).startsWith('f:') || (c && c.id === '__all' && S.page === 'live');
+const sortable = c => c && !['__fav', '__recent', '__cont', '__new', '__newrel', '__top', '__langs', '__prov', 'up', '__all'].includes(c.id) && !String(c.id).startsWith('f:') || (c && c.id === '__all' && S.page === 'live');
 function itemsFor(t, c) {
   if (!c) return [];
   if (t === 'favs') return c.sg ? specialList('live', '__fav').filter(it => sportOf(it) === c.sg) : specialList(c.ft, '__fav');
@@ -6228,9 +6227,6 @@ function renderBrowse() {
     else if (c.kind === 'up') empty = 'Press OK to go back to all sections.';
     else if (c.ft) empty = 'No favourite ' + (isLive ? 'channels' : kind === 'vod' ? 'movies' : 'series') + ' yet. To add one, highlight it anywhere in the app and ' + how + '.';
     else if (c.id === '__adult') empty = ui.pinH ? 'Locked. Press OK and enter your PIN to open this section.' : 'Adult content stays hidden until you create a PIN: Settings → Adult content PIN.';
-    else if (String(c.id).startsWith('__c:')) empty = 'None of your channels matched this league’s list. Pin your own channels from the Options menu (M).';
-    else if (c.id === '__cl') empty = 'None of your channels matched the Champions League list. Pin your own channels from the Options menu (M).';
-    else if (c.id === '__pl') empty = 'None of your channels matched the Premier League list. Pin your own channels from the Options menu (M).';
     else if (c.id === '__fav') empty = 'No favourites yet. Press the red button on any ' + noun + ' to add it here.';
     else if (c.id === '__recent') empty = 'Channels you watch will show up here.';
     else if (c.id === '__cont') empty = t === 'vod' ? 'Movies you start will show up here so you can pick up where you left off.' : 'Series you open will show up here.';
