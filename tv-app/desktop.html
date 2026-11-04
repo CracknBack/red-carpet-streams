@@ -664,6 +664,8 @@ h2 .sep{color:var(--muted);font-weight:500;margin:0 1.2rem}
 .overlay{position:fixed;top:0;left:0;right:0;bottom:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(6,12,16,.8)}
 .obox{min-width:min(56rem, 92vw);max-height:80vh;display:flex;flex-direction:column;background:var(--panel);border:.15rem solid rgba(231,185,111,.45);border-radius:1.2rem;padding:1.6rem 2.4rem 2.4rem;box-shadow:0 2rem 6rem rgba(0,0,0,.6)}
 .obox .slabel{flex:none}
+#opts-img{display:block;width:16rem;height:16rem;margin:.8rem auto 0;border-radius:.6rem;background:#fff;padding:.8rem;flex:none}
+#opts-msg{flex:none;text-align:center;margin:1rem 0 0}
 #opts-list{overflow-y:auto;flex:1 1 auto;min-height:0}
 .obox .row{height:5.4rem;flex:none}
 html.native,html.native body{background:transparent!important}
@@ -1127,7 +1129,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 
 <div id="ask" class="overlay hidden"><div class="obox askbox"><div id="ask-title" class="slabel"></div><p id="ask-msg" class="note"></p><input id="ask-in" type="text" autocomplete="off" spellcheck="false"><p class="note">OK to save, Back to cancel</p></div></div>
 <div id="pk" class="overlay hidden"><div class="obox pkbox"><div class="pkcol"><div id="pk-title" class="slabel"></div><p class="pkm">Scan this with your phone’s camera, type, and press Send.</p><p id="pk-msg" class="pkst">Starting…</p><p id="pk-url" class="pku hidden"></p><p class="note">Back to cancel</p></div><canvas id="pk-qr"></canvas></div></div>
-<div id="opts" class="overlay hidden"><div class="obox"><div class="slabel">Options</div><div id="opts-list"></div></div></div>
+<div id="opts" class="overlay hidden"><div class="obox"><div id="opts-title" class="slabel">Options</div><img id="opts-img" class="hidden"><p id="opts-msg" class="note hidden"></p><div id="opts-list"></div></div></div>
 <div id="loading" class="loading hidden"><div class="spinner"></div><p id="loading-msg">Loading…</p><div id="loading-bar" class="pbar hidden"><div id="loading-bar-fill" class="pbar-fill"></div></div></div>
 <div id="toast" class="toast hidden"></div>
 <div id="numjump" class="hidden"></div>
@@ -2581,11 +2583,16 @@ function proActivateMenu() {
   });
 }
 function proUpsell(feature) {
+  const qr = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent('https://www.redcarpetplayer.store');
   openMenu([
-    {l: feature + ' is a Red Carpet Pro feature ($9.99 one-time).', a: () => {}},
+    {l: feature + ' is a Red Carpet Pro feature.', a: () => {}},
     {l: 'Enter a Red Carpet Pro license key…', a: proActivateMenu},
     {l: 'Not now', a: () => {}}
-  ]);
+  ], {
+    title: 'Red Carpet Pro — www.redcarpetplayer.store',
+    img: qr,
+    msg: 'Scan or visit redcarpetplayer.store on your phone to get your $4.99 Launch Pro Key (reg. $9.99), then enter it below.'
+  });
 }
 
 /* ================= pinned channels (yours) ================= */
@@ -8307,7 +8314,15 @@ function optsKey(k) {
 const fakeEv = () => ({preventDefault() {}});
 
 /* ================= accounts: the menu ================= */
-function openMenu(items) { OPT.items = items; OPT.i = 0; OPT.open = true; renderOpts(); }
+function openMenu(items, extra) {
+  OPT.items = items; OPT.i = 0; OPT.open = true;
+  $('opts-title').textContent = (extra && extra.title) || 'Options';
+  $('opts-img').classList.toggle('hidden', !(extra && extra.img));
+  if (extra && extra.img) $('opts-img').src = extra.img;
+  $('opts-msg').classList.toggle('hidden', !(extra && extra.msg));
+  $('opts-msg').textContent = (extra && extra.msg) || '';
+  renderOpts();
+}
 function switchAccount(id) {
   const a = ACCT.list.find(x => x.id === id);
   if (!a || id === ACCT.cur) return;

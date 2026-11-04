@@ -85,8 +85,11 @@
     border-bottom:1px solid rgba(212,175,55,.16);
   }
   .hero-inner{position:relative;z-index:1;max-width:34rem;padding:3rem 0}
+  .compliance-pill{display:inline-flex;align-items:center;gap:.5rem;background:rgba(8,11,18,.6);border:1px solid var(--card-border);color:var(--gold-light);font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:.45rem .9rem;border-radius:999px;margin-bottom:1rem}
   .hero h1{font-size:2.5rem;line-height:1.08;letter-spacing:.01em;margin:.9rem 0 1.05rem;text-transform:uppercase;font-weight:800;text-shadow:0 .2rem 1rem rgba(0,0,0,.6)}
   .hero p.sub{font-size:1.02rem;line-height:1.55;color:var(--muted);max-width:30rem;margin:0 0 1.8rem;text-shadow:0 .15rem .6rem rgba(0,0,0,.7)}
+  .hero-price-line{font-size:.92rem;color:var(--ink);margin:0 0 1rem}
+  .hero-price-line .price-was{font-size:.92rem}
   .cta-row{display:flex;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:1.3rem}
   .btn-primary{
     display:inline-flex;align-items:center;gap:.6rem;
@@ -145,6 +148,7 @@
   .feat-item p{color:var(--muted);font-size:.84rem;line-height:1.5;margin:0}
 
   /* ---------- Pricing ---------- */
+  .unified-wrap{max-width:72rem;margin:0 auto;display:flex;flex-direction:column;gap:3rem}
   .pricing-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.6rem;max-width:52rem;margin:0 auto}
   .price-card{
     border-radius:var(--radius);border:1px solid var(--card-border);background:var(--card);
@@ -153,8 +157,11 @@
   .price-card.pro{border-color:rgba(212,175,55,.55);box-shadow:0 0 0 1px rgba(212,175,55,.12),0 1.5rem 3rem rgba(158,42,43,.18)}
   .price-tier{font-size:.78rem;letter-spacing:.16em;text-transform:uppercase;font-weight:800;color:var(--muted)}
   .price-card.pro .price-tier{color:var(--gold)}
+  .launch-badge{display:inline-block;align-self:flex-start;background:rgba(212,175,55,.14);border:1px solid var(--gold);color:var(--gold-light);font-size:.7rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:.3rem .7rem;border-radius:999px}
   .price-amount{font-size:2.1rem;font-weight:800}
   .price-amount span{font-size:.95rem;color:var(--muted);font-weight:600}
+  .price-was{color:var(--muted);font-weight:600;font-size:1.3rem;margin-right:.4rem;text-decoration:line-through;opacity:.7}
+  .price-note{margin:-.4rem 0 0;font-size:.8rem;color:var(--muted)}
   .price-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.65rem;font-size:.88rem;color:var(--ink)}
   .price-list li{display:flex;align-items:flex-start;gap:.6rem}
   .price-list svg{width:1rem;height:1rem;flex:none;margin-top:.15rem;color:var(--gold)}
@@ -289,9 +296,11 @@
   <!-- ========== HERO (cinematic, real artwork + real logo) ========== -->
   <section class="hero">
     <div class="wrap hero-inner">
+      <span class="compliance-pill">100% Standalone Media Player &amp; Stream Facilitator • Bring Your Own M3U / Xtream Playlist</span>
       <span class="eyebrow">Bring-Your-Own-Playlist Player</span>
       <h1>The Ultimate <span class="gold-text">4K Live TV</span> &amp; Event Guide Player</h1>
-      <p class="sub">All your personal M3U/M3U8 playlists, network tuner APIs, and XMLTV schedules — unified on Android TV. Instant local channel caching and real-time Event Guide matching, entirely on your own device.</p>
+      <p class="sub">Red Carpet Player is a hardware-accelerated player interface and smart EPG organizer for playlists you already have — your own M3U/M3U8, Xtream, or network tuner source, plus XMLTV schedules. It ships with zero built-in channels, streams, or media content; everything you watch comes from the playlist you supply.</p>
+      <p class="hero-price-line"><s class="price-was">$9.99</s> <b class="gold-text">$4.99 USD</b> — Limited-Time Launch Price • One-Time Lifetime Pro Key</p>
 
       <div class="cta-row" id="setup">
         <a class="btn-primary" href="https://github.com/CracknBack/red-carpet-streams/releases/download/firestick-60/RedCarpetPlayer-v3.23.38-build60.apk" id="download-btn">
@@ -461,33 +470,6 @@
   </section>
 
   <!-- ========== INSTALL GUIDE ========== -->
-  <section class="section section-tight" id="install-guide">
-    <div class="wrap">
-      <div class="section-head">
-        <span class="eyebrow">Setup &amp; Downloader</span>
-        <h2>How To <span class="gold-text">Install</span></h2>
-        <p>Three steps on your TV device — no sideloading tools, no computer required.</p>
-      </div>
-      <div class="install-grid">
-        <div class="install-card">
-          <div class="install-num">1</div>
-          <h3>Open Downloader on Your TV</h3>
-          <p>Install the free <b>Downloader by AFTVnews</b> app from the Google Play Store or Amazon Appstore on your TV device.</p>
-        </div>
-        <div class="install-card">
-          <div class="install-num">2</div>
-          <h3>Enter Code <code>3149413</code></h3>
-          <p>Enter our Downloader code (or <code>aftv.news/3149413</code> in any browser) and press Go to install Red Carpet Player.</p>
-        </div>
-        <div class="install-card">
-          <div class="install-num">3</div>
-          <h3>Connect Your Playlist</h3>
-          <p>Launch Red Carpet Player, open Settings, and enter your own M3U URL, network tuner address, or XMLTV guide source.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- ========== FEATURE STRIP: icon-left, text-right, 3 columns ========== -->
   <section class="section section-tight" id="features">
     <div class="wrap">
@@ -523,40 +505,61 @@
     </div>
   </section>
 
-  <!-- ========== PRICING ========== -->
-  <section class="section section-tight" id="pricing">
+  <!-- ========== INSTALL & PRICING: unified single-view section ========== -->
+  <section class="section section-tight" id="install-guide">
     <div class="wrap">
       <div class="section-head">
-        <span class="eyebrow">Licensing</span>
-        <h2>Simple, <span class="gold-text">Honest</span> Pricing</h2>
-        <p>Red Carpet Player is a standalone playback and guide utility. You bring the playlist — we just make it fast and organised.</p>
+        <span class="eyebrow">Install &amp; Licensing</span>
+        <h2>Install &amp; Unlock <span class="gold-text">Pro</span> in 3 Steps</h2>
+        <p>Red Carpet Player is a standalone playback and guide utility — you bring the playlist, we make it fast and organised. Everything you need to go from install to Pro is on this one page.</p>
       </div>
-      <div class="pricing-grid">
-        <div class="price-card">
-          <span class="price-tier">Free</span>
-          <div class="price-amount">$0</div>
-          <ul class="price-list">
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Bring your own M3U/M3U8 playlist or network tuner API</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Local channel caching</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Standard Event Guide matching</li>
-          </ul>
-          <button class="btn-free" type="button" onclick="document.getElementById('download-btn').scrollIntoView({behavior:'smooth'})">Download Free</button>
+      <div class="unified-wrap">
+        <div class="pricing-grid">
+          <div class="price-card">
+            <span class="price-tier">Free Base Player</span>
+            <div class="price-amount">$0</div>
+            <ul class="price-list">
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Bring your own M3U/M3U8 playlist or network tuner API</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Local channel caching</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Standard Event Guide matching</li>
+            </ul>
+            <button class="btn-free" type="button" onclick="document.getElementById('download-btn').scrollIntoView({behavior:'smooth'})">Download Free</button>
+          </div>
+          <div class="price-card pro">
+            <span class="price-tier">Red Carpet Pro — Lifetime License</span>
+            <span class="launch-badge">Limited-Time Early Adopter Launch Offer — 50% Off</span>
+            <div class="price-amount"><s class="price-was">$9.99</s>$4.99 <span class="currency">USD · one-time</span></div>
+            <p class="price-note">No recurring fees — one $4.99 payment unlocks Pro forever.</p>
+            <ul class="price-list">
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Everything in the Free tier</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Smart EPG Channel Auto-Match &amp; Manual Guide Re-mapping</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Pinned Channels, Custom Category Reordering &amp; Search Shortcuts</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Multi-Source XMLTV &amp; Supplemental Schedule Merging</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Lifetime v3.x Software Updates (Up to 5 Personal TV Devices)</li>
+            </ul>
+            <label class="ack-row">
+              <input type="checkbox" id="ack-check" onchange="document.getElementById('pro-btn').disabled = !this.checked">
+              I understand Red Carpet Player is an empty media player utility that includes NO TV channels, playlists, or media streams, and that software license purchases are non-refundable due to lack of third-party content.
+            </label>
+            <button class="btn-pro" id="pro-btn" type="button" disabled onclick="alert('License checkout is finalizing activation — email redcarpetplayer@pm.me if you need immediate access.')">Get Red Carpet Pro ($4.99)</button>
+          </div>
         </div>
-        <div class="price-card pro">
-          <span class="price-tier">Red Carpet Pro — Software License</span>
-          <div class="price-amount">$4.99 <span class="currency">USD · one-time</span></div>
-          <ul class="price-list">
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Everything in the Free tier</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Smart EPG Channel Auto-Match &amp; Manual Guide Re-mapping</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Pinned Channels, Custom Category Reordering &amp; Search Shortcuts</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Multi-Source XMLTV &amp; Supplemental Schedule Merging</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Lifetime v3.x Software Updates (Up to 5 Personal TV Devices)</li>
-          </ul>
-          <label class="ack-row">
-            <input type="checkbox" id="ack-check" onchange="document.getElementById('pro-btn').disabled = !this.checked">
-            I understand Red Carpet Player is an empty media player utility that includes NO TV channels, playlists, or media streams, and that software license purchases are non-refundable due to lack of third-party content.
-          </label>
-          <button class="btn-pro" id="pro-btn" type="button" disabled onclick="alert('License checkout is finalizing activation — email redcarpetplayer@pm.me if you need immediate access.')">Get Red Carpet Pro</button>
+        <div class="install-grid">
+          <div class="install-card">
+            <div class="install-num">1</div>
+            <h3>Install Free on TV</h3>
+            <p>Open the free <b>Downloader by AFTVnews</b> app on your Android TV / Fire TV and enter code <code>3149413</code> (or <code>aftv.news/3149413</code> in any browser) to install Red Carpet Player and test it with your own playlist.</p>
+          </div>
+          <div class="install-card">
+            <div class="install-num">2</div>
+            <h3>Buy Pro Key Here</h3>
+            <p>Click <b>“Get Red Carpet Pro ($4.99)”</b> above from your phone or computer to receive your <code>RCP-XXXX</code> license key by email.</p>
+          </div>
+          <div class="install-card">
+            <div class="install-num">3</div>
+            <h3>Activate On TV</h3>
+            <p>On your TV app, open <b>Settings → Red Carpet Pro</b> (or tap any Pro feature) and enter your <code>RCP-XXXX</code> key to unlock Pro permanently.</p>
+          </div>
         </div>
       </div>
     </div>
