@@ -91,7 +91,6 @@
   .hero h1{font-size:2.5rem;line-height:1.08;letter-spacing:.01em;margin:.9rem 0 1.05rem;text-transform:uppercase;font-weight:800;text-shadow:0 .2rem 1rem rgba(0,0,0,.6)}
   .hero p.sub{font-size:1.02rem;line-height:1.55;color:var(--muted);max-width:30rem;margin:0 0 1.8rem;text-shadow:0 .15rem .6rem rgba(0,0,0,.7)}
   .hero-price-line{font-size:.92rem;color:var(--ink);margin:0 0 1rem}
-  .hero-price-line .price-was{font-size:.92rem}
   .cta-row{display:flex;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:1.3rem}
   .btn-primary{
     display:inline-flex;align-items:center;gap:.6rem;
@@ -162,7 +161,6 @@
   .launch-badge{display:inline-block;align-self:flex-start;background:rgba(212,175,55,.14);border:1px solid var(--gold);color:var(--gold-light);font-size:.7rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:.3rem .7rem;border-radius:999px}
   .price-amount{font-size:2.1rem;font-weight:800}
   .price-amount span{font-size:.95rem;color:var(--muted);font-weight:600}
-  .price-was{color:var(--muted);font-weight:600;font-size:1.3rem;margin-right:.4rem;text-decoration:line-through;opacity:.7}
   .price-note{margin:-.4rem 0 0;font-size:.8rem;color:var(--muted)}
   .price-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.65rem;font-size:.88rem;color:var(--ink)}
   .price-list li{display:flex;align-items:flex-start;gap:.6rem}
@@ -295,7 +293,9 @@
     .hero h1{font-size:clamp(1.75rem, 6vw, 2.5rem)}
     .hero p.sub{font-size:.9rem}
     .cat-row{grid-template-columns:repeat(4,1fr);row-gap:1.6rem}
-    .screen-grid{grid-template-columns:1fr}
+    #screens .wrap{padding:0 1rem}
+    .screen-grid{grid-template-columns:1fr;gap:1.4rem}
+    .tv-frame{padding:.6rem .6rem .8rem}
     .device-grid{grid-template-columns:1fr}
     .feat-grid{grid-template-columns:1fr}
     .pricing-grid{grid-template-columns:1fr}
@@ -341,7 +341,7 @@
       <span class="eyebrow">Next-Gen M3U &amp; Xtream Media Player</span>
       <h1>Your Playlist. Finally Given A <span class="gold-text">Cinema-Grade</span> Interface.</h1>
       <p class="sub">Ditch clunky, spreadsheet-style TV apps. Red Carpet Player transforms your existing M3U or Xtream connection into a lightning-fast 4K theatre experience—complete with an automatic Live Event Guide that maps fixtures directly to your channels.</p>
-      <p class="hero-price-line"><s class="price-was">$9.99</s> <b class="gold-text">$4.99 USD</b> — Limited-Time Launch Price • One-Time Lifetime Pro Key</p>
+      <p class="hero-price-line"><b class="gold-text">$4.99 USD</b> Early Adopter Launch Price — One-Time Lifetime Pro Key <span class="muted">(Standard price $9.99 after launch)</span></p>
 
       <div class="cta-row" id="setup">
         <a class="btn-primary" href="https://github.com/CracknBack/red-carpet-streams/releases/download/firestick-60/RedCarpetPlayer-v3.23.38-build60.apk" id="download-btn">
@@ -622,9 +622,9 @@
           </div>
           <div class="price-card pro">
             <span class="price-tier">Red Carpet Pro — Lifetime License</span>
-            <span class="launch-badge">Limited-Time Early Adopter Launch Offer — 50% Off</span>
-            <div class="price-amount"><s class="price-was">$9.99</s>$4.99 <span class="currency">USD · one-time</span></div>
-            <p class="price-note">No recurring fees — one $4.99 payment unlocks Pro forever.</p>
+            <span class="launch-badge">Early Adopter Launch Price</span>
+            <div class="price-amount">$4.99 <span class="currency">USD · one-time</span></div>
+            <p class="price-note">Standard price $9.99 after launch. No recurring fees — one payment unlocks Pro forever.</p>
             <ul class="price-list">
               <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Everything in the Free tier</li>
               <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Smart EPG Channel Auto-Match &amp; Manual Guide Re-mapping</li>
