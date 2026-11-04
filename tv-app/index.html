@@ -2544,21 +2544,47 @@ function fixtureList(ev) {
 
 /* ================= Red Carpet Pro license =================
    One-time $9.99 purchase via a Merchant of Record (Lemon Squeezy). A real purchase hands the buyer a
-   Lemon Squeezy license key, verified here against their /v1/licenses/activate endpoint. PRO_TEST_KEY
-   is a fixed local key for testing the Free/Pro split on-device before that webhook is connected. */
-const PRO_TEST_KEY = 'RCP-TEST-0000-DEV';
+   Lemon Squeezy license key (their own UUID format, not any shape of our choosing -- this file never
+   assumes one), verified here against their /v1/licenses/activate endpoint. PRO_TEST_KEY_HASH is a
+   SHA-256 hash, not the key itself, so the real dev/test value isn't sitting in plaintext in a public
+   APK/repo -- compare by hashing what's typed, never by storing the secret itself here. */
+const PRO_TEST_KEY_HASH = '7fbdf56186f49b702a85e133836b6c6bf2c81676b41ecf37486771c1c871e45f';
+async function sha256Hex(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
 function isProUnlocked() { return !!(ui.pro && ui.pro.key); }
+/* A stable-per-device label (not a hardcoded constant) so each of a license's up-to-5 activated
+   instances shows up distinctly in the Lemon Squeezy dashboard instead of 5 identical "Red Carpet
+   Player" rows nobody can tell apart -- generated once and persisted, so re-activating the same
+   device later reuses the same label instead of spawning a new-looking instance name each time. */
+function proDeviceLabel() {
+  let id = load('sp_devid', null);
+  if (!id) { id = Math.random().toString(36).slice(2, 6).toUpperCase(); save('sp_devid', id); }
+  return 'Red Carpet Player - ' + id;
+}
 async function proActivateOnline(key) {
   try {
     const res = await fetch('https://api.lemonsqueezy.com/v1/licenses/activate', {
       method: 'POST',
       headers: {'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'},
-      body: new URLSearchParams({license_key: key, instance_name: 'Red Carpet Player'})
+      body: new URLSearchParams({license_key: key, instance_name: proDeviceLabel()})
     });
     const j = await res.json().catch(() => null);
     if (j && j.activated) return {ok: true, instanceId: j.instance && j.instance.id};
     return {ok: false, error: (j && j.error) || 'That key wasn’t accepted.'};
   } catch (e) { return {ok: false, error: 'Couldn’t reach the licensing server. Check your connection and try again.'}; }
+}
+async function proDeactivateOnline(key, instanceId) {
+  try {
+    const res = await fetch('https://api.lemonsqueezy.com/v1/licenses/deactivate', {
+      method: 'POST',
+      headers: {'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'},
+      body: new URLSearchParams({license_key: key, instance_id: instanceId})
+    });
+    const j = await res.json().catch(() => null);
+    return !!(j && j.deactivated);
+  } catch (e) { return false; }
 }
 /* Unlocking/deactivating Pro changes what guideV2Url()/rcsUrl() resolve to (see PRO_GUIDE_V2_URL /
    PRO_RCS_GUIDE above) whenever the owner hasn't already pasted a custom address of their own --
@@ -2567,11 +2593,29 @@ function proApplyDefaultGuides() {
   if (!ui.guideV2Url) { GUIDE_V2 = null; EVENTS = null; if (guideV2Url()) loadGuideV2(true).then(() => renderMain()); }
   if (!ui.rcsGuide) loadGuide(true);
 }
+/* The one real deactivation path -- used by both "clear the key field" and the explicit Settings
+   menu option below, so a device's license-key instance is always actually released on Lemon
+   Squeezy's side (freeing one of the license's 5 device slots), not just unset locally. A test-key
+   activation has no online instance to release, so this only calls out when mode === 'online'. */
+async function proDeactivate() {
+  const p = ui.pro;
+  let released = true;
+  if (p && p.mode === 'online' && p.instanceId) released = await proDeactivateOnline(p.key, p.instanceId);
+  ui.pro = null; save('sp_ui', ui); renderMain(); proApplyDefaultGuides();
+  toast(released ? 'Red Carpet Pro deactivated on this device.' : 'Deactivated locally, but couldn’t reach the licensing server to release this device’s slot. Email redcarpetplayer@pm.me if your license still shows it as in use.');
+}
+function proDeactivateMenu() {
+  openMenu([
+    {l: 'This frees up one of your license’s device slots. The device itself drops back to Free.', a: () => {}},
+    {l: 'Yes, deactivate this device', a: proDeactivate},
+    {l: 'No, keep it active', a: () => {}}
+  ]);
+}
 function proActivateMenu() {
-  askText('Red Carpet Pro', 'Enter the license key from your Red Carpet Pro purchase receipt to unlock custom search shortcuts, channel pinning, manual guide channel matching and supplemental schedule feeds. Leave it empty to deactivate an existing key.', (ui.pro && ui.pro.key) || '', async v => {
+  askText('Red Carpet Pro', 'Enter your Pro License Key to unlock custom search shortcuts, channel pinning, manual guide channel matching and supplemental schedule feeds. You can type it with the remote, or use your phone’s Google TV / Fire TV remote app to paste it in. Leave it empty to deactivate this device.', (ui.pro && ui.pro.key) || '', async v => {
     const k = v.trim();
-    if (!k) { ui.pro = null; save('sp_ui', ui); renderMain(); proApplyDefaultGuides(); toast('Red Carpet Pro deactivated.'); return; }
-    if (k.toUpperCase() === PRO_TEST_KEY) {
+    if (!k) { await proDeactivate(); return; }
+    if ((await sha256Hex(k.toUpperCase())) === PRO_TEST_KEY_HASH) {
       ui.pro = {key: k.toUpperCase(), mode: 'test', activatedAt: Date.now()}; save('sp_ui', ui); renderMain();
       proApplyDefaultGuides(); toast('Red Carpet Pro activated (test key).'); return;
     }
@@ -7405,7 +7449,14 @@ function settingsAction(i) {
     {l: ui.rcsOff ? 'Turn the Red Carpet guide on' : 'Turn the Red Carpet guide off', a: () => { ui.rcsOff = !ui.rcsOff; save('sp_ui', ui); loadGuide(true); renderMain(); }},
     {l: 'Set the guide address…', a: () => askText('Red Carpet sports guide', 'Paste the address of a guide that ends in sports.xml.gz. Nothing is fetched until an address is set here. Leave it empty to turn this off.', ui.rcsGuide || '', v => { ui.rcsGuide = v.trim(); ui.rcsOff = false; save('sp_ui', ui); loadGuide(true); renderMain(); })}]); }
   else if (a === 'guidev2') { if (!isProUnlocked()) { proUpsell('Supplemental schedule feeds'); return; } askText('Resolved sports schedule (guide-v2)', 'Optional. Paste the address of a guide-v2.json file (your own rcs-guide build) to turn on multi-country broadcaster matching for leagues it covers. Nothing is fetched until an address is set here. Leave it empty to turn this off.', ui.guideV2Url || '', v => { ui.guideV2Url = v.trim(); save('sp_ui', ui); GUIDE_V2 = null; EVENTS = null; renderMain(); if (ui.guideV2Url) loadGuideV2(true).then(() => renderMain()); }); }
-  else if (a === 'pro') proActivateMenu();
+  else if (a === 'pro') {
+    if (isProUnlocked()) openMenu([
+      {l: 'Change license key…', a: proActivateMenu},
+      {l: 'Deactivate & release this device’s Pro slot…', a: proDeactivateMenu},
+      {l: 'Cancel', a: () => {}}
+    ]);
+    else proActivateMenu();
+  }
   else if (a === 'maybe') { ui.showMaybe = !ui.showMaybe; save('sp_ui', ui); renderMain(); }
   else if (a === 'gpv') { ui.gpvOff = !ui.gpvOff; save('sp_ui', ui); renderMain(); }
   else if (a === 'livefmt') { ui.liveFmt = LIVEFMT_ORDER[(LIVEFMT_ORDER.indexOf(ui.liveFmt || 'auto') + 1) % LIVEFMT_ORDER.length]; save('sp_ui', ui); renderMain(); }
