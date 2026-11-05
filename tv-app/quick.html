@@ -66,8 +66,14 @@ input{width:100%;background:var(--panel);border:.2rem solid var(--line);border-r
 #main{background:linear-gradient(180deg,rgba(8,13,20,.86),rgba(8,13,20,.94)),url(home-bg-wide.jpg) center/cover no-repeat,var(--bg)}
 #rail .brand{font-size:2.4rem;line-height:1.05;font-weight:700;color:var(--amber);margin:0 0 3.2rem 2rem}
 .ri{display:flex;align-items:center;gap:1.6rem;white-space:nowrap;padding:1.1rem 1.4rem 1.1rem 2.2rem;margin:.2rem 2rem .2rem 0;font-size:2.2rem;color:#B8A383;border-left:.4rem solid transparent;border-radius:0 .6rem .6rem 0;cursor:pointer}
-.ri.active{color:#fff;border-left-color:var(--amber)}
+/* The active row used to just flip .ri.focus's own background on too (same translucent crimson wash
+   used for plain keyboard-focus elsewhere in the rail), which read as a muddy, washed-out pink against
+   the rail's own maroon gradient, plus it inherited .ri's edge-hugging layout (zero left margin, right-
+   only rounding) meant for a flat unselected row. "You're here" gets its own clean gold/red treatment and
+   floats as a proper pill, independent of whether keyboard focus also happens to be sitting on it. */
+.ri.active{color:#fff;background:linear-gradient(90deg,rgba(231,185,111,.28),rgba(196,30,45,.16));border-left-color:var(--amber);padding-right:1.25rem;margin:0 .75rem;border-radius:.625rem}
 .ri.focus{background:var(--focus-bg);color:#fff}
+.ri.active.focus{background:linear-gradient(90deg,rgba(231,185,111,.38),rgba(196,30,45,.26));border-left-color:var(--amber)}
 .ri .ic{width:4.4rem;height:4.4rem;flex:none;display:block}
 .ri .ic svg,.ri .ic img{width:100%;height:100%;display:block;object-fit:contain}
 .ri .ic img{opacity:.7;transition:opacity .15s}
@@ -193,7 +199,7 @@ h2{font-size:3rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overfl
 #main.sport,#game{background:linear-gradient(180deg,rgba(8,13,20,.55),rgba(8,13,20,.78) 45%,rgba(8,13,20,.88)),url(sport-bg-wide.jpg) center/cover no-repeat,var(--bg)}
 @media (orientation:portrait){#main.sport,#game{background:linear-gradient(180deg,rgba(8,13,20,.55),rgba(8,13,20,.78) 45%,rgba(8,13,20,.88)),url(sport-bg-portrait.jpg) center/cover no-repeat,var(--bg)}}
 @media (orientation:portrait){#home{background:linear-gradient(180deg,rgba(8,13,20,.15),rgba(8,13,20,.55) 55%,rgba(8,13,20,.8)),url(home-bg-portrait.jpg) center/cover no-repeat,var(--bg)}}
-.hwrap{position:absolute;top:0;left:0;right:0;bottom:5rem;padding:2.4rem 6rem 0;display:flex;flex-direction:column}
+.hwrap{position:absolute;top:0;left:0;right:0;bottom:6.5rem;padding:2.4rem 6rem 0;display:flex;flex-direction:column}
 .hhead{position:relative;display:flex;justify-content:center;align-items:flex-start}
 .hlogo{width:11rem;margin-top:2.2rem;filter:drop-shadow(0 1rem 2.4rem rgba(0,0,0,.5))}
 .hlogo .rc-word{font-size:2.6rem;margin-top:.5rem}
@@ -6844,7 +6850,15 @@ function pickChip(c) {
 function homeOpenSportGroup(id) {
   const g = SPORT_GROUPS.find(s => s[0] === id);
   if (!g) return;
-  if (g[3].length === 1) { homeOpenSearch(g[3][0]); return; }
+  /* A single-competition sport (Baseball -> MLB, Boxing -> Boxing...) used to land via
+     homeOpenSearch(g[3][0]), which sets Q.sport to the competition name but never Q.sportGroup --
+     sportChips() then built the tab row from the user's own pinned chip list instead of this sport's
+     competition, so a sport not already pinned (anything outside DEFAULT_CHIPS) left no tab able to
+     match Q.sport, and the previously-active tab stayed highlighted while the fixture cards below (which
+     key off Q.sport directly, not Q.chip) were already correct. Routing through the same
+     "All <sport>" landing multi-competition sports use for their last menu option fixes it for free --
+     it sets Q.sportGroup, which makes sportChips() build the row from this sport's own competition list. */
+  if (g[3].length === 1) { homeOpenSportGroupAll(id); return; }
   const items = g[3].map(c => ({l: compLabel(c), a: () => homeOpenSearch(c)}));
   items.push({l: 'All ' + g[1], a: () => homeOpenSportGroupAll(id)});
   openMenu(items);
@@ -7841,7 +7855,16 @@ function urlsForOne0(it) {
     if (PC) return ts.concat(hls);
     return (fmts.includes('m3u8') ? [{url: base + '.m3u8', how: 'native'}] : []).concat(hls, fmts.includes('ts') ? [{url: base + '.ts', how: 'native'}] : [], ts);
   }
-  return [{url: b + (it.t === 'vod' ? '/movie/' : '/series/') + u + '/' + p + '/' + it.id + '.' + (it.ext || 'mp4'), how: 'native'}];
+  /* The provider's own declared container_extension is sometimes just wrong -- a known, common
+     Xtream-panel inconsistency (reported real case: a Series episode that wouldn't play under its
+     declared extension at all). Try it first since it's usually right, then the other extensions real
+     VOD/Series providers actually use, so a wrong declaration doesn't dead-end after one failed
+     attempt the way it used to. Live TV already gets this kind of multi-candidate resilience (HLS, then
+     mpegts, then native) via NativeStreamer's own retry loop; VOD/Series only ever had the one URL. */
+  const vodBase = b + (it.t === 'vod' ? '/movie/' : '/series/') + u + '/' + p + '/' + it.id;
+  const declaredExt = String(it.ext || 'mp4').toLowerCase();
+  const extFallbacks = ['mp4', 'mkv', 'ts', 'avi'].filter(e => e !== declaredExt);
+  return [declaredExt].concat(extFallbacks).map(e => ({url: vodBase + '.' + e, how: 'native'}));
 }
 function startStream() {
   const it = cur(); if (!it) return;
