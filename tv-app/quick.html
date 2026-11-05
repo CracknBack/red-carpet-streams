@@ -678,6 +678,11 @@ h2 .sep{color:var(--muted);font-weight:500;margin:0 1.2rem}
 #opts-msg{flex:none;text-align:center;margin:1rem 0 0}
 #opts-list{overflow-y:auto;flex:1 1 auto;min-height:0}
 .obox .row{height:5.4rem;flex:none}
+.dbox{max-width:min(72rem,92vw)}
+.dtext{font-size:1.9rem;line-height:1.55;margin:1.4rem 0 2.2rem;color:var(--text)}
+.drow{display:flex;gap:1.6rem;justify-content:flex-end;flex:none}
+.dbtn{appearance:none;font:inherit;font-size:1.9rem;font-weight:700;padding:1.1rem 2.4rem;border-radius:.8rem;border:.18rem solid rgba(231,185,111,.5);background:var(--raise);color:var(--text);cursor:pointer}
+.dbtn.focus{background:var(--amber);border-color:var(--amber);color:#1a1006}
 html.native,html.native body{background:transparent!important}
 html.native #player{background:transparent}
 html.native #video{display:none}
@@ -1143,6 +1148,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 <div id="ask" class="overlay hidden"><div class="obox askbox"><div id="ask-title" class="slabel"></div><p id="ask-msg" class="note"></p><input id="ask-in" type="text" autocomplete="off" spellcheck="false"><p class="note">OK to save, Back to cancel</p></div></div>
 <div id="pk" class="overlay hidden"><div class="obox pkbox"><div class="pkcol"><div id="pk-title" class="slabel"></div><p class="pkm">Scan this with your phone’s camera, type, and press Send.</p><p id="pk-msg" class="pkst">Starting…</p><p id="pk-url" class="pku hidden"></p><p class="note">Back to cancel</p></div><canvas id="pk-qr"></canvas></div></div>
 <div id="opts" class="overlay hidden"><div class="obox"><div id="opts-title" class="slabel">Options</div><img id="opts-img" class="hidden"><p id="opts-msg" class="note hidden"></p><div id="opts-list"></div></div></div>
+<div id="disclaimer" class="overlay hidden"><div class="obox dbox"><div class="slabel">Before you start</div><p class="note dtext">Red Carpet Player is a general-purpose media player and local EPG organizer designed for personal and professional playback of user-provided playlists. Red Carpet Player does not host, provide, sell, or distribute any media content, playlists, or live streams. Users are solely responsible for ensuring they have the legal right to access any streams loaded into the application.</p><div class="drow"><button id="d-disagree" class="dbtn" type="button">Disagree &amp; Exit</button><button id="d-agree" class="dbtn" type="button">Agree &amp; Continue</button></div></div></div>
 <div id="loading" class="loading hidden"><div class="spinner"></div><p id="loading-msg">Loading…</p><div id="loading-bar" class="pbar hidden"><div id="loading-bar-fill" class="pbar-fill"></div></div></div>
 <div id="toast" class="toast hidden"></div>
 <div id="numjump" class="hidden"></div>
@@ -9015,7 +9021,45 @@ function enterMain() {
   setTimeout(crashGuardMarkStable, 150000);
 }
 
+/* ================= first-use legal disclaimer =================
+   Shown once, before anything else -- even the login screen -- regardless of whether this device
+   already has a saved config, since the disclaimer is about the app itself, not about any one account.
+   Versioned key (sp_disclaimer_v1) so a future change to the actual wording can re-prompt everyone by
+   bumping the suffix, without needing to touch whatever's already saved under the old key. */
+const DIS_KEY = 'sp_disclaimer_v1';
+const disclaimerAccepted = () => load(DIS_KEY, false) === true;
+const DIS = {open: false, sel: 1, resolve: null};   /* sel: 0 = disagree, 1 = agree -- agree focused by default */
+function renderDisclaimer() {
+  $('d-agree').classList.toggle('focus', DIS.sel === 1);
+  $('d-disagree').classList.toggle('focus', DIS.sel === 0);
+}
+function showDisclaimer() {
+  return new Promise(resolve => {
+    DIS.open = true; DIS.sel = 1; DIS.resolve = resolve;
+    renderDisclaimer();
+    $('disclaimer').classList.remove('hidden');
+  });
+}
+function closeDisclaimer(agree) {
+  DIS.open = false;
+  $('disclaimer').classList.add('hidden');
+  if (agree) { save(DIS_KEY, true); DIS.resolve(true); }
+  else if (FIRE) window.RCS.exit();   /* same exit path exitPrompt() already uses */
+  else window.close();
+}
+function disclaimerKey(k) {
+  if (k === KEY.LEFT) DIS.sel = 0;
+  else if (k === KEY.RIGHT) DIS.sel = 1;
+  else if (k === KEY.ENTER) { closeDisclaimer(DIS.sel === 1); return; }
+  else if (k === KEY.BACK || k === KEY.ESC) { closeDisclaimer(false); return; }   /* Back reads as Disagree, not a no-op */
+  else return;
+  renderDisclaimer();
+}
+$('d-agree').addEventListener('click', () => closeDisclaimer(true));
+$('d-disagree').addEventListener('click', () => closeDisclaimer(false));
+
 async function boot() {
+  if (!disclaimerAccepted()) await showDisclaimer();
   crashGuardOnBoot();
   memLog('boot start');
   await idb.open();
@@ -9047,6 +9091,7 @@ function wakeHints() {
 }
 function handleKey(k, e) {
   wakeHints();
+  if (DIS.open) { e.preventDefault(); disclaimerKey(k); return; }
   if (PK.open) { e.preventDefault(); if (k === KEY.BACK || k === KEY.ESC || k === KEY.ENTER) closePhone(); return; }
   if (ASK.open) {
     if (k === KEY.MENU && !$('ask-in').classList.contains('hidden')) { e.preventDefault(); openPhone($('ask-title').textContent, t => { $('ask-in').value = t; }); return; } if (k === KEY.ENTER) { e.preventDefault(); closeAsk(true); } else if (k === KEY.BACK || k === KEY.ESC) { e.preventDefault(); closeAsk(false); } return; }
