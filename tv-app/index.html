@@ -5911,12 +5911,26 @@ function buildCats0(t) {
 function buildVodCats(t) {
   const d = DATA[t], bad = adultBadCats(t);
   const v = [];
+  /* "Continue watching", first in the list and only shown when it's actually got something in it --
+     reuses continueWatchingList() (the Home screen's own "Continue" tile/page), which resolves straight
+     from the saved progress records' OWN cached name/icon/etc, not a catalog lookup -- unlike the older
+     __cont branch in specialList() below (kept for the dedicated 'cont' page, which needs no change
+     here), that path only works once the whole type has been fetched+grouped via ensureTitlesGrouped,
+     which Movies/Series opening deliberately no longer does eagerly (a full-catalog fetch is what used
+     to OOM-crash this provider's real size, see buildVodCats' own history just above). Prepended here as
+     a cheap, catalog-independent list, so it's reliable the very first time this page opens, not just
+     after some other category happened to trigger a full fetch. */
+  const cwCount = continueWatchingList().filter(r => r.t === t).length;
+  const cont = cwCount ? [{id: '__cont', name: 'Continue watching', n: cwCount}] : [];
   d.cats.forEach(c => {
     if (bad.has(c.id)) return;
     const n = d.catItems && d.catItems.has(c.id) ? d.catItems.get(c.id).length : undefined;
     v.push({id: c.id, name: c.name, raw: c.raw, co: c.co, n});
   });
-  return t === 'series' ? groupSeriesCats(v) : v;
+  /* "Continue watching" is concatenated back on AFTER grouping, not pushed into v before it, since
+     groupSeriesCats() reorders/buckets everything it's given by region -- it would otherwise end up
+     wherever an unmatched "Continue watching" name happens to sort to, not reliably first. */
+  return cont.concat(t === 'series' ? groupSeriesCats(v) : v);
 }
 /* TV Series: the provider's own category list runs to ~200 entries on this account (confirmed on the
    real device), almost entirely <region/language> x <platform-or-genre> combinations -- "Germany
@@ -6173,10 +6187,14 @@ function specialList(t, id) {
   if (id === '__adult') return adultOk() ? sortItems(t, d.adult || []) : [];
   if (id === '__fav') return uniq(favs[t].map(get));
   if (id === '__recent') return uniq(recent.live.map(get));
-  if (id === '__cont') {
-    if (t === 'series') return uniq(recent.series.map(get));
-    return uniq(Object.keys(prog).filter(k => k[0] === 'v').sort((a, b) => prog[b].ts - prog[a].ts).map(k => get(k.slice(1))));
-  }
+  /* vod/series only -- buildVodCats() is the only thing that ever offers this id for these two types, and
+     only once continueWatchingList() already has something in it for that type. Same cheap, catalog-
+     independent source, not a d.byId lookup: that depends on the whole type having been fetched+grouped
+     (ensureTitlesGrouped), which Movies/Series opening deliberately no longer does eagerly, so a d.byId-
+     based version of this could show the category yet still render it empty. continueWatchingList()'s
+     own lite:1 items are the same pattern openItem() already hydrates a lean search-index result from --
+     selecting one of these fetches its one category on demand, same place "open a search result" does. */
+  if (id === '__cont' && (t === 'vod' || t === 'series')) return continueWatchingList().filter(r => r.t === t);
   if (id === '__new') return d.items.slice().sort((a, b) => b.added - a.added).slice(0, 300);
   if ((t === 'vod' || t === 'series') && (id === '__newrel' || id === '__top')) return libIndex(t)[id === '__newrel' ? 'newrel' : 'top'];
   if ((t === 'vod' || t === 'series') && (id === '__langs' || id === '__prov' || id === 'up')) return [];
@@ -6688,6 +6706,19 @@ async function showPage(p) {
   $('main').classList.toggle('sport', isSearchPage(p) || p === 'favs');
   const browse = p === 'live' || p === 'vod' || p === 'series' || p === 'favs' || p === 'cont';
   if (p === 'favs') B.favs.cats = [];   /* rebuilt each visit so the counts are current */
+  /* Movies/Series used to only land on "Continue watching" (buildLibCats' own first entry) the very
+     FIRST time you opened either in a session -- ensureCats() is a no-op once b.cats is already
+     populated, so every later visit just restored whatever category you'd last been browsing (via
+     b.catId), even if something was sitting ready to resume. Rebuilding fresh on every visit, same as
+     favs just above, means a real resume candidate is the first thing you see each time you go
+     straight to Movies or Series, not something you have to remember to navigate back to. */
+  /* catId cleared too, not just cats -- ensureCats() below restores by matching catId against the
+     freshly-rebuilt list FIRST, before ever falling back to its own index-0 default, so leaving catId
+     set to whatever category was last browsed (e.g. "Drama") would keep landing back there even with
+     cats rebuilt, defeating the point: Continue watching (now buildVodCats' own index 0 when it has
+     anything in it) is meant to be what a fresh visit to Movies/Series shows, every time, not just the
+     first time this session. */
+  if (p === 'vod' || p === 'series') { B[p].cats = []; B[p].catId = null; }
   $('page-browse').classList.toggle('hidden', !browse);
   $('page-search').classList.toggle('hidden', !isSearchPage(p));
   $('page-settings').classList.toggle('hidden', p !== 'settings');
