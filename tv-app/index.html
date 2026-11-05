@@ -200,6 +200,7 @@ h2{font-size:3rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overfl
 .htime{font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-size:7rem;font-weight:700;color:#fff;line-height:1}
 .hdate{font-size:2.2rem;color:var(--text);margin-top:.6rem}
 .hsub{font-size:1.7rem;color:var(--muted);margin-top:.4rem}
+.htrial{font-size:1.5rem;font-weight:700;letter-spacing:.04em;color:#D9AE6B;margin-top:.5rem;cursor:pointer;border:.1rem solid #D9AE6B;border-radius:.5rem;padding:.3rem .8rem;display:inline-block}
 .htiles{display:grid;grid-template-columns:repeat(3,30rem);justify-content:center;gap:2.6rem 8rem;margin-top:4.2rem}
 .htile{border-radius:2rem;background:none;border:.25rem solid transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6rem;padding:1rem 0 1.2rem;cursor:pointer;transition:transform .15s,filter .15s,background .15s;color:var(--text)}
 .htile .hico{width:16rem;height:16rem;display:block;border-radius:50%;transition:box-shadow .15s,filter .15s}
@@ -886,6 +887,7 @@ html.light .row.focus{color:#3A1D18}
 html.light .bd-prolock{color:#8A5A1C}
 html.light .row.focus .bd{color:#3A1D18}
 html.light .htime{color:#3A1D18}
+html.light .htrial{color:#8A5A1C}
 html.light .htile.focus .hd{color:#8A5A1C}
 html.light .hslot{color:#8A5A1C;background:linear-gradient(180deg,rgba(252,248,238,0.94),rgba(252,248,238,0.97));box-shadow:inset 0 0 0 .5rem #FCF8EE,inset 0 0 0 .62rem rgba(150,20,36,.85),0 1rem 3rem rgba(90,60,30,0.25)}
 html.light .hslot .hd{color:#8A5A1C}
@@ -1085,7 +1087,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 <div id="home" class="screen hidden">
   <div class="hspot" aria-hidden="true"><i class="hs-glow l"></i><i class="hs-glow r"></i><i class="hs-beam l"></i><i class="hs-beam r"></i><i class="hs-pool"></i></div>
   <div class="hwrap">
-    <div class="hhead"><div class="logo hlogo"><img src="logo-mark.png" alt=""><div class="rc-word"><span class="rc-red">RED CARPET</span><span class="rc-gold">PLAYER</span></div></div><div class="hclock"><div id="h-time" class="htime"></div><div id="h-date" class="hdate"></div><div id="h-sub" class="hsub"></div></div><button id="h-theme" class="htheme" type="button" aria-label="Switch between light and dark"><span class="th-sun"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.3 5.3l1.9 1.9M16.8 16.8l1.9 1.9M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9"/></svg></span><span class="th-moon"><svg viewBox="0 0 24 24"><path d="M20.2 14.6A8.6 8.6 0 0 1 9.4 3.8a8.6 8.6 0 1 0 10.8 10.8z"/></svg></span></button></div>
+    <div class="hhead"><div class="logo hlogo"><img src="logo-mark.png" alt=""><div class="rc-word"><span class="rc-red">RED CARPET</span><span class="rc-gold">PLAYER</span></div></div><div class="hclock"><div id="h-time" class="htime"></div><div id="h-date" class="hdate"></div><div id="h-sub" class="hsub"></div><div id="h-trial" class="htrial hidden" onclick="proUpsell('Red Carpet Pro')"></div></div><button id="h-theme" class="htheme" type="button" aria-label="Switch between light and dark"><span class="th-sun"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.3 5.3l1.9 1.9M16.8 16.8l1.9 1.9M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9"/></svg></span><span class="th-moon"><svg viewBox="0 0 24 24"><path d="M20.2 14.6A8.6 8.6 0 0 1 9.4 3.8a8.6 8.6 0 1 0 10.8 10.8z"/></svg></span></button></div>
     <div id="h-tiles" class="hcar"></div>
     <div id="h-strip-wrap" class="hstrip"><div id="hhub" class="hhub"><div class="hhub-head"><button id="h-brand" class="hhub-brand" type="button"><img class="hhub-sh" src="sh-badge.png" alt=""><div id="h-strip-title" class="hhub-title"></div></button></div><div id="h-strip" class="hhub-game"></div><div class="hsport-toggle-row"><button id="h-sport-toggle" class="hsport-toggle" type="button"><span class="hst-car">▾</span>Your Event</button></div><div id="h-find" class="hhub-sports"></div></div></div>
   </div>
@@ -2012,7 +2014,7 @@ let serverInfo = {};
    already pasted a different address -- that's still a private build's own default below if desired. */
 const GUIDE_V2_URL_DEFAULT = '';   // e.g. 'https://your-own-pages-site/guide-v2.json' for a private build
 const PRO_GUIDE_V2_URL = 'https://cracknback.github.io/rcs-guide/guide-v2.json';
-const guideV2Url = () => (ui.guideV2Url || GUIDE_V2_URL_DEFAULT || (isProUnlocked() ? PRO_GUIDE_V2_URL : '') || '').trim();
+const guideV2Url = () => (ui.guideV2Url || GUIDE_V2_URL_DEFAULT || (isProActive() ? PRO_GUIDE_V2_URL : '') || '').trim();
 let GUIDE_V2 = null, GUIDE_V2_BUSY = false;
 async function loadGuideV2(force) {
   if (GUIDE_V2_BUSY || !guideV2Url()) return;
@@ -2559,6 +2561,25 @@ async function sha256Hex(str) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 function isProUnlocked() { return !!(ui.pro && ui.pro.key); }
+/* 7-day full-Pro trial, no key required. Anchored to Android's own package install record
+   (window.RCS.getFirstInstallTime(), added alongside this) when running inside the real app, since
+   that's OS-level metadata that survives "Clear Data"/"Clear Cache" -- a plain localStorage timestamp
+   doesn't. Falls back to a localStorage-only first-run timestamp on Windows/the no-install desktop
+   build, where there's no native install record to ask for. Neither survives a full uninstall and
+   reinstall, same as any on-device-only trial anywhere -- that's a much higher-friction reset than a
+   cache clear, which is the actual abuse case this is worth defending against. */
+const TRIAL_DAYS = 7;
+const TRIAL_START = (() => {
+  if (FIRE && window.RCS.getFirstInstallTime) {
+    try { const t = window.RCS.getFirstInstallTime(); if (t > 0) return t; } catch (e) {}
+  }
+  let t = load('sp_first_launch', null);
+  if (!t) { t = Date.now(); save('sp_first_launch', t); }
+  return t;
+})();
+function trialDaysLeft() { return Math.max(0, Math.ceil(TRIAL_DAYS - (Date.now() - TRIAL_START) / 86400000)); }
+function inTrial() { return trialDaysLeft() > 0; }
+function isProActive() { return isProUnlocked() || inTrial(); }
 /* A stable-per-device label (not a hardcoded constant) so each of a license's up-to-5 activated
    instances shows up distinctly in the Lemon Squeezy dashboard instead of 5 identical "Red Carpet
    Player" rows nobody can tell apart -- generated once and persisted, so re-activating the same
@@ -2658,7 +2679,7 @@ const pinIdx = (c, g) => pinList(c).findIndex(p => String(p.id) === String(g.id)
 const isPinned = (c, g) => pinIdx(c, g) >= 0;
 function togglePin(c, g) {
   const l = pinList(c), i = pinIdx(c, g);
-  if (i < 0 && !isProUnlocked()) { proUpsell('Pinning channels'); return; }
+  if (i < 0 && !isProActive()) { proUpsell('Pinning channels'); return; }
   if (i >= 0) l.splice(i, 1); else l.push({id: g.id, n: chKey(g.name)});
   save('sp_ui', ui); Q.skey = ''; resView.reset();
   toast((i >= 0 ? 'Unpinned ' : 'Pinned ') + disp(g) + (i >= 0 ? ' from ' : ' to ') + c + '.');
@@ -3290,7 +3311,7 @@ function parseShortcut(x) {
   return 'team:' + (TEAM_OF.get(n) || x.trim());
 }
 function askShortcuts() {
-  if (!isProUnlocked()) { proUpsell('Custom search shortcuts'); return; }
+  if (!isProActive()) { proUpsell('Custom search shortcuts'); return; }
   askText('Search shortcuts', 'Your shortcuts, separated by commas. Leagues and teams both work, for example: Premier League, La Liga, F1, Arsenal. To delete one, remove it from the list. Leave it empty to restore the defaults.',
     chipsList().map(chipLabel).join(', '), v => {
       const out = [];
@@ -3424,7 +3445,7 @@ function sportsEpgMap(all) {
    just above for why that's different from a default-on free install) unless overridden here too. */
 const RCS_GUIDE = '', RCS_LABEL = 'Red Carpet';   // e.g. 'https://your-own-pages-site/sports.xml.gz' for a private build
 const PRO_RCS_GUIDE = 'https://cracknback.github.io/rcs-guide/sports.xml.gz';
-const rcsUrl = () => ui.rcsOff ? '' : (ui.rcsGuide || RCS_GUIDE || (isProUnlocked() ? PRO_RCS_GUIDE : '') || '').trim();
+const rcsUrl = () => ui.rcsOff ? '' : (ui.rcsGuide || RCS_GUIDE || (isProActive() ? PRO_RCS_GUIDE : '') || '').trim();
 const EPGS = 'https://epgshare01.online/epgshare01/epg_ripper_';
 /* the free country guides confirmed to exist; a country's guide is used when any of its sports channels has no guide */
 const XG_BY_CC = {UK: ['UK', EPGS + 'UK1.xml.gz'], IE: ['UK', EPGS + 'UK1.xml.gz'], US: ['US sports', EPGS + 'US_SPORTS1.xml.gz'],
@@ -4353,7 +4374,7 @@ function chRow(x, i) {
   const ev = GS.ev, past = ev && evState(ev, nowMs()) === 2;
   const canReplay = past && catchupVersion(x), lt = x.lang === 2 ? (LANGS[CO_LANG[x.g.cc]] && LANGS[CO_LANG[x.g.cc]] !== 'English' ? LANGS[CO_LANG[x.g.cc]] : 'Not English') : LANG_TXT[x.lang];
   const chk = GS.now.get(x.g.id), warn = chk && chk.title && !chk.match && (x.kind === 'replay' ? x.start <= nowMs() : !past);
-  return '<div class="row gch' + (warn ? ' doubt' : '') + '" data-i="' + i + '">' + logoTile(x.g, 'row-l') + '<div class="gtxt"><div class="gtitle">' + esc(x.kind === 'name' ? feedTitle(x.g) : disp(x.g)) + badges({ql: x.g.ql}) + (!isProUnlocked() ? '<span class="bd bd-prolock">🔒 PRO DIRECT TUNE</span>' : '') + '</div>' +
+  return '<div class="row gch' + (warn ? ' doubt' : '') + '" data-i="' + i + '">' + logoTile(x.g, 'row-l') + '<div class="gtxt"><div class="gtitle">' + esc(x.kind === 'name' ? feedTitle(x.g) : disp(x.g)) + badges({ql: x.g.ql}) + (!isProActive() ? '<span class="bd bd-prolock">🔒 PRO DIRECT TUNE</span>' : '') + '</div>' +
     '<div class="sub">' + esc([lt, CNAME[x.g.cc] && x.g.cc !== 'ZZ' && CNAME[x.g.cc] !== lt ? CNAME[x.g.cc] : '', covText(x, past, canReplay)].filter(Boolean).join('  ·  ')) + '</div>' +
     (warn ? '<div class="sub warnline">This channel’s own guide says “' + esc(chk.title) + '” is on now</div>' : '') + '</div></div>';
 }
@@ -4379,7 +4400,7 @@ function manualLinkedChannel(ev) {
 }
 function doLinkChannel() {
   if (!GS.ev) return;
-  if (!isProUnlocked()) { proUpsell('Manually linking a channel'); return; }
+  if (!isProActive()) { proUpsell('Manually linking a channel'); return; }
   const ev = GS.ev;
   askText('Link a channel', 'Type a channel name from your own playlist to bind it to this fixture. It’ll appear at the top of this list and launch with one click, every time this fixture shows up, until you unlink it.', '', v => {
     if (!v.trim()) return;
@@ -4419,7 +4440,7 @@ function playEvent(ev, idx, chans) {
   if (!x) return;
   /* Browsing the Event Guide -- fixtures, sports filters, matched channels -- is free. One-click
      tuning into a matched channel from here is the Pro feature being gated, not the browsing itself. */
-  if (!isProUnlocked()) { proUpsell('One-click Event Guide tuning'); return; }
+  if (!isProActive()) { proUpsell('One-click Event Guide tuning'); return; }
   /* a replay or preview tile always opens the channel; if it hasn't started (or has ended) you're told when it is on */
   if (x.kind === 'preview' || x.kind === 'replay') {
     const word = x.kind === 'preview' ? 'preview' : 'replay', onAir = x.start <= now && (!x.stop || x.stop > now);
@@ -4719,6 +4740,9 @@ function renderHome() {
   $('h-date').textContent = d.toLocaleDateString([], {weekday: 'long', day: 'numeric', month: 'long'});
   const u = userInfo || {}, exp = Number(u.exp_date) ? new Date(Number(u.exp_date) * 1000) : null;
   $('h-sub').textContent = isM3u() ? 'Playlist' : exp ? 'Subscription active until ' + exp.toLocaleDateString([], {day: 'numeric', month: 'short', year: 'numeric'}) : (u.status || '');
+  const showTrialBadge = !isProUnlocked() && inTrial();
+  $('h-trial').classList.toggle('hidden', !showTrialBadge);
+  if (showTrialBadge) $('h-trial').textContent = 'PRO TRIAL — ' + trialDaysLeft() + ' DAY' + (trialDaysLeft() === 1 ? '' : 'S') + ' LEFT';
   $('h-ver').innerHTML = (GUIDE_BUSY ? '<span class="hbd"></span>Updating the TV guide…&nbsp;&nbsp;·&nbsp;&nbsp;' : '') + 'Version ' + esc(APP_VERSION);
   /* the carousel: seven slots around the chosen tile (it wraps round) */
   const tiles = homeTiles(), n = tiles.length;
@@ -7147,7 +7171,7 @@ function chanTile(x, i, now, past) {
   const tag = x.kind === 'replay' || x.kind === 'catchup' ? '' : sure ? '<span class="ct-ok">✓ Confirmed</span>' : '<span class="ct-lk">' + (x.kind === 'slot' ? 'Confirmation pending' : '') + '</span>';
   return '<div class="ctile' + (sure || x.kind === 'replay' || x.kind === 'catchup' ? '' : ' unsure') + '" data-i="' + i + '"><div class="ct-logo">' + logoTile(x.g, 'ct-l') + '</div><div class="ct-info">' +
     '<div class="ct-name">' + esc(x.kind === 'name' ? feedTitle(x.g) : disp(x.g)) + badges(x.g) + '</div><div class="ct-sub">' + esc(sub) + (x.start > now && ['live', 'slot', 'preview', 'replay'].indexOf(x.kind) >= 0 ? ' ' + cdHtml(x.start, 'in ') : '') + '</div>' +
-    '<div class="ct-tags">' + tag + (!isProUnlocked() ? '<span class="ct-prolock">🔒 PRO DIRECT TUNE</span>' : '') + (isAppFeed(x.g) ? '<span class="ct-app">App feed</span>' : '') + (() => { const c = langCodeOf(x.g); return c && c !== prefLang() ? '<span class="ct-lang">' + (LANGS[c] || c.toUpperCase()) + '</span>' : ''; })() +
+    '<div class="ct-tags">' + tag + (!isProActive() ? '<span class="ct-prolock">🔒 PRO DIRECT TUNE</span>' : '') + (isAppFeed(x.g) ? '<span class="ct-app">App feed</span>' : '') + (() => { const c = langCodeOf(x.g); return c && c !== prefLang() ? '<span class="ct-lang">' + (LANGS[c] || c.toUpperCase()) + '</span>' : ''; })() +
     /* several brands (beIN chief among them) run near-identical channel numbering per country -- "beIN
        Sports 3" alone doesn't say which one. g.cc already exists (clean() reads it off the channel's own
        name/category) and already drives tsdbGroups()'s country filtering; this just also shows it, so
@@ -7206,7 +7230,7 @@ function renderChanTiles() {
      bottom tile was disproportionately a beIN variant -- looked like the app was singling it out, it
      was really just "whatever's currently last". Land on the first newly-revealed tile instead. */
   if (GS._expandFocus) { GS._expandFocus = false; if (maybeRowStart >= 0) GS.ch = GS.rows[maybeRowStart][0]; }
-  const sig = [ev.key, GS.q, V, GC, GS.now.size, EPGVER, GS.showMaybe ? 1 : 0, extra, isProUnlocked() ? 1 : 0, Math.floor(now / 60000), GS.list.map(x => x.g ? x.g.id + x.kind + (x.dups ? x.dups.length : 0) : 'h').join(',')].join('|');
+  const sig = [ev.key, GS.q, V, GC, GS.now.size, EPGVER, GS.showMaybe ? 1 : 0, extra, isProActive() ? 1 : 0, Math.floor(now / 60000), GS.list.map(x => x.g ? x.g.id + x.kind + (x.dups ? x.dups.length : 0) : 'h').join(',')].join('|');
   if (el.dataset.sig !== sig) {
     el.dataset.sig = sig; el.classList.add('ctiles');
     let html = '';
@@ -7369,7 +7393,7 @@ function askChannelName(label) {
    refused to guess between -- offered first since there's already a short list to pick from, before
    falling back to typing a name from scratch. Never auto-applied; only ever a human's call. */
 function openChannelAlias() {
-  if (!isProUnlocked()) { proUpsell('Fixing a channel’s guide match'); return; }
+  if (!isProActive()) { proUpsell('Fixing a channel’s guide match'); return; }
   const pend = Object.entries(ALIAS.pend).sort((a, b) => (b[1].ts || 0) - (a[1].ts || 0));
   const items = pend.slice(0, 20).map(([k, p]) => ({l: '“' + p.label + '” — not sure which channel', a: () => {
     const sub = p.cands.map(c => ({l: c.name, a: () => { confirmAlias(k, DATA.live.byId.get(String(c.id)) || {id: c.id, name: c.name, cc: ''}); toast('Linked “' + p.label + '” to ' + c.name + '. Updating the TV guide…'); }}));
@@ -7404,7 +7428,7 @@ function renderSettings() {
     ['App version', APP_VERSION]
   ].concat(CLOCK.skew ? [['Device clock', 'Off by ' + Math.round(Math.abs(CLOCK.skew) / 60000) + ' minutes; the app corrects for it']] : []);
   const V_ = {
-    pro: ['Red Carpet Pro', isProUnlocked() ? 'Activated' + (ui.pro.mode === 'test' ? ' (test key)' : '') : 'Free Edition — tap to enter a license key'],
+    pro: ['Red Carpet Pro', isProUnlocked() ? 'Activated' + (ui.pro.mode === 'test' ? ' (test key)' : '') : inTrial() ? 'Free Trial — ' + trialDaysLeft() + ' day' + (trialDaysLeft() === 1 ? '' : 's') + ' left' : 'Free Edition — tap to enter a license key'],
     refresh: ['Update lists now', 'Last updated ' + upd + (GUIDE && GUIDE.ts ? ' · guide ' + clockStr(new Date(GUIDE.ts)) : '')], guidecheck: ['Check the TV guide', 'See what the guide contains'],
     catlist: ['Copy category list', 'Movies/Series category names, for reorganising them'],
     fdkey: ['Fixtures key (football-data.org)', !ui.fdKey ? 'Not set' : FD.err ? 'Problem: ' + FD.err.replace('Fixtures couldn’t be updated: ', '') : FD.ts ? FD.list.length + ' games · updated ' + clockStr(new Date(FD.ts)) : 'Saved'],
@@ -7436,7 +7460,7 @@ function renderSettings() {
     '<p class="note">This app is a local media player and TV guide reader. It plays whatever playlist and guide addresses you provide; it does not host, provide or verify any media streams itself.</p></div><div class="slist" id="slist">';
   SETS.forEach((a, i) => {
     if (SEC[a]) h += '<div class="slabel">' + esc(SEC[a]) + '</div>';
-    h += '<div class="srow' + (a === 'signout' ? ' danger' : '') + (S.zone === 'set' && S.setIdx === i ? ' focus' : '') + '" data-i="' + i + '"><span>' + esc(V_[a][0]) + '</span><span class="v' + (a === 'pro' && isProUnlocked() ? ' gold' : '') + '">' + esc(V_[a][1]) + '</span></div>';
+    h += '<div class="srow' + (a === 'signout' ? ' danger' : '') + (S.zone === 'set' && S.setIdx === i ? ' focus' : '') + '" data-i="' + i + '"><span>' + esc(V_[a][0]) + '</span><span class="v' + (a === 'pro' && isProActive() ? ' gold' : '') + '">' + esc(V_[a][1]) + '</span></div>';
   });
   $('page-settings').innerHTML = h + '</div></div>';
   const f = document.querySelector('#slist .srow.focus');
@@ -7488,10 +7512,10 @@ function settingsAction(i) {
       {l: 'Move times back 30 minutes', a: () => setFix(-1800e3)},
       {l: 'Move times forward 30 minutes', a: () => setFix(1800e3)}]);
   }
-  else if (a === 'rcsguide') { if (!isProUnlocked()) { proUpsell('Supplemental schedule feeds'); return; } openMenu([
+  else if (a === 'rcsguide') { if (!isProActive()) { proUpsell('Supplemental schedule feeds'); return; } openMenu([
     {l: ui.rcsOff ? 'Turn the Red Carpet guide on' : 'Turn the Red Carpet guide off', a: () => { ui.rcsOff = !ui.rcsOff; save('sp_ui', ui); loadGuide(true); renderMain(); }},
     {l: 'Set the guide address…', a: () => askText('Red Carpet sports guide', 'Paste the address of a guide that ends in sports.xml.gz. Nothing is fetched until an address is set here. Leave it empty to turn this off.', ui.rcsGuide || '', v => { ui.rcsGuide = v.trim(); ui.rcsOff = false; save('sp_ui', ui); loadGuide(true); renderMain(); })}]); }
-  else if (a === 'guidev2') { if (!isProUnlocked()) { proUpsell('Supplemental schedule feeds'); return; } askText('Resolved sports schedule (guide-v2)', 'Optional. Paste the address of a guide-v2.json file (your own rcs-guide build) to turn on multi-country broadcaster matching for leagues it covers. Nothing is fetched until an address is set here. Leave it empty to turn this off.', ui.guideV2Url || '', v => { ui.guideV2Url = v.trim(); save('sp_ui', ui); GUIDE_V2 = null; EVENTS = null; renderMain(); if (ui.guideV2Url) loadGuideV2(true).then(() => renderMain()); }); }
+  else if (a === 'guidev2') { if (!isProActive()) { proUpsell('Supplemental schedule feeds'); return; } askText('Resolved sports schedule (guide-v2)', 'Optional. Paste the address of a guide-v2.json file (your own rcs-guide build) to turn on multi-country broadcaster matching for leagues it covers. Nothing is fetched until an address is set here. Leave it empty to turn this off.', ui.guideV2Url || '', v => { ui.guideV2Url = v.trim(); save('sp_ui', ui); GUIDE_V2 = null; EVENTS = null; renderMain(); if (ui.guideV2Url) loadGuideV2(true).then(() => renderMain()); }); }
   else if (a === 'pro') {
     if (isProUnlocked()) openMenu([
       {l: 'Change license key…', a: proActivateMenu},
@@ -8356,7 +8380,7 @@ function optItems() {
   if (sc === 'main' && isSearchPage(S.page)) it.push({l: 'Update the TV guide now', a: () => loadGuide(true)});
   if (sc === 'main' && S.page === 'sportshub') it.push({l: 'Edit search shortcuts', a: askShortcuts});
   if (sc === 'game') it.push({l: 'Search channels for this game', a: doGameSearch});
-  if (sc === 'game' && GS.ev) it.push({l: '+ Link Channel' + (isProUnlocked() ? '' : ' (Red Carpet Pro)'), a: doLinkChannel});
+  if (sc === 'game' && GS.ev) it.push({l: '+ Link Channel' + (isProActive() ? '' : ' (Red Carpet Pro)'), a: doLinkChannel});
   if (sc === 'game' && ui.aiKey && GS.ev && GS.ev.fixture) it.push({l: 'Look this game up online again', a: () => runLookup(GS.ev, true)});
   const pt = pinTarget();
   /* 37 "Pin to <comp>" rows would be unusable on a remote -- offer the one that's actually relevant

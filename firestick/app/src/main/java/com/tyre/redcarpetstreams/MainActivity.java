@@ -640,5 +640,16 @@ public class MainActivity extends Activity {
         /* Called from index.html's focusin/focusout listener whenever a text <input> gains or
            loses real focus -- see typingActive's own comment for why this needs to exist at all. */
         @JavascriptInterface public void setTyping(final boolean on) { typingActive = on; }
+        /* The 7-day Pro trial's anchor: Android's own package install record, not app-private
+           storage, so it survives "Clear Data"/"Clear Cache" (the localStorage copy doesn't). It
+           can't survive a full uninstall+reinstall -- no on-device signal can -- but that's a much
+           higher-friction reset than a cache clear, which is the actual abuse case this defends. */
+        @JavascriptInterface public long getFirstInstallTime() {
+            try {
+                return getPackageManager().getPackageInfo(getPackageName(), 0).firstInstallTime;
+            } catch (Exception e) {
+                return 0;
+            }
+        }
     }
 }
