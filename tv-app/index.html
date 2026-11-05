@@ -2598,6 +2598,14 @@ function proApplyDefaultGuides() {
   if (!ui.guideV2Url) { GUIDE_V2 = null; EVENTS = null; if (guideV2Url()) loadGuideV2(true).then(() => renderMain()); }
   if (!ui.rcsGuide) loadGuide(true);
 }
+/* ui.pro can change while sitting on the Event Guide's game page -- proUpsell() opens the activation
+   flow straight from there. renderMain() alone is a no-op off the 'main' screen (confirmed by hand:
+   activating Pro from a fixture page left the PRO DIRECT TUNE badge and the tune-in gate stale until
+   something else forced a re-render), so route to whichever screen is actually showing. */
+function proRefreshScreen() {
+  if (S.screen === 'game' && GS.ev) renderGame();
+  else renderMain();
+}
 /* The one real deactivation path -- used by both "clear the key field" and the explicit Settings
    menu option below, so a device's license-key instance is always actually released on Lemon
    Squeezy's side (freeing one of the license's 5 device slots), not just unset locally. A test-key
@@ -2606,7 +2614,7 @@ async function proDeactivate() {
   const p = ui.pro;
   let released = true;
   if (p && p.mode === 'online' && p.instanceId) released = await proDeactivateOnline(p.key, p.instanceId);
-  ui.pro = null; save('sp_ui', ui); renderMain(); proApplyDefaultGuides();
+  ui.pro = null; save('sp_ui', ui); proRefreshScreen(); proApplyDefaultGuides();
   toast(released ? 'Red Carpet Pro deactivated on this device.' : 'Deactivated locally, but couldn’t reach the licensing server to release this device’s slot. Email redcarpetplayer@pm.me if your license still shows it as in use.');
 }
 function proDeactivateMenu() {
@@ -2621,12 +2629,12 @@ function proActivateMenu() {
     const k = v.trim();
     if (!k) { await proDeactivate(); return; }
     if ((await sha256Hex(k.toUpperCase())) === PRO_TEST_KEY_HASH) {
-      ui.pro = {key: k.toUpperCase(), mode: 'test', activatedAt: Date.now()}; save('sp_ui', ui); renderMain();
+      ui.pro = {key: k.toUpperCase(), mode: 'test', activatedAt: Date.now()}; save('sp_ui', ui); proRefreshScreen();
       proApplyDefaultGuides(); toast('Red Carpet Pro activated (test key).'); return;
     }
     toast('Checking your key…');
     const r = await proActivateOnline(k);
-    if (r.ok) { ui.pro = {key: k, mode: 'online', instanceId: r.instanceId, activatedAt: Date.now()}; save('sp_ui', ui); renderMain(); proApplyDefaultGuides(); toast('Red Carpet Pro activated.'); }
+    if (r.ok) { ui.pro = {key: k, mode: 'online', instanceId: r.instanceId, activatedAt: Date.now()}; save('sp_ui', ui); proRefreshScreen(); proApplyDefaultGuides(); toast('Red Carpet Pro activated.'); }
     else toast(r.error);
   });
 }
