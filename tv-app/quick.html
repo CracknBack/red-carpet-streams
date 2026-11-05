@@ -46,6 +46,13 @@ button,input{font:inherit;color:inherit}
 .field span{display:block;color:var(--muted);font-size:1.7rem;margin-bottom:.6rem}
 input{width:100%;background:var(--panel);border:.2rem solid var(--line);border-radius:.6rem;padding:1.2rem 1.6rem;font-size:2.4rem;outline:none}
 .field.focus input,input:focus{border-color:var(--amber);box-shadow:0 0 0 .4rem var(--amber-soft)}
+.authfield{display:flex;align-items:flex-start;gap:1.2rem;cursor:pointer}
+.authfield input{width:2.4rem;height:2.4rem;flex:none;margin:.2rem 0 0;appearance:none;-webkit-appearance:none;border-radius:.4rem;border:.2rem solid var(--line);background:var(--panel);cursor:pointer;position:relative}
+.authfield input:checked{background:var(--amber);border-color:var(--amber)}
+.authfield input:checked::after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:#1a1006;font-weight:700}
+.authtext{color:var(--text);font-size:1.7rem;line-height:1.4}
+.authfield.focus input{border-color:var(--amber);box-shadow:0 0 0 .4rem var(--amber-soft)}
+.authfield.focus .authtext{color:var(--amber)}
 .btn{display:inline-block;background:var(--raise);border:.2rem solid var(--line);border-radius:.6rem;padding:1.2rem 3.2rem;font-size:2.2rem;font-weight:600;cursor:pointer}
 .btn.focus{background:var(--red2);color:#fff;border-color:var(--amber)}
 .err{color:#FF8A80;min-height:2.6rem;margin-top:2rem;font-size:1.8rem}
@@ -365,7 +372,7 @@ html.phone .hb-find{font-size:3.4rem;padding:0 2rem}
 .ct-sub .cd{display:block}
 .ct-tags:empty{display:none}
 .ct-tags{margin-top:.6rem;display:flex;gap:1rem;overflow:hidden;white-space:nowrap}
-.ct-ok{font-size:1.45rem;color:#9AD3A6}.ct-lk{font-size:1.45rem;color:var(--muted)}.ct-app{font-size:1.45rem;color:#E9B96E}
+.ct-ok{font-size:1.45rem;color:#9AD3A6}.ct-ch{font-size:1.45rem;color:#E7B96F}.ct-lk{font-size:1.45rem;color:var(--muted)}.ct-app{font-size:1.45rem;color:#E9B96E}
 .ct-prolock{font-size:1.45rem;font-weight:700;color:#D9AE6B}
 .ctile.focus .ct-prolock{color:#7A4A10}
 .ct-warn{font-size:1.4rem;color:#FF8A80;margin-top:.4rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -758,6 +765,7 @@ html.phone .htheme span{width:4.4rem;height:4.4rem}
 .ftile.focus .ft-pill.rep,.ftile.focus .ft-pill.on{border-color:#5A2A1E;color:#5A2A1E}
 .ctile.focus .ct-sub{color:#4A1A1A}
 .ctile.focus .ct-ok{color:#1F6B3F}
+.ctile.focus .ct-ch{color:#7B4A2A}
 .ctile.focus .ct-app{color:#7A4A10}
 .ctile.focus .ct-warn{color:#A01818}
 .ctile.focus .bd{color:#5A2A1E;border-color:rgba(90,42,30,.6)}
@@ -925,6 +933,7 @@ html.light .ft-names{color:#3A1D18}
 html.light .ct-name{color:#3A1D18}
 html.light .ct-sub{color:#8A5A1C}
 html.light .ct-ok{color:#3A1D18}
+html.light .ct-ch{color:#8A5A1C}
 html.light .ct-app{color:#8A5A1C}
 html.light .ct-prolock{color:#8A5A1C}
 html.light .ct-warn{color:#8A5A1C}
@@ -1036,6 +1045,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
     <label class="field" id="f-pass"><span>Password</span><input id="in-pass" type="password" autocomplete="off"></label>
     <label class="field" id="f-m3u"><span>Playlist link</span><input id="in-m3u" type="text" placeholder="http://example.com/playlist.m3u" autocomplete="off" spellcheck="false"></label>
     <label class="field" id="f-epg"><span>TV guide link (XMLTV, optional)</span><input id="in-epg" type="text" placeholder="http://example.com/guide.xml.gz" autocomplete="off" spellcheck="false"></label>
+    <label class="field authfield" id="f-auth"><input id="in-auth" type="checkbox"><span class="authtext">I confirm I am authorised to access the playlist and media sources I am adding.</span></label>
     <button id="f-go" class="btn">Sign in</button>
     <p id="login-err" class="err"></p>
     <p id="login-ver" class="note"></p>
@@ -2120,7 +2130,12 @@ function v2Events() {
     });
     out.push({key: 'v2:' + e.id, fixture: true, status: e.status, label: e.label || ((e.home || '') + ' v ' + (e.away || '')),
       comp: e.comp, teams: e.home && e.away ? [e.home, e.away] : null, liveEvent: true, isEvent: true,
-      text: ' ' + norm((e.label || '') + ' ' + e.comp) + ' ', kick, start: kick, stop, chans: [...chans.values()], reps, pres});
+      text: ' ' + norm((e.label || '') + ' ' + e.comp) + ' ', kick, start: kick, stop, chans: [...chans.values()], reps, pres,
+      /* guide-v2's own raw broadcaster strings, untouched by tsdbGroups -- kept only for display (the
+         Event Guide card's "Official: X" label, see officialBroadcaster()), never consulted by any
+         matching logic. Whether a local channel was actually found for any of these is irrelevant to
+         what gets shown here: this is "who officially holds the rights", not "what's in your list". */
+      rawChannels: e.channels || []});
   }
   return out;
 }
@@ -2731,7 +2746,8 @@ function proUpsell(feature) {
   ], {
     title: 'Red Carpet Pro — www.redcarpetplayer.store',
     img: qr,
-    msg: 'Scan or visit redcarpetplayer.store on your phone to get your $4.99 Launch Pro Key (reg. $9.99), then enter it below.'
+    msg: 'Scan or visit redcarpetplayer.store on your phone to get your $4.99 Launch Pro Key (reg. $9.99), then enter it below.' +
+      ' Pro unlocks software utilities only — local guide matching, categories, multi-EPG merging and pinned channels. It does not provide access to any media content.'
   });
 }
 
@@ -7007,14 +7023,28 @@ function fixtureCd(x, s, reps, repNow, now) {
   const nx = reps.filter(r => r.start > now && !r.hl).sort((a, b) => a.start - b.start)[0];
   return nx ? cdHtml(nx.start, 'Replay in ') : '';
 }
+/* "Official: X" on an Event Guide card -- guide-v2's own broadcaster-of-record for the account's home
+   market (AU), straight from resolve_v2.py's server-side resolution, never from local matching. Purely a
+   transparency label (who actually, legitimately holds the rights), independent of whether tsdbGroups
+   found a local channel for it -- falls back to the local match count when guide-v2 has nothing for AU,
+   or isn't the source for this fixture at all (an EPG-scanned or football-data-only fixture has no
+   rawChannels at all). Never consulted by tsdbGroups/pairMatch/fxById/brand-prefix matching -- display
+   only, same as the rest of this function. */
+function officialBroadcaster(x) {
+  if (!x.rawChannels || !x.rawChannels.length) return null;
+  const c = x.rawChannels.find(c => c.country === 'AU' && c.channel);
+  return c ? clean(c.channel).name : null;
+}
 function fixtureTile(x, i, now) {
   const s = evState(x, now), reps = (x.reps || []).filter(r => !r.stop || r.stop > now), repNow = reps.some(r => repLiveNow(x, r, now));
   const pill = s === 0 ? (x.liveEvent ? '<span class="ft-pill live">LIVE</span>' : '<span class="ft-pill on">ON NOW</span>')
     : s === 2 ? '<span class="ft-pill rep">' + (x.status === 'POSTPONED' ? 'POSTPONED' : repNow ? 'REPLAY' : 'FULL TIME') + '</span>' : '';
   const n = x.fixture ? collapseFeeds(x.chans.filter(c => c.kind !== 'slot')).length : x.chans.length;
+  const official = officialBroadcaster(x);
+  const nLabel = official ? 'Official: ' + official : n ? n + ' playlist match' + (n === 1 ? '' : 'es') : '';
   return '<div class="ftile" data-i="' + i + '"><div class="ft-top"><span class="ft-comp">' + lgImg(x.comp, '') + esc(compLabel(x.comp) || '') + '</span>' + pill + '</div>' +
     '<div class="ft-names">' + esc(x.label.replace(/ v /, ' vs ')) + '</div>' +
-    '<div class="ft-bot"><span class="ft-time' + (s === 2 ? ' ft-played' : '') + '">' + (s === 2 ? '<small class="ft-day">Played</small>' + esc(((dayWord(x.kick) || 'Today ') + clockStr(new Date(x.kick))).trim()) : esc(clockStr(new Date(x.kick)))) + '</span><span class="ft-right">' + fixtureCd(x, s, reps, repNow, now) + '<span class="ft-n">' + (n && s !== 2 ? n + (n === 1 ? ' channel' : ' channels') : s === 2 ? 'replays and catch-up' : '') + '</span></span></div></div>';
+    '<div class="ft-bot"><span class="ft-time' + (s === 2 ? ' ft-played' : '') + '">' + (s === 2 ? '<small class="ft-day">Played</small>' + esc(((dayWord(x.kick) || 'Today ') + clockStr(new Date(x.kick))).trim()) : esc(clockStr(new Date(x.kick)))) + '</span><span class="ft-right">' + fixtureCd(x, s, reps, repNow, now) + '<span class="ft-n">' + (s !== 2 ? esc(nLabel) : 'replays and catch-up') + '</span></span></div></div>';
 }
 /* two columns of game tiles -- wider tiles so both team names fit without truncating (used to be three
    across, which cut off longer team names; see .ft-names) */
@@ -7395,7 +7425,7 @@ function pendingReason(x, ev) {
   return 'Pending: its guide doesn’t list this game';
 }
 /* a game's channels: tiles in three groups (showing now, going to show it, replays) */
-const SEC_TITLE = ['Showing now', 'Going to show it', 'Replays', 'Doubtful: the channel’s own guide shows something else', 'Category Matches in Your Playlist (Unscheduled in EPG)'];
+const SEC_TITLE = ['Showing now', 'In your playlist & guide', 'Replays', 'Doubtful: the channel’s own guide shows something else', 'Category Matches in Your Playlist (Unscheduled in EPG)'];
 function chanSection(x, ev, now) {
   if (x.kind === 'compch' || x.kind === 'likely') return 4;                  /* a guess: this channel usually carries the competition */
   if (!claimOk(ev, x)) return 3;
@@ -7418,7 +7448,17 @@ function chanTile(x, i, now, past) {
     : x.kind === 'preview' ? 'Preview ' + t(x.start) : x.kind === 'every' ? 'Shows every match' : x.kind === 'name' ? 'Match feed' + (x.dups && x.dups.length ? ' +' + x.dups.length : '')
     : x.kind === 'online' ? 'Reported online' : x.kind === 'pinned' ? 'Your pinned channel' : x.kind === 'found' ? 'Found by your search'
     : x.kind === 'slot' ? 'Listed at kick-off: ' + (x.title || 'this competition') : x.kind === 'compch' || x.kind === 'likely' ? pendingReason(x, GS.ev) : x.start > now ? 'From ' + t(x.start) : 'On now';
-  const tag = x.kind === 'replay' || x.kind === 'catchup' ? '' : sure ? '<span class="ct-ok">✓ Confirmed</span>' : '<span class="ct-lk">' + (x.kind === 'slot' ? 'Confirmation pending' : '') + '</span>';
+  /* Neutral source labels, not a vouching claim: which LOCAL signal matched this channel to the fixture,
+     not a statement that the stream itself is verified or endorsed. "Guide Match" = found in the
+     provider's own XMLTV EPG text (a programme title/description naming this fixture) or the channel's
+     own guide separately confirming it (x.confirmed); "Channel Match" = the channel's own raw name/
+     broadcaster identity matched instead (a PPV feed literally named after the match, a channel
+     configured to always carry this competition, or a broadcaster identified by name) -- see pairMatch()/
+     tsdbGroups()/x.kind for how each one was actually found; this only decides which of the two words to
+     show once something already qualifies as "sure" above, it doesn't change what counts as a match. */
+  const matchLabel = x.kind === 'name' || x.kind === 'online' || x.kind === 'every' ? 'Channel Match' : 'Guide Match';
+  const matchCls = matchLabel === 'Channel Match' ? 'ct-ch' : 'ct-ok';
+  const tag = x.kind === 'replay' || x.kind === 'catchup' ? '' : sure ? '<span class="' + matchCls + '">' + matchLabel + '</span>' : '<span class="ct-lk">' + (x.kind === 'slot' ? 'Confirmation pending' : '') + '</span>';
   return '<div class="ctile' + (sure || x.kind === 'replay' || x.kind === 'catchup' ? '' : ' unsure') + '" data-i="' + i + '"><div class="ct-logo">' + logoTile(x.g, 'ct-l') + '</div><div class="ct-info">' +
     '<div class="ct-name">' + esc(x.kind === 'name' ? feedTitle(x.g) : disp(x.g)) + badges(x.g) + '</div><div class="ct-sub">' + esc(sub) + (x.start > now && ['live', 'slot', 'preview', 'replay'].indexOf(x.kind) >= 0 ? ' ' + cdHtml(x.start, 'in ') : '') + '</div>' +
     '<div class="ct-tags">' + tag + (!isProActive() ? '<span class="ct-prolock">🔒 PRO DIRECT TUNE</span>' : '') + (isAppFeed(x.g) ? '<span class="ct-app">App feed</span>' : '') + (() => { const c = langCodeOf(x.g); return c && c !== prefLang() ? '<span class="ct-lang">' + (LANGS[c] || c.toUpperCase()) + '</span>' : ''; })() +
@@ -7489,7 +7529,7 @@ function renderChanTiles() {
       html += '<div class="chead' + (k === 3 ? ' doubt' : '') + '">' + SEC_TITLE[k] + '<span>' + a.length + (a.length === 1 ? ' channel' : ' channels') + '</span></div><div class="csec">' + a.map(i => chanTile(GS.list[i], i, now, past)).join('') + '</div>';
     });
     if (!confirmed && !GS.showMaybe) html = '<div class="cempty">No channel is confirmed for this game yet.</div>' + html;
-    if (extra) html += '<div class="cmore" data-i="' + SENT + '">' + (GS.showMaybe ? 'Hide the channels that aren’t confirmed' : 'Show ' + extra + ' more channel' + (extra === 1 ? '' : 's') + ' that aren’t confirmed') +
+    if (extra) html += '<div class="cmore" data-i="' + SENT + '">' + (GS.showMaybe ? 'Hide extra matching channels' : 'Show ' + extra + ' more matching broadcaster channel' + (extra === 1 ? '' : 's')) +
       '<small>' + [secs[4].length ? secs[4].length + ' possible' : '', secs[3].length ? secs[3].length + ' doubtful' : ''].filter(Boolean).join(' · ') + '</small></div>';
     el.innerHTML = html || '<div class="cempty">No channels found for this game yet. Press S to search your channels.</div>';
   }
@@ -7619,7 +7659,14 @@ function runSearch() {
    football-data.org competition this app uses -- no user, including the owner, needs to find or paste
    a football-data.org key on-device any more. ui.fdKey/loadFixtures/FD_COMPS are untouched and still
    work if a key is ever set programmatically, just no longer surfaced in Settings. */
-const SETS = HAS_MPV ? ['pro', 'refresh', 'catlist', 'pins', 'chalias', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'rcsguide', 'guidev2', 'pcplayer', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'] : ['pro', 'refresh', 'catlist', 'pins', 'chalias', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'rcsguide', 'guidev2', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'signout'];
+const SETS = HAS_MPV ? ['pro', 'refresh', 'catlist', 'pins', 'chalias', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'rcsguide', 'guidev2', 'pcplayer', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'about', 'signout'] : ['pro', 'refresh', 'catlist', 'pins', 'chalias', 'region', 'teams', 'guidecheck', 'xguide', 'xgsky', 'rcsguide', 'guidev2', 'lang', 'qpref', 'avoidhevc', 'livefmt', 'gpv', 'maybe', 'epgfix', 'layout', 'logos', 'names', 'adult', 'adultkw', 'accounts', 'about', 'signout'];
+/* ABN 16 217 031 405, Melbourne VIC -- the business identity line Settings' "About & Legal" row shows,
+   and the Pro Unlock modal's own footnote draws the "software utilities only" sentence from. One place
+   so the two can't quietly drift out of sync with each other. */
+const ABOUT_LEGAL_TEXT = 'Red Carpet Player — ABN: 16 217 031 405 (Melbourne, VIC, Australia)\n\nContact: support@redcarpetplayer.store\n\n' +
+  'Red Carpet Player is a general-purpose media player and local playlist/EPG organiser. It does not host, provide, sell, or distribute any channels, streams, playlists, or media content. To play media, you must supply your own playlist from a source you are legally authorised to access. Red Carpet Player is not affiliated with or endorsed by any broadcaster, league, or team.\n\n' +
+  'The Event Guide displays public fixture schedules and cross-references them locally on your device against the channel and XMLTV metadata supplied by your playlist. Red Carpet Player does not verify or vouch for any external stream.\n\n' +
+  'Upgrading to Red Carpet Pro unlocks software utilities only (automated local guide matching, custom categories, multi-EPG merging, and pinned channels) and does not provide access to any media content.\n\nPress OK or Back to close.';
 /* ---------- Settings: fix a channel's guide match (see ALIAS, above tsdbGroups) ---------- */
 function searchLiveByName(q) {
   const toks = norm(q).split(' ').filter(Boolean);
@@ -7703,8 +7750,9 @@ function renderSettings() {
     xguide: ['Free TV guides', ui.xgOff ? 'Off' : 'Automatic' + (GUIDE && GUIDE.xfiles && GUIDE.xfiles.length ? ' (' + GUIDE.xfiles.join(', ') + ')' : '')], teams: ['Search shortcuts', chipsList().map(chipLabel).join(', ') || 'None'],
     pcplayer: ['Movies and series play in', ui.pcPlayer === 'mpv' ? 'Always mpv' : 'mpv when needed'], lang: ['Preferred language', LANGS[ui.lang]],
     layout: ['Live TV layout', ui.liveLayout === 'provider' ? 'Provider’s categories' : 'Country, then genre'], logos: ['Channel logos', ui.logos === 'provider' ? 'Provider’s only' : 'Best match'],
-    names: ['Names', ui.orig ? 'Provider’s originals' : 'Tidied up'], signout: ['Sign out', '']};
-  const SEC = {pro: 'Red Carpet Pro', refresh: 'Lists', pins: 'Event Guide', guidecheck: 'TV guide', pcplayer: 'Playback', lang: HAS_MPV ? '' : 'Playback', layout: 'Display', adult: 'Adult content', accounts: 'Account'};
+    names: ['Names', ui.orig ? 'Provider’s originals' : 'Tidied up'],
+    about: ['About & Legal', 'ABN 16 217 031 405 · Melbourne, VIC'], signout: ['Sign out', '']};
+  const SEC = {pro: 'Red Carpet Pro', refresh: 'Lists', pins: 'Event Guide', guidecheck: 'TV guide', pcplayer: 'Playback', lang: HAS_MPV ? '' : 'Playback', layout: 'Display', adult: 'Adult content', accounts: 'Account', about: 'About'};
   let h = '<div class="sgrid"><div class="sacct"><div class="slabel">Account</div>' + rows.map(r => '<div class="kv"><span>' + esc(r[0]) + '</span><span>' + esc(r[1]) + '</span></div>').join('') +
     '<p class="note">Lists are stored on this device so everything opens instantly. They update by themselves every 12 hours.</p>' +
     '<p class="note">This app is a local media player and TV guide reader. It plays whatever playlist and guide addresses you provide; it does not host, provide or verify any media streams itself.</p></div><div class="slist" id="slist">';
@@ -7748,6 +7796,7 @@ function settingsAction(i) {
   else if (a === 'adult') adultPinMenu();
   else if (a === 'adultkw') askText('Extra adult keywords', 'If some adult channels or categories aren’t being caught, type words from their names, separated by commas. They move into the locked section when the app restarts.', ui.adultKw || '', v => { ui.adultKw = v.trim(); save('sp_ui', ui); toast('Restarting to apply…'); setTimeout(() => location.reload(), 300); });
   else if (a === 'accounts') openAccountsMenu();
+  else if (a === 'about') askText('About & Legal', ABOUT_LEGAL_TEXT, '', () => {}, true);
   else if (a === 'qpref') { ui.qpref = QPREF_ORDER[(QPREF_ORDER.indexOf(ui.qpref || 'best') + 1) % QPREF_ORDER.length]; save('sp_ui', ui); resortVersions(); renderMain(); toast('Picture quality: ' + QPREF_LABEL[ui.qpref]); }
   else if (a === 'avoidhevc') { ui.avoidHevc = !ui.avoidHevc; save('sp_ui', ui); resortVersions(); renderMain(); }
   else if (a === 'epgfix') {
@@ -8879,14 +8928,20 @@ const L = {idx: 0, mode: 'xtream'};
 const LFIELDS = {xtream: ['f-server', 'f-user', 'f-pass'], m3u: ['f-m3u', 'f-epg']};
 const ALLF = ['f-server', 'f-user', 'f-pass', 'f-m3u', 'f-epg'];
 const inputOf = f => 'in-' + f.slice(2);
-const lItems = () => ['lmode'].concat(LFIELDS[L.mode], ['f-go']);
+const lItems = () => ['lmode'].concat(LFIELDS[L.mode], ['f-auth', 'f-go']);
+/* Persisted separately from the disclaimer gate (DIS/disclaimerAccepted) -- that one is about the app
+   itself and asked once ever; this one is about THIS specific playlist/account being added, asked again
+   any time a NEW one is (adding a second account, or re-entering details after a sign-in failure clears
+   the form) but not nagged on every ordinary boot once a device already has one confirmed. */
+const AUTH_KEY = 'sp_auth_confirmed';
+function setAuthChecked(v) { $('in-auth').checked = v; save(AUTH_KEY, v); }
 function loginRender() {
   ALLF.forEach(id => $(id).classList.toggle('hidden', !LFIELDS[L.mode].includes(id)));
   $('lede').textContent = L.mode === 'xtream' ? 'Sign in with the Xtream Codes details from your provider.' :
     'Paste the M3U playlist link from your provider. The TV guide link is optional; many playlists include their own.';
   document.querySelectorAll('.lm').forEach(b => b.classList.toggle('on', b.getAttribute('data-m') === L.mode));
   const items = lItems();
-  ALLF.concat(['lmode', 'f-go']).forEach(id => $(id).classList.toggle('focus', items[L.idx] === id));
+  ALLF.concat(['lmode', 'f-auth', 'f-go']).forEach(id => $(id).classList.toggle('focus', items[L.idx] === id));
 }
 function setLoginMode(m) { if (L.mode === m) return; L.mode = m; L.idx = 0; $('login-err').textContent = ''; loginRender(); }
 function showLogin(err, pre) {
@@ -8895,7 +8950,8 @@ function showLogin(err, pre) {
   if (c && c.type === 'm3u') { L.mode = 'm3u'; $('in-m3u').value = c.url || ''; $('in-epg').value = c.epg || ''; }
   else if (c) { L.mode = 'xtream'; $('in-server').value = c.server || ''; $('in-user').value = c.user || ''; $('in-pass').value = pre ? '' : (c.pass || ''); }
   $('login-err').textContent = err || '';
-  const items = lItems(), empty = items.findIndex(id => id.startsWith('f-') && id !== 'f-go' && id !== 'f-epg' && !$(inputOf(id)).value);
+  $('in-auth').checked = load(AUTH_KEY, false) === true;
+  const items = lItems(), empty = items.findIndex(id => id.startsWith('f-') && id !== 'f-go' && id !== 'f-auth' && id !== 'f-epg' && !$(inputOf(id)).value);
   L.idx = empty >= 0 ? empty : items.length - 1;
   loginRender();
 }
@@ -8915,6 +8971,7 @@ async function authenticate() {
   if (userInfo.status && userInfo.status !== 'Active') toast('Account status: ' + userInfo.status);
 }
 async function doLogin() {
+  if (!$('in-auth').checked) { $('login-err').textContent = 'Please confirm you’re authorised to access the playlist and media sources you’re adding.'; return; }
   let c, upgraded = false;
   if (L.mode === 'm3u') {
     let url = $('in-m3u').value.trim(), epg = $('in-epg').value.trim();
@@ -8967,6 +9024,7 @@ function loginKey(k, e) {
   else if (k === KEY.ENTER) {
     if (at === 'lmode') setLoginMode(L.mode === 'xtream' ? 'm3u' : 'xtream');
     else if (at === 'f-go') doLogin();
+    else if (at === 'f-auth') { setAuthChecked(!$('in-auth').checked); loginRender(); }
     else $(inputOf(at)).focus();
   }
 }
@@ -9253,6 +9311,7 @@ wheel($('eps'), d => { SER.zone = 'eps'; const n = (SER.eps[SER.seasons[SER.s]] 
 wheel($('g-chans'), d => { if (!GS.ev) return; GS.ch = Math.max(0, Math.min(GS.list.length - 1, GS.ch + d)); renderGame(); }, 7.4);
 wheel($('m-vers'), d => { if (!MV.g) return; MV.zone = 'vers'; MV.vi = Math.max(0, Math.min(movieVerList().length - 1, MV.vi + d)); renderMovie(); }, 6.8);
 $('f-go').addEventListener('click', doLogin);
+$('in-auth').addEventListener('change', () => setAuthChecked($('in-auth').checked));
 $('opts-list').addEventListener('click', e => { const i = idxOf(e); if (i >= 0) runOpt(i); });
 $('opts').addEventListener('click', e => { if (e.target === $('opts')) closeOpts(); });
 ALLF.forEach(id => $(inputOf(id)).addEventListener('focus', () => { const i = lItems().indexOf(id); if (i >= 0) { L.idx = i; loginRender(); } }));
