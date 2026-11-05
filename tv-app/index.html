@@ -1403,13 +1403,46 @@ const norm = s => {
 let CUR = null;                                   /* the lists being prepared in the background, until they are ready to swap in */
 const D_ = () => CUR || DATA;
 function runSync(g) { let r; do { r = g.next(); } while (!r.done); return r.value; }
+/* Hardened after a real, repeated stall on a Fire TV Stick: "Preparing channels…"/"Loading movies…" sat
+   indefinitely, heap completely flat (confirmed via logcat MEMPROBE -- zero further allocation), while
+   unrelated setInterval timers kept firing normally the whole time. That rules out both a genuinely slow
+   device (heap would keep growing) and a fully-dead JS thread (other timers wouldn't fire either) -- what's
+   left is this function's own yield-and-resume step silently never resuming, or the generator throwing
+   mid-slice with nothing here to catch it, silently killing whatever awaited this call (applyData/
+   ensureTitlesGrouped) with zero trace. Two independent hardenings below, neither mutually exclusive with
+   the other being the real cause -- both close a real gap regardless of which one actually fired. */
 async function runSliced(g, report) {
   let t = performance.now(), r;
   for (;;) {
-    r = g.next();
+    try {
+      r = g.next();
+    } catch (e) {
+      /* A single bad item throwing mid-generator used to kill this whole call, and silently everything
+         awaiting it, with no trace -- the exact shape of an eternal, unexplained spinner. Logged loud
+         (memLog already pipes to logcat) and re-thrown, not swallowed: the caller still needs to know
+         this didn't finish so its own loading state and any user-facing message stay accurate. */
+      memLog('runSliced: generator threw -- ' + (e && e.message || e));
+      throw e;
+    }
     if (r.done) return r.value;
-    if (report && r.value != null) report(r.value);
-    if (performance.now() - t > 12) { await new Promise(res => setTimeout(res, 0)); t = performance.now(); }
+    if (report && r.value != null) {
+      try { report(r.value); } catch (e) { memLog('runSliced: report() threw -- ' + (e && e.message || e)); }
+    }
+    if (performance.now() - t > 12) {
+      /* Two independent clocks raced, not one setTimeout(0): requestAnimationFrame runs off the
+         compositor's own frame clock, a different mechanism than the timer queue -- if whatever caused
+         the real stall affects one, the other can still fire. A final, generous setTimeout(2000) is a
+         last-resort watchdog: if genuinely neither of the first two ever fires, force the loop to
+         continue anyway rather than hang forever -- a forced continue here only ever costs a brief
+         pause, never correctness, since this is purely a cooperative-scheduling yield, not a data
+         dependency between slices. */
+      await Promise.race([
+        new Promise(res => setTimeout(res, 0)),
+        new Promise(res => requestAnimationFrame(res)),
+        new Promise(res => setTimeout(res, 2000)),
+      ]);
+      t = performance.now();
+    }
   }
 }
 const CATMAPS = new WeakMap();
@@ -1703,6 +1736,12 @@ async function refreshAll(fg) {
     await applyData(d, fg);
     if (S.screen === 'main') { showPage(S.page); if (isSearchPage(S.page) && Q.text) runSearch(); }
     if (!fg) toast('Lists updated');
+  } catch (e) {
+    /* Same gap as ensureTitlesGrouped's own catch: nothing above this used to show the owner anything
+       when this failed partway through -- the spinner only clearing (via the finally below) with no
+       explanation of why the channel list never showed up. */
+    memLog('refreshAll failed -- ' + (e && e.message || e));
+    toast('Lists couldn’t be updated: ' + (e && e.message || e));
   } finally {
     refreshing = false;
     if (fg) loading(false);
@@ -3686,7 +3725,10 @@ async function loadExtraGuides(chans, chIdx, items, from, to, every, force) {
            logic that a future fix could fix in one place and forget to fix in the other. */
         names.forEach(n => tsdbGroups(n, cc).forEach(g => gs.add(g.id)));
         if (gs.size) { ids.set(id, [...gs]); lim.set(id, Math.min(...[...gs].map(x => covered.has(x) ? (provMax.get(x) || 0) : 0))); count += gs.size; }
-      });
+      }, /* timeout: these are third-party community URLs with no uptime guarantee -- 20s with literally
+            no bytes received, or 2 minutes total regardless of trickle, and this one source gives up
+            instead of leaving every OTHER source (and the whole guide pipeline) waiting on it forever. */
+      {idleMs: 20000, maxMs: 120000});
       notes.push('Free ' + name + ' guide: ' + count + ' of your channels matched');
     } catch (e) { notes.push('Free ' + name + ' guide couldn’t be downloaded (' + e.message + ')'); }
   }));
@@ -3715,39 +3757,70 @@ function guideListFor(it, limit) {
   return (GUIDE.byG.get(it.id) || []).filter(x => !x[2] || x[2] > now).sort((a, b) => a[1] - b[1]).slice(0, limit > 12 ? 40 : limit > 2 ? 12 : 2)
     .map(x => ({title: x[3], desc: x[4] || '', start: x[1], stop: x[2], t: clockStr(new Date(x[1]))}));
 }
-/* Reads a big XMLTV file piece by piece, so it never has to sit in memory all at once. */
-async function streamXml(url, onProg, onProgress, onChan) {
-  const open = async gz => {
-    const r = await fetch(url, GUIDE_AC ? {signal: GUIDE_AC.signal} : {});
-    if (!r.ok) throw new Error('The guide link replied with error ' + r.status + '.');
-    let body = r.body;
-    if (gz) body = body.pipeThrough(new DecompressionStream('gzip'));
-    return body.pipeThrough(new TextDecoderStream()).getReader();
-  };
-  const gz = /\.gz(\?|$)/i.test(url) && !!window.DecompressionStream;
-  let reader;
-  try { reader = await open(gz); } catch (e) { if (!gz) throw e; reader = await open(false); }
-  let buf = '', bytes = 0, t0 = Date.now();
-  for (;;) {
-    /* pause while something is playing, and hand control back to the screen every few milliseconds */
-    if (Date.now() - t0 > 25) { await new Promise(r => setTimeout(r, 8)); t0 = Date.now(); }
-    const {value, done} = await reader.read();
-    if (done) break;
-    buf += value; bytes += value.length;
-    let end;
-    if (onChan) while ((end = buf.indexOf('</channel>')) >= 0) {
-      const st = buf.lastIndexOf('<channel', end);
-      if (st >= 0) onChan(buf.slice(st, end));
-      buf = buf.slice(end + 10);
-    }
-    while ((end = buf.indexOf('</programme>')) >= 0) {
-      const st = buf.lastIndexOf('<programme', end);
-      if (st >= 0) onProg(buf.slice(st, end));
-      buf = buf.slice(end + 12);
-    }
-    if (buf.length > 1e6) buf = buf.slice(-65536);
-    if (onProgress) onProgress(bytes);
+/* Reads a big XMLTV file piece by piece, so it never has to sit in memory all at once.
+   timeout: {idleMs, maxMs} -- independent of the shared GUIDE_AC used by loadGuide's own provider-guide
+   fetch below (aborting that would also kill the provider fetch if the two ever overlap). loadExtraGuides'
+   sources are third-party, unmonitored community URLs with no uptime guarantee: a fetch() or a stream read
+   that never completes -- not an HTTP error, which the caller's own try/catch already handles, but a
+   connection that just goes silent -- never rejects on its own, so without an explicit deadline here, one
+   dead source hangs the whole Promise.all() of sources forever with nothing on screen to explain why.
+   Confirmed real case: the owner watched exactly this happen live. idleMs resets on every chunk actually
+   received, so a connection that's genuinely still transferring (even slowly) is never killed for that
+   alone; maxMs is a hard backstop regardless of how much trickle keeps resetting idleMs. */
+async function streamXml(url, onProg, onProgress, onChan, timeout) {
+  let ac = GUIDE_AC, idleTimer = null, maxTimer = null;
+  if (timeout) {
+    ac = new AbortController();
+    if (timeout.maxMs) maxTimer = setTimeout(() => ac.abort(), timeout.maxMs);
   }
+  const bumpIdle = () => {
+    if (!timeout || !timeout.idleMs) return;
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => ac.abort(), timeout.idleMs);
+  };
+  try {
+    const open = async gz => {
+      const r = await fetch(url, ac ? {signal: ac.signal} : {});
+      if (!r.ok) throw new Error('The guide link replied with error ' + r.status + '.');
+      let body = r.body;
+      if (gz) body = body.pipeThrough(new DecompressionStream('gzip'));
+      return body.pipeThrough(new TextDecoderStream()).getReader();
+    };
+    const gz = /\.gz(\?|$)/i.test(url) && !!window.DecompressionStream;
+    let reader;
+    bumpIdle();
+    try { reader = await open(gz); } catch (e) { if (!gz) throw e; reader = await open(false); }
+    bumpIdle();
+    let buf = '', bytes = 0, t0 = Date.now();
+    for (;;) {
+      /* pause while something is playing, and hand control back to the screen every few milliseconds */
+      if (Date.now() - t0 > 25) { await new Promise(r => setTimeout(r, 8)); t0 = Date.now(); }
+      const {value, done} = await reader.read();
+      if (done) break;
+      bumpIdle();
+      buf += value; bytes += value.length;
+      let end;
+      if (onChan) while ((end = buf.indexOf('</channel>')) >= 0) {
+        const st = buf.lastIndexOf('<channel', end);
+        if (st >= 0) onChan(buf.slice(st, end));
+        buf = buf.slice(end + 10);
+      }
+      while ((end = buf.indexOf('</programme>')) >= 0) {
+        const st = buf.lastIndexOf('<programme', end);
+        if (st >= 0) onProg(buf.slice(st, end));
+        buf = buf.slice(end + 12);
+      }
+      if (buf.length > 1e6) buf = buf.slice(-65536);
+      if (onProgress) onProgress(bytes);
+    }
+  } catch (e) {
+    /* Only reinterpret the error when THIS call made its own AbortController (timeout truthy) -- the
+       no-timeout path still uses the shared GUIDE_AC exactly as before, including a deliberate abort
+       from elsewhere (a fresh loadGuide() superseding an in-flight one), which must keep reading as
+       whatever it already read as, not get relabelled "timed out". */
+    if (timeout && ac.signal.aborted) throw new Error('timed out (no response for ' + (timeout.idleMs || 0) / 1000 + 's, or over ' + (timeout.maxMs || 0) / 1000 + 's total)');
+    throw e;
+  } finally { clearTimeout(idleTimer); clearTimeout(maxTimer); }
 }
 function subWithDesc(block, title, su) {
   let sub = su ? xmlDec(su[1]) : '';
@@ -5323,9 +5396,22 @@ function* prepTitlesG(t) {
 const prepTitles = t => runSync(prepTitlesG(t));
 /* The grouping applyData() skipped for vod/series (see there for why): done once, the first time
    it's actually needed, with its own "Preparing…" message so it never surprises the user. */
+/* Guards against two overlapping runs for the SAME type (a double-press opening Movies twice while the
+   first call is still in flight, or a background refreshAll() landing mid-way through) racing on the
+   same x.items/x.grouped mutations -- a real, if rare, contributor to the exact "nothing ever finishes"
+   shape this whole function was hardened against. A second call for a type already in flight just awaits
+   the SAME promise instead of starting a second one. */
+const TITLES_INFLIGHT = new Map();
 async function ensureTitlesGrouped(t) {
   const x = DATA && DATA[t];
   if (!x || x.grouped) return;
+  if (TITLES_INFLIGHT.has(t)) return TITLES_INFLIGHT.get(t);
+  const p = ensureTitlesGroupedOnce(t);
+  TITLES_INFLIGHT.set(t, p);
+  try { await p; } finally { TITLES_INFLIGHT.delete(t); }
+}
+async function ensureTitlesGroupedOnce(t) {
+  const x = DATA && DATA[t];
   loading(true, t === 'vod' ? 'Preparing movies…' : 'Preparing series…');
   try {
     /* A previous visit (this session or an earlier one) may have already fetched and grouped this
@@ -5371,6 +5457,14 @@ async function ensureTitlesGrouped(t) {
        needs this redone each session; it's cheap compared to the fetch+grouping it piggybacks on. */
     await runSliced(libIndexG(t));
     ALL = DATA.live.items.concat(DATA.vod.items, DATA.series.items);
+  } catch (e) {
+    /* No catch existed anywhere above this function -- a thrown error (the provider's API timing out,
+       a bad item in a real sliced loop now surfaced instead of silently hung, …) used to become an
+       unhandled rejection with nothing on screen to explain it, the spinner only clearing (via the
+       finally below) with no further feedback. Loud in logcat plus a plain-language toast turns that
+       into something the owner can actually act on. */
+    memLog('ensureTitlesGrouped[' + t + '] failed -- ' + (e && e.message || e));
+    toast((t === 'vod' ? 'Movies' : 'Series') + ' list couldn’t be loaded: ' + (e && e.message || e));
   } finally { loading(false); }
 }
 async function ensureVodSeriesReady() {
