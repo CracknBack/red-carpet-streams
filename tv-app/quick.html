@@ -3822,16 +3822,28 @@ async function streamXml(url, onProg, onProgress, onChan, timeout) {
       if (done) break;
       bumpIdle();
       buf += value; bytes += value.length;
-      let end;
+      /* A single chunk from a fast/local connection can contain thousands of complete <programme>
+         blocks at once (measured: a 17.7MB guide produced single unyielded stretches of 1.3-3.3s on a
+         bare-metal profiling run) -- the idle-time check above this for-loop only runs BETWEEN
+         reader.read() calls, never inside this extraction loop, so a chunk-heavy block had no yield
+         point at all. A fixed "every N blocks" yield was tried first and measured WORSE (+3s): once
+         ITEMS_CAP is hit, onProg() short-circuits to almost nothing per call, so most of those yields
+         were pure setTimeout(0) overhead (measured ~4.5ms/call here) with no real work to interrupt.
+         Gating on elapsed time instead -- same pattern as the between-reads check above -- only yields
+         when actual work has accumulated, so cheap post-cap iterations never pay for it. Nothing about
+         what gets matched/extracted changes, only how often control is handed back. */
+      let end, tExtract = Date.now();
       if (onChan) while ((end = buf.indexOf('</channel>')) >= 0) {
         const st = buf.lastIndexOf('<channel', end);
         if (st >= 0) onChan(buf.slice(st, end));
         buf = buf.slice(end + 10);
+        if (Date.now() - tExtract > 40) { await new Promise(r => setTimeout(r, 0)); tExtract = Date.now(); }
       }
       while ((end = buf.indexOf('</programme>')) >= 0) {
         const st = buf.lastIndexOf('<programme', end);
         if (st >= 0) onProg(buf.slice(st, end));
         buf = buf.slice(end + 12);
+        if (Date.now() - tExtract > 40) { await new Promise(r => setTimeout(r, 0)); tExtract = Date.now(); }
       }
       if (buf.length > 1e6) buf = buf.slice(-65536);
       if (onProgress) onProgress(bytes);
@@ -4443,6 +4455,7 @@ async function ensureEventsAsync() {
     EVENTS_BUILDING = false;
     memLog('buildEvents done');
     if (EVENTS && S.screen === 'home') renderHome();
+    if (EVENTS && S.screen === 'main' && isSearchPage(S.page)) { Q.skey = ''; Q.gkey = ''; renderMain(); }
   }
 }
 
@@ -4525,7 +4538,14 @@ function evRank(ev, now) { if (ev.nameOnly && !ev.timed) return 3.5; const s = e
 function evState(ev, now) { if (ev.fixture) return fxState(ev, now); return ev.start <= now && (!ev.stop || ev.stop > now) ? 0 : ev.start > now ? 1 : 2; }
 function filteredEvents(f, q) {
   if (!GUIDE && !FD.list.length) return [];
-  if (!EVENTS) buildEvents();
+  /* Sports Hub / Search are the only hot render-path callers (resultList()) -- same non-blocking
+     pattern as homeLives()/homeUpcoming(): don't drain buildEventsG() synchronously on the render path,
+     builds in the background without blocking; ensureEventsAsync() re-renders when ready. This is what
+     used to make the Event Guide page itself freeze for 2+ seconds the first time it was opened right
+     after a guide reload (measured: a single buildEvents() call takes ~2.2s on a 49k-channel catalog) --
+     the one other caller (guideCheck(), an on-demand Settings diagnostic, not a render path) keeps the
+     synchronous buildEvents() call, unchanged. */
+  if (!EVENTS) { ensureEventsAsync(); return []; }
   const now = nowMs(), toks = norm(q || '').split(' ').filter(Boolean);
   let l = EVENTS.filter(ev => ev.stop > now - 12 * 3600e3 || (ev.reps && ev.reps.some(r => r.stop > now)));
   if (toks.length) {
