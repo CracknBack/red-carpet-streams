@@ -1350,6 +1350,13 @@ function clean(raw, withYear, keepQual) {
     break;
   }
   s = s.replace(/^([^()]{1,24})\)\s*/, '$1 ');   /* "AU (STAN 54) – …" leaves "STAN 54) – …" */
+  /* "Super Sport" (two words, any provider's casing/spacing) is one brand, "SuperSport" -- a panel
+     that lists it split would otherwise make chKey() produce a different token than a one-word
+     listing of the same channel, and would put the generic "super" at the start of the name where
+     BRAND_WORD_STOP (too generic alone -- also starts "Super Rugby", "Super Bowl"...) blocks it from
+     ever being used as a brand-match word. Collapsed here, before anything else touches word
+     boundaries, so every downstream step sees the same single token a one-word listing would. */
+  s = s.replace(/\bsuper\s+sport\b/gi, 'SuperSport');
   let t = s.match(/\s*(?:[|:\-–(\[]\s*)([A-Z]{2,3})[\])]?\s*$/);
   if (!t) { t = s.match(/\s+([A-Z]{2})\s*$/); if (t && !SAFE_TRAIL.has(t[1])) t = null; }
   if (t && COUNTRIES.has(t[1]) && s.length - t[0].length > 1) { if (!co) co = CMAP[t[1]] || t[1]; s = s.slice(0, -t[0].length); }
@@ -2056,7 +2063,11 @@ function v2Events() {
     (e.channels || []).forEach(c => {
       const start = Date.parse(c.start) || kick;
       tsdbGroups(c.channel, c.country).forEach(g => {
-        const row = {g, epg: '', start, kick, stop: Math.max(stop, start + 2 * 3600e3), lang: chLang(g), region: regionOf(g), source: 'v2', confidence: c.confidence};
+        /* tier:'brand' means this channel wasn't individually confirmed -- it's one of possibly many
+           numbered feeds sharing the broadcaster's brand (see tsdbGroups' own comment). buildEventsG's
+           prune step removes these again for any event where a different signal confirms one specific
+           feed from the same brand family, so this flag only matters transiently, between here and there. */
+        const row = {g, epg: '', start, kick, stop: Math.max(stop, start + 2 * 3600e3), lang: chLang(g), region: regionOf(g), source: 'v2', confidence: c.confidence, tier: TSDB_GROUPS_TIER};
         if (c.kind === 'LIVE') { const old = chans.get(g.id); if (!old || start < old.start) chans.set(g.id, Object.assign(row, {kind: 'live'})); }
         else if (c.kind === 'REPLAY') reps.push(Object.assign(row, {kind: 'replay', hl: 0}));
         else pres.push(Object.assign(row, {kind: 'preview'}));
@@ -2774,7 +2785,8 @@ const NEAR_IDX = new WeakMap();
    the caller (tsdbGroups) reads this immediately afterward to record the ambiguity for a human to
    resolve later, instead of the candidates just vanishing the way they always used to. */
 let NEAR_AMBIG = null;
-function nearMatchUnique(tidx, k) {
+function nearMatchUnique(tidx, k, minLen) {
+  minLen = minLen || 7;
   let lenIdx = NEAR_IDX.get(tidx);
   if (!lenIdx) {
     lenIdx = new Map();
@@ -2784,7 +2796,12 @@ function nearMatchUnique(tidx, k) {
   const b0 = Math.floor(k.length / 5), hits = new Set();
   for (let b = b0 - 4; b <= b0 + 4; b++) {
     for (const kk of (lenIdx.get(b) || [])) {
-      if (kk.length < 7 || kk === k) continue;
+      /* minLen defaults to 7 -- the original guard, sized for fuzzy-matching full channel-name keys,
+         where anything shorter is too generic to risk a guess. The brand-key index (tsdbGroups' tier
+         3) is keyed on deliberately SHORT, already-distinctive brand words ("stan", "bein") with their
+         own BRAND_WORD_STOP gate upstream of this call -- a 7-char floor there would wrongly reject
+         exactly the short real brands this tier exists to catch, so that caller passes a lower minLen. */
+      if (kk.length < minLen || kk === k) continue;
       if (chKeyNear(kk, k) || chKeyNear(k, kk)) hits.add(kk);
     }
   }
@@ -2835,8 +2852,54 @@ function confirmAlias(k, g) {
   EPGMAP_CACHE[0] = EPGMAP_CACHE[1] = null; EVENTS = null;
   loadGuide(true).catch(() => {});
 }
+/* A channel's own "brand" -- its cleaned name with a trailing per-feed number stripped off, e.g.
+   "Stan Sport 1" -> "Stan Sport", "STAN 04" -> "STAN", "DAZN PPV 11" -> "DAZN PPV". Run through chKey()
+   itself so it shares the exact same normalisation every other tier here uses -- calling clean() again
+   on an already-cleaned substring is harmless (there's no leading/trailing tag left to find). Channels
+   with no trailing number (most of the catalog) just key on their whole cleaned name, same as today. */
+/* The FIRST number in the name, not the last -- a numbered multi-feed channel's own "now playing"
+   text is often appended live by the provider ("STAN 01 – Rennes v Olympiakos  UEFA Europa League
+   Matchday 4", confirmed real), which can carry its own trailing digits (a matchday number, a year...)
+   well after the feed number that actually identifies the channel. Matching the first digit run keeps
+   "STAN 01" as the brand regardless of what number-bearing text follows it; a plain brand with no
+   number at all (no digits anywhere) falls through to using the whole name unchanged. */
+const stripFeedNum = name => { const m = String(name || '').match(/^(\D*?)\s*0*(\d{1,3})\b/); return m ? m[1].trim() : String(name || ''); };
+const brandKeyOf = name => chKey(stripFeedNum(name)) || chKey(name);
+/* Called from buildEventsG() once every merge for an event has had its turn. A tier:'brand' row only
+   exists because tsdbGroups found no SPECIFIC confirmed channel at the time it ran; if a later merge in
+   the same pass (the EPG team-name scan, a PPV channel-name match, or tsdbGroups' own tier 1/2/alias on
+   a different broadcaster entry for the same event) added a genuinely specific channel from that same
+   brand family, keep only that one and drop the unconfirmed numbered siblings -- showing all N feeds is
+   strictly worse once the app actually knows which one. */
+function pruneBrandSiblings(list) {
+  if (!list.length) return list;
+  const confirmed = new Set();
+  list.forEach(c => { if (c.tier !== 'brand') confirmed.add(brandKeyOf(c.g.name)); });
+  if (!confirmed.size) return list;
+  return list.filter(c => c.tier !== 'brand' || !confirmed.has(brandKeyOf(c.g.name)));
+}
+/* Shared by every merge in buildEventsG() that adds a second source's channels onto a v2 event. v2
+   events run tsdbGroups FIRST (inside v2Events(), before any of these merges), so a channel id can
+   already be sitting in v.chans tagged tier:'brand' -- unconfirmed, tsdbGroups' own brand-family
+   catch-all -- when a merge below finds that EXACT SAME channel again through a specific, confirmed
+   signal (the EPG scan, a PPV channel-name match, guideChansForEvent, fixtureEvents()). None of those
+   sources ever set tier at all, so c.tier is always undefined on a row reaching this function -- the
+   plain "skip if already present" the dedup here used to do would keep the FIRST row seen for that id
+   forever, silently keeping the unconfirmed 'brand' guess even once a real confirmation for the exact
+   same channel shows up. Upgrade instead of skip: a specific confirmation always replaces an
+   unconfirmed brand-tier guess for the same id, never the other way round. */
+function mergeChan(list, have, c) {
+  const i = have.get(c.g.id);
+  if (i === undefined) { have.set(c.g.id, list.length); list.push(c); return; }
+  if (list[i].tier === 'brand' && c.tier !== 'brand') list[i] = c;
+}
+/* Set by tsdbGroups right before it returns, so a caller that cares (only v2Events() does) can tag the
+   row with how confident this particular match actually is -- same out-of-band pattern NEAR_AMBIG
+   already uses just above, not a new idiom. */
+let TSDB_GROUPS_TIER = null;
 function tsdbGroups(chName, cc) {
   if (!DATA.live.tidx) { const m = new Map(); DATA.live.items.forEach(g => { const k = chKey(g.name); (m.get(k) || m.set(k, []).get(k)).push(g); }); DATA.live.tidx = m; }
+  TSDB_GROUPS_TIER = null;
   const k = chKey(chName);
   if (!k) return [];
   /* A confirmed alias skips the country check entirely, on purpose -- it's exactly the kind of case
@@ -2845,36 +2908,49 @@ function tsdbGroups(chName, cc) {
      looked at this exact pairing and confirmed it, re-applying the same heuristic that may have caused
      the original miss would silently undo the fix it was created to provide. */
   const aliased = resolveAlias(k);
-  if (aliased) return aliased;
+  if (aliased) { TSDB_GROUPS_TIER = 'alias'; return aliased; }
   let gs = DATA.live.tidx.get(k) || [];
+  if (gs.length) TSDB_GROUPS_TIER = 'exact';
   if (!gs.length && k.length >= 7) {
     gs = nearMatchUnique(DATA.live.tidx, k);
-    if (!gs.length && NEAR_AMBIG) noteAmbiguous(k, chName, NEAR_AMBIG);
+    if (gs.length) TSDB_GROUPS_TIER = 'near';
+    else if (NEAR_AMBIG) noteAmbiguous(k, chName, NEAR_AMBIG);
   }
   if (!gs.length) {
-    /* Last resort: some providers number a brand's own per-event feeds with just the bare brand word
-       ("STAN 13", "STAN 14" for the curated entry "Stan Sport") -- the full curated phrase never
-       appears in the channel's own name at all, so no amount of substring matching above finds it.
-       Match on the curated entry's own first word, as a whole word, against each candidate channel's
-       first word -- whole-word so "Stan" doesn't also catch an unrelated "Stanley Cup" channel, and
-       required to be reasonably distinctive (4+ letters, not in BRAND_WORD_STOP) so this can't fire on
-       something generic. Confirmed real case: "Stan Sport" in PL_CH never matched the user's actual
-       "STAN 13"/"STAN 14" channels through either tier above. */
-    const brandWord = norm(chName).split(' ')[0];
-    if (brandWord && brandWord.length >= 4 && !BRAND_WORD_STOP.has(brandWord)) {
-      if (!DATA.live.widx) { const m = new Map(); DATA.live.items.forEach(g => { const w = norm(g.name).split(' ')[0]; if (w) (m.get(w) || m.set(w, []).get(w)).push(g); }); DATA.live.widx = m; }
-      gs = DATA.live.widx.get(brandWord) || [];
-      /* Unlike tier 2, this one was never gated at all -- confirmed real case: a curated table's literal
-         "Peacock" entry (BL_CH) matched every channel in a real ~49k-channel catalog that happened to
-         start with "Peacock" (100 of them), gluing one broadcaster's listings onto all of them. A small
-         same-brand numbering (Stan -> 2 feeds) is the case this tier exists for; a hundred unrelated
-         channels sharing a common first word is the same "too generic to guess" shape tier 2 already
-         refuses -- so refuse it here too instead of accepting everything. */
-      if (gs.length > 10) gs = [];
+    /* Last resort: some providers number a brand's own per-event feeds ("Stan Sport AU" shows up on
+       air as "STAN 01".."STAN NN", real account confirmed to run past 80; "DAZN PPV 1".."DAZN PPV 99";
+       "BEIN Sports 1"...) -- the curated broadcaster phrase never appears in any one channel's own name,
+       so no amount of substring matching above finds a SPECIFIC feed. Matched here by brand (name minus
+       its trailing feed number) via the same length-bucketed containment scan tier 2 already uses, just
+       against a brand-keyed index instead of a full-name one -- so "stansport" (guide-v2's own cleaned
+       brand, no number) correctly contains "stan" (the real "STAN 01" feed's brand) the same way tier 2
+       already matches "TNT Sports 1" against "TNT Sports". Every feed sharing the ONE matching brand is
+       returned together, tagged tier:'brand' -- this is deliberately not narrowed to a single feed (nothing
+       in a bare broadcaster name like "Stan Sport AU" says WHICH numbered feed is airing a given match);
+       buildEventsG()'s own prune step removes these again for any event where a different signal (the
+       EPG scan, a PPV channel-name match, or tier 1/2 above) already confirms one specific feed. Still
+       refuses on genuine ambiguity -- more than one DISTINCT brand family near-matching -- same as tier 2,
+       just over a smaller, brand-only index so an 80-feed family is one candidate, not eighty. */
+    if (!DATA.live.bidx) {
+      const m = new Map();
+      DATA.live.items.forEach(g => { const b = brandKeyOf(g.name); if (b) (m.get(b) || m.set(b, []).get(b)).push(g); });
+      DATA.live.bidx = m;
+    }
+    const gBrand = brandKeyOf(chName);
+    if (gBrand && gBrand.length >= 4 && !BRAND_WORD_STOP.has(gBrand)) {
+      gs = DATA.live.bidx.get(gBrand) || [];
+      if (gs.length) TSDB_GROUPS_TIER = 'brand';
+      if (!gs.length) {
+        gs = nearMatchUnique(DATA.live.bidx, gBrand, 4);
+        if (gs.length) TSDB_GROUPS_TIER = 'brand';
+        else if (NEAR_AMBIG) noteAmbiguous(gBrand, chName, NEAR_AMBIG);
+      }
     }
   }
   if (!cc) return gs;
-  return gs.filter(g => !g.cc || g.cc === 'ZZ' || g.cc === cc || (cc === 'UK' && g.cc === 'IE'));
+  const filtered = gs.filter(g => !g.cc || g.cc === 'ZZ' || g.cc === cc || (cc === 'UK' && g.cc === 'IE'));
+  if (!filtered.length) TSDB_GROUPS_TIER = null;
+  return filtered;
 }
 
 
@@ -4127,8 +4203,10 @@ function* buildEventsG() {
      also covers (the fxById block below, matched by a shared TheSportsDB event id); this generalises the
      same idea to every sport guide-v2 tracks, tried first by full name, then by surname/one-word fallback
      since the two sources don't always format a player's name the same way. */
+  /* Hoisted out of the v2.length block below -- the FD.list.length block further down needs this too,
+     for the fxByTeams fallback (see its own comment). */
+  const sidesOf = ev => ev.teams ? ev.teams.map(norm) : (() => { const m = String(ev.label || '').match(/^(.+?)\s+(?:v|vs\.?|versus)\s+(.+)$/i); return m ? [norm(m[1]), norm(m[2])] : null; })();
   if (v2.length) {
-    const sidesOf = ev => ev.teams ? ev.teams.map(norm) : (() => { const m = String(ev.label || '').match(/^(.+?)\s+(?:v|vs\.?|versus)\s+(.+)$/i); return m ? [norm(m[1]), norm(m[2])] : null; })();
     const lastWord = s => s.trim().split(' ').pop();
     const byComp = new Map();
     out.forEach(ev => { if (!ev.chans.length) return; const k = ev.comp || ''; (byComp.get(k) || byComp.set(k, []).get(k)).push(ev); });
@@ -4143,7 +4221,7 @@ function* buildEventsG() {
          (even one generic channel), the client's own independently-found matches (real provider feeds
          literally named after this event) were discarded outright instead of adding to what TheSportsDB
          already gave. Merge both, deduped, always. */
-      if (found && found.chans.length) { const have = new Set(v.chans.map(c => c.g.id)); found.chans.forEach(c => { if (!have.has(c.g.id)) { have.add(c.g.id); v.chans.push(c); } }); }
+      if (found && found.chans.length) { const have = new Map(v.chans.map((c, i) => [c.g.id, i])); found.chans.forEach(c => mergeChan(v.chans, have, c)); }
     });
     /* F1 (and anything else shaped like it -- MotoGP sessions etc.) never reaches the merge above at all:
        the block right below (EVENTS = v2.concat(...)) drops every f1Events() entry outright wherever
@@ -4163,8 +4241,8 @@ function* buildEventsG() {
       let best = null, bestDiff = Infinity;
       cands.forEach(ev => { const d = Math.abs(ev.kick - v.kick); if (d < bestDiff) { bestDiff = d; best = ev; } });
       if (!best || bestDiff > 30 * 60e3 || !best.chans.length) return;
-      const have = new Set(v.chans.map(c => c.g.id));
-      best.chans.forEach(c => { if (!have.has(c.g.id)) { have.add(c.g.id); v.chans.push(c); } });
+      const have = new Map(v.chans.map((c, i) => [c.g.id, i]));
+      best.chans.forEach(c => mergeChan(v.chans, have, c));
     });
     /* Everything else guide-v2 tracks that ALSO has no two sides -- MotoGP, NASCAR, PGA Tour, European
        Tour, and anything else shaped like a single-entity race/tournament rather than a head-to-head
@@ -4183,8 +4261,8 @@ function* buildEventsG() {
       if (sidesOf(v)) return;
       const g = guideChansForEvent(v);
       if (!g.chans.length) return;
-      const have = new Set(v.chans.map(c => c.g.id));
-      g.chans.forEach(c => { if (!have.has(c.g.id)) { have.add(c.g.id); v.chans.push(c); } });
+      const have = new Map(v.chans.map((c, i) => [c.g.id, i]));
+      g.chans.forEach(c => mergeChan(v.chans, have, c));
     });
   }
   if (FD.list.length) {
@@ -4198,9 +4276,31 @@ function* buildEventsG() {
        than leaving a v2 event stuck at zero channels when a second signal already found some. */
     if (fxAll.length) {
       const fxById = new Map(fxAll.map(f => [String(f.key).replace(/^fx:/, ''), f]));
+      /* Fallback for when the id join above misses: guide-v2 sources Champions League and Europa
+         League fixtures from TheSportsDB (v.key is 'v2:tsdb:<id>'), but this file's OWN
+         fixtureEvents() just above fetches those same two competitions straight from football-
+         data.org (FD_COMPS includes 'CL'/'EL') -- a completely different id space, so fid never
+         matches anything in fxById for exactly these two competitions, and every real PPV channel-
+         name match (kind:'name') fixtureEvents() found for them was silently never reaching the
+         guide-v2 event. Keyed by comp + the two team names sorted (order-independent, same
+         normalisation sidesOf already uses), so it doesn't care which provider's id either side
+         carries -- only whether they're plainly the same match. */
+      const fxByTeams = new Map();
+      fxAll.forEach(f => {
+        if (!f.teams) return;
+        const tk = f.comp + '|' + f.teams.map(norm).slice().sort().join('|');
+        (fxByTeams.get(tk) || fxByTeams.set(tk, []).get(tk)).push(f);
+      });
       v2.forEach(v => {
         const fid = (String(v.key).match(/:(\d+)$/) || [])[1];
-        const match = fid && fxById.get(fid);
+        let match = fid && fxById.get(fid);
+        if (!match) {
+          const sides = sidesOf(v);
+          if (sides) {
+            const tk = v.comp + '|' + sides.slice().sort().join('|');
+            match = (fxByTeams.get(tk) || []).find(f => Math.abs(f.kick - v.kick) < 2 * 3600e3) || null;
+          }
+        }
         if (!match || !match.chans.length) return;
         /* Used to only run when v.chans was already empty -- meaning as soon as TheSportsDB had ANY
            channels at all for a match, fixtureEvents()'s own channel-name matching for that exact same
@@ -4212,12 +4312,16 @@ function* buildEventsG() {
            already nonzero. These are independent, often higher-confidence signals (the provider named
            the channel after the exact match); merge them, deduped, always, rather than picking one source
            over the other based on which happened to find something first. */
-        const have = new Set(v.chans.map(c => c.g.id));
-        match.chans.forEach(c => { if (!have.has(c.g.id)) { have.add(c.g.id); v.chans.push(c); } });
+        const have = new Map(v.chans.map((c, i) => [c.g.id, i]));
+        match.chans.forEach(c => mergeChan(v.chans, have, c));
       });
     }
+    v2.forEach(v => { v.chans = pruneBrandSiblings(v.chans); v.reps = pruneBrandSiblings(v.reps); v.pres = pruneBrandSiblings(v.pres); });
     EVENTS = v2.concat(fx, f1.filter(ev => !v2Comps.has(ev.comp)), out.filter(ev => !FD_NAMES.has(ev.comp) && !v2Comps.has(ev.comp) && !(f1.length && ev.comp === 'Formula 1') && !covered(ev)));
-  } else EVENTS = v2.concat(f1.filter(ev => !v2Comps.has(ev.comp)), out.filter(ev => !v2Comps.has(ev.comp) && !(f1.length && ev.comp === 'Formula 1')));
+  } else {
+    v2.forEach(v => { v.chans = pruneBrandSiblings(v.chans); v.reps = pruneBrandSiblings(v.reps); v.pres = pruneBrandSiblings(v.pres); });
+    EVENTS = v2.concat(f1.filter(ev => !v2Comps.has(ev.comp)), out.filter(ev => !v2Comps.has(ev.comp) && !(f1.length && ev.comp === 'Formula 1')));
+  }
 }
 const buildEvents = () => runSync(buildEventsG());
 let EVENTS_BUILDING = false;
