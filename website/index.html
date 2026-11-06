@@ -202,6 +202,21 @@
     background:transparent;color:var(--ink);font-weight:700;letter-spacing:.02em;text-transform:uppercase;font-size:.85rem;cursor:pointer;
   }
 
+  /* ---------- Download Cards ---------- */
+  .dl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.6rem;max-width:72rem;margin:0 auto}
+  .dl-card{border-radius:var(--radius);border:1px solid var(--card-border);background:var(--card);padding:1.9rem 1.8rem;display:flex;flex-direction:column;gap:1rem}
+  .dl-card h3{margin:0;font-size:1.02rem;text-transform:uppercase;letter-spacing:.01em;color:var(--gold-light)}
+  .dl-card p{margin:0;font-size:.86rem;color:var(--muted);line-height:1.55;flex:1}
+  .dl-card .code-pill{align-self:stretch;justify-content:center}
+  .btn-dl{
+    display:inline-flex;align-items:center;justify-content:center;gap:.6rem;text-align:center;
+    background:transparent;border:1px solid var(--gold);color:var(--gold-light);
+    font-weight:800;letter-spacing:.02em;font-size:.82rem;text-transform:uppercase;
+    padding:.85rem 1.1rem;border-radius:.65rem;text-decoration:none;cursor:pointer;transition:background .15s ease;
+  }
+  .btn-dl:hover{background:rgba(212,175,55,.1)}
+  .btn-dl svg{width:1.05rem;height:1.05rem;flex:none}
+
   /* ---------- Install Guide ---------- */
   .install-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.6rem;max-width:64rem;margin:0 auto}
   .install-card{border-radius:var(--radius);border:1px solid var(--card-border);background:var(--card);padding:1.9rem 1.8rem;position:relative}
@@ -313,6 +328,7 @@
     .device-grid{grid-template-columns:1fr}
     .feat-grid{grid-template-columns:1fr}
     .pricing-grid{grid-template-columns:1fr}
+    .dl-grid{grid-template-columns:1fr}
     .compare-table th,.compare-table td{padding:.8rem .9rem;font-size:.78rem}
     .footer-row{flex-direction:column;align-items:flex-start}
 
@@ -374,6 +390,46 @@
 
       <div class="platform-pills">
         <div class="grp"><b>For TV:</b><span class="chip">Google TV</span><span class="chip">Android TV</span><span class="chip">Fire TV</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== DOWNLOAD: three platform cards ========== -->
+  <section class="section section-tight" id="get-app">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Get Red Carpet Player</span>
+        <h2>Download For Your <span class="gold-text">Device</span></h2>
+        <p>Same free base player and $4.99 Pro upgrade, on every platform below.</p>
+      </div>
+      <div class="dl-grid">
+        <div class="dl-card">
+          <h3>Fire TV, Google TV, Nvidia Shield &amp; Android TV</h3>
+          <p>Open the free <b>Downloader</b> app (by AFTVnews) on your TV device and enter this code to install Red Carpet Player directly.</p>
+          <div class="code-pill">
+            <span class="lbl">Downloader Code</span>
+            <span class="code">3149413</span>
+            <button type="button" aria-label="Copy downloader code" onclick="copyDownloaderCode()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="dl-card">
+          <h3>Android Phones &amp; Tablets</h3>
+          <p>The same universal APK runs on phones and tablets too, with a touch-friendly layout.</p>
+          <a class="btn-dl" href="https://github.com/CracknBack/red-carpet-streams/releases/download/firestick-60/RedCarpetPlayer-v3.23.38-build60.apk">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+            Download APK and tap to install on Android 8.0+ phones or tablets
+          </a>
+        </div>
+        <div class="dl-card">
+          <h3>Windows PC</h3>
+          <p>A native Windows build with full hardware-decoded playback — unzip and run, no installer needed.</p>
+          <a class="btn-dl" href="https://github.com/CracknBack/red-carpet-streams/releases/download/firestick-60/Red-Carpet-Streams-Windows-Quick-Install-3.23.38.zip">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+            Download Windows .zip
+          </a>
+        </div>
       </div>
     </div>
   </section>
@@ -667,7 +723,7 @@
               <input type="checkbox" id="ack-check" onchange="document.getElementById('pro-btn').disabled = !this.checked">
               I understand Red Carpet Player is an empty media player utility that includes NO TV channels, playlists, or media streams, and that software license purchases are non-refundable due to lack of third-party content.
             </label>
-            <button class="btn-pro" id="pro-btn" type="button" disabled onclick="alert('License checkout is finalizing activation — email redcarpetplayer@pm.me if you need immediate access.')">Get Red Carpet Pro ($4.99)</button>
+            <button class="btn-pro" id="pro-btn" type="button" disabled onclick="window.open('https://redcarpetplayer.lemonsqueezy.com/checkout/buy/70a50843-75c3-4fd5-9a25-379bd2b058e0','_blank')">Get Red Carpet Pro ($4.99)</button>
           </div>
         </div>
         <div class="install-grid">
@@ -694,13 +750,13 @@
 
 <footer>
   <div class="wrap footer-row">
-    <p class="footer-disclaimer">© 2026 Red Carpet Player — a neutral, content-free local media player &amp; XMLTV schedule reader. We do not provide, host, sell, or include any media streams, channels, or playlists; you supply your own legally acquired playlist or tuner feed.</p>
+    <p class="footer-disclaimer">Red Carpet Player — ABN: 16 217 031 405 (Melbourne, VIC, Australia). © 2026 Red Carpet Player — a neutral, content-free local media player &amp; XMLTV schedule reader. We do not provide, host, sell, or include any media streams, channels, or playlists; you supply your own legally acquired playlist or tuner feed.</p>
     <div class="footer-links">
       <a href="#privacy" onclick="openModal('privacy')">Privacy Policy</a>
       <a href="#terms" onclick="openModal('terms')">Terms of Use</a>
       <a href="#dmca" onclick="openModal('dmca')">DMCA / Copyright Notice</a>
       <a href="#support" onclick="openModal('support')">Support</a>
-      <a href="mailto:redcarpetplayer@pm.me">redcarpetplayer@pm.me</a>
+      <a href="mailto:support@redcarpetplayer.store">support@redcarpetplayer.store</a>
     </div>
   </div>
 </footer>
@@ -733,7 +789,7 @@
     </ul>
     <h4>Contact</h4>
     <ul>
-      <li><a href="mailto:redcarpetplayer@pm.me">redcarpetplayer@pm.me</a></li>
+      <li><a href="mailto:support@redcarpetplayer.store">support@redcarpetplayer.store</a></li>
     </ul>
   </div>
 </div>
@@ -778,7 +834,7 @@
     <h4>Reporting a concern</h4>
     <ul>
       <li>Because we do not host or control any media content, copyright concerns about a specific stream should be directed to the provider of that playlist or feed, not to us.</li>
-      <li>If you believe the player software itself infringes a right you hold, contact us directly: <a href="mailto:redcarpetplayer@pm.me">redcarpetplayer@pm.me</a></li>
+      <li>If you believe the player software itself infringes a right you hold, contact us directly: <a href="mailto:support@redcarpetplayer.store">support@redcarpetplayer.store</a></li>
     </ul>
   </div>
 </div>
@@ -786,7 +842,7 @@
 <div class="modal-overlay" id="modal-support" onclick="if(event.target===this) closeModal('support')">
   <div class="modal-box">
     <div class="modal-head"><h3>Support</h3><button class="modal-close" onclick="closeModal('support')" aria-label="Close">✕</button></div>
-    <p>Reach us directly at <a href="mailto:redcarpetplayer@pm.me">redcarpetplayer@pm.me</a>.</p>
+    <p>Reach us directly at <a href="mailto:support@redcarpetplayer.store">support@redcarpetplayer.store</a>.</p>
     <h4>Do you provide channels?</h4>
     <ul><li>No. Red Carpet Player is a standalone media player utility — you supply your own M3U/M3U8 playlist, network tuner address, or XMLTV guide source.</li></ul>
     <h4>How do I activate Pro on my TV?</h4>

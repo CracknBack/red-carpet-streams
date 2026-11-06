@@ -328,6 +328,16 @@ public class MainActivity extends Activity {
         return super.dispatchKeyEvent(e);
     }
 
+    /* Phone/tablet system Back (gesture or soft button) doesn't always reach dispatchKeyEvent as a
+       real KEYCODE_BACK KeyEvent the way the Fire TV remote's hardware Back does -- it can invoke
+       this directly instead. Forwards the same code (461) the remote's Back already sends, and
+       never calls super, so Back always hands control to the web app (closing an open overlay,
+       etc.) instead of finishing the activity outright, matching the remote's behaviour exactly. */
+    @Override
+    public void onBackPressed() {
+        js("window.__rcsKey&&__rcsKey(461)");
+    }
+
     static int map(int k) {
         switch (k) {
             case KeyEvent.KEYCODE_BACK: return 461;
@@ -637,6 +647,18 @@ public class MainActivity extends Activity {
             });
         }
         @JavascriptInterface public void exit() { ui.post(MainActivity.this::finish); }
+        /* The Pro Unlock modal's "Open Checkout on This Device" button, for phones/tablets running
+           this same APK -- a WebView has no multi-window support configured (no
+           WebChromeClient.onCreateWindow), so a plain window.open() from the page is silently a
+           no-op here; a real Intent to the system browser is the only way off-page navigation
+           actually reaches the user. */
+        @JavascriptInterface public void openUrl(final String url) {
+            ui.post(() -> {
+                try {
+                    startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)));
+                } catch (Exception e) { }
+            });
+        }
         /* Called from index.html's focusin/focusout listener whenever a text <input> gains or
            loses real focus -- see typingActive's own comment for why this needs to exist at all. */
         @JavascriptInterface public void setTyping(final boolean on) { typingActive = on; }

@@ -3,7 +3,7 @@
  * The window shows the same app as the TVs. Files the built-in (Chrome) player can't handle,
  * such as MKV files or Dolby/DTS sound, are handed to mpv, a full-featured player bundled with the app.
  */
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const net = require('net');
@@ -102,6 +102,7 @@ ipcMain.handle('mpv-play', (e, o) => {
 
 ipcMain.handle('mpv-stop', () => stopMpv());
 ipcMain.handle('fullscreen', () => { if (win) win.setFullScreen(!win.isFullScreen()); });
+ipcMain.handle('open-url', (e, url) => shell.openExternal(url));
 ipcMain.handle('quit', () => app.quit());
 
 app.whenReady().then(createWindow);

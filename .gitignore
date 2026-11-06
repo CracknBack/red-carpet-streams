@@ -1,1 +1,4 @@
 /firestick/app/rcs-release.p12
+/.toolchain/
+/firestick/local.properties
+/firestick/app/src/main/assets/

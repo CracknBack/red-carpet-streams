@@ -5,5 +5,6 @@ contextBridge.exposeInMainWorld('RCSPC', {
   mpvStop: () => ipcRenderer.invoke('mpv-stop'),
   onMpv: cb => ipcRenderer.on('mpv', (e, d) => cb(d)),
   fullscreen: () => ipcRenderer.invoke('fullscreen'),
+  openUrl: url => ipcRenderer.invoke('open-url', url),
   quit: () => ipcRenderer.invoke('quit')
 });

@@ -24,6 +24,29 @@ html.phone #page-browse.collapsed #preview{display:none!important}
 html.phone #chips{flex-wrap:wrap;height:auto;row-gap:.8rem}
 html.phone #qstat{display:none}
 html.phone .gchips{row-gap:.8rem}
+/* Touch-capable devices (see IS_TOUCH below) -- input behaviour only, independent of .phone's
+   phone-sized layout above, so it applies equally on e.g. a touch laptop running desktop.html.
+   Most rails/lists rely on D-pad scrollIntoView and are deliberately overflow:hidden for that;
+   touch has no D-pad, so those same containers need real native scroll instead. */
+html.touch-device .list,html.touch-device #rail{overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+html.touch-device .row-track{overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+html.touch-device .rows-wrap,html.touch-device #g-body{-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+html.touch-device *{touch-action:manipulation}
+html.touch-device .obox{position:relative}
+.touch-back{display:none;position:absolute;top:1rem;left:1rem;z-index:50;width:44px;height:44px;border:none;border-radius:50%;background:rgba(10,17,26,.72);color:var(--text);font-size:1.6rem;align-items:center;justify-content:center;cursor:pointer}
+html.touch-device .gmwrap>.touch-back,html.touch-device #page-search>.touch-back,html.touch-device .pkbox>.touch-back{display:flex}
+html.touch-device #osd:not(.hidden)~.touch-back{display:flex}
+/* This one sits directly in #main (.screen, position:fixed), past the left rail -- not inside
+   .page like the other Back buttons, which already starts past the rail via its own left:var(--railw). */
+html.touch-device #page-settings:not(.hidden)~.touch-back{display:flex;left:calc(var(--railw) + 1rem)}
+/* Short landscape phone heights (camera cutouts, small-screen landscape) -- less top padding so
+   the Fixture Detail/page content and the left rail/right preview never get pushed under a notch. */
+@media (max-height:500px){
+  html.touch-device .gmwrap{padding-top:2rem}
+  html.touch-device .page{padding-top:1rem}
+}
+html.touch-device #rail{padding-left:env(safe-area-inset-left,0)}
+html.touch-device #preview,html.touch-device #g-pvw{padding-right:env(safe-area-inset-right,0)}
 html.pc .row:hover,html.pc .card:hover .poster{cursor:pointer}
 body{font-family:'Barlow','Helvetica Neue',Arial,sans-serif;color:var(--text);background:var(--bg);height:100vh;overflow:hidden;font-size:2rem;line-height:1.3;-webkit-font-smoothing:antialiased}
 .hidden{display:none!important}
@@ -888,6 +911,7 @@ html.phone #pk-qr{width:min(36rem, 70vw);height:min(36rem, 70vw)}
 .svl{align-self:center;margin-right:1.2rem;color:var(--muted);font-size:1.8rem}
 .osdh{font-size:1.7rem;opacity:.75;margin-top:.6rem}
 /*LIGHT-START*/
+html.light .touch-back{background:rgba(252,248,238,0.72)}
 html.light .btn.focus{color:#3A1D18}
 html.light .err{color:#8A5A1C}
 html.light #rail{background:linear-gradient(180deg,rgba(110,15,26,.35),rgba(252,248,238,0.00) 55%)}
@@ -1081,12 +1105,14 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
   </section>
 
   <section id="page-search" class="page hidden">
+    <button class="touch-back" type="button" aria-label="Back">←</button>
     <div class="qbox"><div class="qbar" id="qbar"><svg class="qic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg><input id="q" type="text" readonly placeholder="Search Anything" autocomplete="off" spellcheck="false"><button id="qclear" class="qclear hidden" aria-label="Clear">✕ Clear</button></div><span id="qstat"></span></div>
     <div id="kb"></div>
     <div class="sres"><div id="chips"></div><div id="rlist" class="list"></div><div id="s-empty" class="empty hidden"></div></div>
   </section>
 
   <section id="page-settings" class="page hidden"></section>
+  <button class="touch-back" type="button" aria-label="Back">←</button>
   <footer id="hints" class="hints"></footer>
 </div>
 
@@ -1118,6 +1144,7 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 
 <div id="game" class="screen hidden">
   <div class="gmwrap">
+    <button class="touch-back" type="button" aria-label="Back">←</button>
     <div id="gm-when" class="gmwhen"></div>
     <button id="gm-search" class="gmsearch" type="button">Search channels</button>
     <h1 id="gm-title" class="stitle"></h1>
@@ -1151,11 +1178,12 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
 <div id="player" class="screen hidden">
   <video id="video"></video>
   <div id="osd" class="osd hidden"></div>
+  <button class="touch-back" type="button" aria-label="Back">✕</button>
   <div id="pmsg" class="pmsg hidden"></div>
 </div>
 
 <div id="ask" class="overlay hidden"><div class="obox askbox"><div id="ask-title" class="slabel"></div><p id="ask-msg" class="note"></p><input id="ask-in" type="text" autocomplete="off" spellcheck="false"><p class="note">OK to save, Back to cancel</p></div></div>
-<div id="pk" class="overlay hidden"><div class="obox pkbox"><div class="pkcol"><div id="pk-title" class="slabel"></div><p class="pkm">Scan this with your phone’s camera, type, and press Send.</p><p id="pk-msg" class="pkst">Starting…</p><p id="pk-url" class="pku hidden"></p><p class="note">Back to cancel</p></div><canvas id="pk-qr"></canvas></div></div>
+<div id="pk" class="overlay hidden"><div class="obox pkbox"><button class="touch-back" type="button" aria-label="Close">✕</button><div class="pkcol"><div id="pk-title" class="slabel"></div><p class="pkm">Scan this with your phone’s camera, type, and press Send.</p><p id="pk-msg" class="pkst">Starting…</p><p id="pk-url" class="pku hidden"></p><p class="note">Back to cancel</p></div><canvas id="pk-qr"></canvas></div></div>
 <div id="opts" class="overlay hidden"><div class="obox"><div id="opts-title" class="slabel">Options</div><img id="opts-img" class="hidden"><p id="opts-msg" class="note hidden"></p><div id="opts-list"></div></div></div>
 <div id="disclaimer" class="overlay hidden"><div class="obox dbox"><div class="slabel">Before you start</div><p class="note dtext">Red Carpet Player is a general-purpose media player and local EPG organizer designed for personal and professional playback of user-provided playlists. Red Carpet Player does not host, provide, sell, or distribute any media content, playlists, or live streams. Users are solely responsible for ensuring they have the legal right to access any streams loaded into the application.</p><div class="drow"><button id="d-disagree" class="dbtn" type="button">Disagree &amp; Exit</button><button id="d-agree" class="dbtn" type="button">Agree &amp; Continue</button></div></div></div>
 <div id="loading" class="loading hidden"><div class="spinner"></div><p id="loading-msg">Loading…</p><div id="loading-bar" class="pbar hidden"><div id="loading-bar-fill" class="pbar-fill"></div></div></div>
@@ -1191,6 +1219,12 @@ if (FIRE && window.RCS.setTyping) {
 const PC = !!window.RCSPC || !!window.RCS_DESKTOP;   /* Windows app, or the no-install desktop version */
 const PHONE = FIRE && navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) < 700;   /* Android phone */
 if (PHONE) document.documentElement.classList.add('phone');
+/* Any touch-capable device/browser running this shared app, regardless of platform (FIRE/PC/plain
+   web) -- orthogonal to PHONE's phone-sized layout above: this is only about input behaviour
+   (native scroll where D-pad focus-scroll normally substitutes for it, bigger Back/Close targets,
+   safe-area padding), so it applies equally to e.g. a touch laptop running desktop.html. */
+const IS_TOUCH = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || ('ontouchstart' in window);
+if (IS_TOUCH) document.documentElement.classList.add('touch-device');
 const HAS_MPV = !!(window.RCSPC && window.RCSPC.mpv);
 const EXT = !!window.RCS_EXT;   /* Windows quick version: can hand videos to VLC */
 function toggleFS() { if (window.RCSPC) window.RCSPC.fullscreen(); else if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => {}); }
@@ -2736,19 +2770,50 @@ function proActivateMenu() {
     else toast(r.error);
   });
 }
+/* Opens an address in a real system browser, never inside the app's own WebView -- used by the Pro
+   modal's "Open Checkout on This Device" button below. A plain window.open() only actually reaches
+   a system browser when the page is already sitting in one (desktop.html/quick.html, or any other
+   plain browser); the WebView wrapping FIRE has no multi-window support configured, and Electron's
+   window (PC with RCSPC) intercepts it rather than handing it to the OS, so both need their own
+   native hop out -- window.RCS.openUrl (Intent) and window.RCSPC.openUrl (shell.openExternal). */
+function openInSystemBrowser(url) {
+  if (window.RCS && window.RCS.openUrl) { try { window.RCS.openUrl(url); return; } catch (e) {} }
+  if (window.RCSPC && window.RCSPC.openUrl) { try { window.RCSPC.openUrl(url); return; } catch (e) {} }
+  window.open(url, '_blank');
+}
+/* Lemon Squeezy's checkout[custom][device_id] query param -- their own documented way to carry
+   custom data through checkout -- so a purchase from this screen already identifies which device
+   it came from, same as the label Lemon Squeezy's own dashboard shows for an activated instance
+   (see proDeviceLabel). */
+function proCheckoutUrl() {
+  return 'https://redcarpetplayer.lemonsqueezy.com/checkout/buy/70a50843-75c3-4fd5-9a25-379bd2b058e0?checkout[custom][device_id]=' + encodeURIComponent(proDeviceLabel());
+}
 function proUpsell(feature) {
-  const qr = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent('https://www.redcarpetplayer.store');
-  openMenu([
-    {l: feature + ' is a Red Carpet Pro feature.', a: () => {}},
-    {l: 'Enter a Red Carpet Pro license key…', a: proActivateMenu},
-    {l: 'Not now', a: () => {}}
-  ], {
-    title: 'Red Carpet Pro — www.redcarpetplayer.store',
+  const qr = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(proCheckoutUrl());
+  /* The checkout hop only makes sense where a real system browser exists one tap away -- a phone/
+     tablet running this same APK, or Windows. On a TV remote (FIRE, not PHONE) the QR code is the
+     only realistic path to a browser, so this item is left out there rather than offered and failing. */
+  const items = [
+    {l: feature + ' is a Red Carpet Pro feature.', a: () => {}}
+  ];
+  if (PHONE || PC) items.push({l: 'Open Checkout on This Device ($4.99)', a: () => openInSystemBrowser(proCheckoutUrl())});
+  items.push({l: 'Enter a Red Carpet Pro license key…', a: proActivateMenu});
+  items.push({l: 'Not now', a: () => {}});
+  openMenu(items, {
+    title: 'Red Carpet Pro — Checkout',
     img: qr,
-    msg: 'Scan or visit redcarpetplayer.store on your phone to get your $4.99 Launch Pro Key (reg. $9.99), then enter it below.' +
+    msg: 'Scan with your phone’s camera to open checkout and get your $4.99 Launch Pro Key (reg. $9.99), then enter it below.' +
       ' Pro unlocks software utilities only — local guide matching, categories, multi-EPG merging and pinned channels. It does not provide access to any media content.'
   });
 }
+/* Returning from the system browser (checkout, or just backgrounding the app) is the one moment
+   worth automatically re-checking Pro's state for -- proRefreshScreen() already re-renders whichever
+   of Settings/the game page is showing from every other activation path, so reuse it here too rather
+   than only updating on the next manual action. Both events are listened for since visibilitychange
+   alone doesn't fire in every case a WebView resumes from (e.g. plain window focus with no real tab
+   switch), and the other way round for a tab-switch inside a desktop browser with no window blur. */
+document.addEventListener('visibilitychange', () => { if (!document.hidden) proRefreshScreen(); });
+window.addEventListener('focus', () => proRefreshScreen());
 
 /* ================= pinned channels (yours) ================= */
 /* PIN_COMPS is defined below, once COMPS exists (a const can't be used before its own declaration runs). */
@@ -8545,7 +8610,7 @@ function renderOsd() {
 function showOsd() {
   renderOsd(); $('osd').classList.remove('hidden');
   clearTimeout(P.oT);
-  P.oT = setTimeout(() => { const it = cur(); if (!(it && it.t !== 'live' && video.paused)) $('osd').classList.add('hidden'); }, 6000);
+  P.oT = setTimeout(() => { const it = cur(); if (!(it && it.t !== 'live' && video.paused)) $('osd').classList.add('hidden'); }, IS_TOUCH ? 4000 : 6000);
 }
 function toggleOsd() { if ($('osd').classList.contains('hidden')) showOsd(); else $('osd').classList.add('hidden'); }
 /* Left and Right: a tap jumps (10 s back, 30 s forward). Hold the key and it scans faster the longer you hold (8x, 16x, 32x, 64x);
@@ -9200,6 +9265,21 @@ function handleKey(k, e) {
 }
 document.addEventListener('keydown', e => handleKey(e.keyCode, e));
 window.__rcsKey = k => handleKey(k, fakeEv());
+
+/* Touch Back/Close buttons (Fixture Detail, Search, Settings, Pro modal, Player HUD) all just
+   simulate the same BACK keycode every other Back path already sends, so they can never drift
+   from the one real close/back-navigation logic each screen's own key handler already has.
+   Capture phase, not bubble: several of these buttons sit inside a container that has its own
+   click listener (e.g. #osd's sibling button inside #player, which also toggles the HUD on tap) --
+   capturing on document fires before that listener does, so stopPropagation() actually reaches it
+   in time instead of running after the inner handler already did. */
+document.addEventListener('click', e => {
+  if (!e.target.closest) return;
+  const btn = e.target.closest('.touch-back');
+  if (!btn) return;
+  e.stopPropagation();
+  handleKey(KEY.BACK, fakeEv());
+}, true);
 
 /* Magic Remote pointer */
 const idxOf = e => { const el = e.target.closest('[data-i]'); return el ? Number(el.getAttribute('data-i')) : -1; };
