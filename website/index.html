@@ -10,6 +10,7 @@
 <meta property="og:description" content="Red Carpet Player unifies your own M3U/M3U8 playlists, network tuner APIs and XMLTV schedules on Android TV, Fire TV, and Google TV — with instant local channel caching and real-time Event Guide matching.">
 <meta property="og:url" content="https://www.redcarpetplayer.store/">
 <meta property="og:type" content="website">
+<meta property="og:site_name" content="Red Carpet Player">
 <meta property="og:image" content="https://www.redcarpetplayer.store/img/hero-art.jpg">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Red Carpet Player — 4K Live TV &amp; Event Guide Player">
@@ -21,7 +22,7 @@
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "Red Carpet Player",
-  "operatingSystem": "Android TV, Google TV, Fire TV",
+  "operatingSystem": "Android TV, Fire OS, Android 8.0+, Windows 10/11",
   "applicationCategory": "MultimediaApplication",
   "description": "Red Carpet Player is a standalone 4K Live TV and Event Guide player for your own M3U/M3U8 or Xtream playlist, with instant local caching and automated fixture-to-channel matching.",
   "url": "https://www.redcarpetplayer.store/",
@@ -39,6 +40,46 @@
       "name": "Red Carpet Pro — Lifetime License",
       "price": "4.99",
       "priceCurrency": "USD"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How do I load a huge 50,000+ channel M3U or Xtream playlist on Fire TV without memory crashes or EPG freezes?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Red Carpet Player never loads your whole catalogue into memory at once. Live channels, movies and series are fetched and cached one provider category at a time into a lightweight on-device index, so even a playlist with tens of thousands of channels and titles opens instantly and stays responsive on a base Fire TV Stick. Search runs against that same lean index instead of a full grouped catalogue, so it can't balloon memory either. The TV guide (EPG) updates in the background and only patches the fixtures that actually changed, instead of rebuilding the whole guide and freezing the screen every time a match goes live."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I install Red Carpet Player on a Firestick or Google TV device?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Install the free Downloader app (by AFTVnews) from the Amazon or Google Play store on your Fire TV, Google TV, Android TV box, or NVIDIA Shield, open it, and enter code 3149413 (or visit aftv.news/3149413 in any browser). It installs the current APK directly — no sideloading files or a USB drive needed."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is there a native Windows desktop M3U/Xtream player with hardware playback and EPG search?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. The Windows build is a native desktop app with hardware-decoded video playback (Chromium's own decoder, with mpv bundled as a fallback for formats it can't handle, such as MKV or Dolby/DTS/TrueHD audio) and the same instant local search and Event Guide fixture matching as the TV app. It installs from a small .zip — no Microsoft Store listing or admin rights required."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does the same app support touch navigation as well as a TV remote?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. The same app runs full D-pad/remote navigation on a TV and real touch input on a phone, tablet, touch laptop, or desktop PC. One codebase, the right input method for whichever screen it's running on."
+      }
     }
   ]
 }
@@ -200,7 +241,9 @@
   .btn-free{
     margin-top:.3rem;width:100%;padding:.85rem 1rem;border-radius:.65rem;border:1px solid var(--card-border);
     background:transparent;color:var(--ink);font-weight:700;letter-spacing:.02em;text-transform:uppercase;font-size:.85rem;cursor:pointer;
+    transition:opacity .15s ease;
   }
+  .btn-free:disabled{opacity:.4;cursor:not-allowed}
 
   /* ---------- Download Cards ---------- */
   .dl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.6rem;max-width:72rem;margin:0 auto}
@@ -278,6 +321,18 @@
   .tv-stand{width:5rem;height:.5rem;background:rgba(212,175,55,.25);border-radius:999px;margin:.9rem auto 0}
   .screen-cap{text-align:center;font-size:.86rem;color:var(--muted);margin-top:.9rem}
   .screen-cap b{color:var(--gold-light);font-weight:700}
+
+  /* ---------- FAQ ---------- */
+  .faq-list{max-width:52rem;margin:0 auto;display:flex;flex-direction:column;gap:.9rem}
+  .faq-item{border-radius:var(--radius);border:1px solid var(--card-border);background:var(--card);padding:0 1.6rem}
+  .faq-item summary{
+    padding:1.3rem 0;cursor:pointer;font-weight:700;font-size:.94rem;color:var(--ink);list-style:none;
+    display:flex;align-items:center;justify-content:space-between;gap:1rem;
+  }
+  .faq-item summary::-webkit-details-marker{display:none}
+  .faq-item summary::after{content:'+';color:var(--gold);font-size:1.3rem;font-weight:400;flex:none;transition:transform .15s ease}
+  .faq-item[open] summary::after{transform:rotate(45deg)}
+  .faq-item p{margin:0 0 1.4rem;font-size:.86rem;color:var(--muted);line-height:1.65}
 
   /* ---------- Footer: single line ---------- */
   footer{border-top:1px solid rgba(212,175,55,.14);padding:1.3rem 0}
@@ -703,7 +758,11 @@
               <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Full Event Guide fixture browsing — filter by sport, see matched channels</li>
               <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>7-day full Pro trial included, automatically — no card required</li>
             </ul>
-            <button class="btn-free" type="button" onclick="document.getElementById('download-btn').scrollIntoView({behavior:'smooth'})">Download Free</button>
+            <label class="ack-row">
+              <input type="checkbox" id="ack-check-free" onchange="document.getElementById('free-btn').disabled = !this.checked">
+              I understand Red Carpet Player is an empty media player utility that includes NO TV channels, playlists, or media streams, and I'm only loading sources I'm legally authorised to access.
+            </label>
+            <button class="btn-free" id="free-btn" type="button" disabled onclick="document.getElementById('download-btn').scrollIntoView({behavior:'smooth'})">Download Free</button>
           </div>
           <div class="price-card pro">
             <span class="price-tier">Red Carpet Pro — Lifetime License</span>
@@ -721,7 +780,7 @@
             </ul>
             <label class="ack-row">
               <input type="checkbox" id="ack-check" onchange="document.getElementById('pro-btn').disabled = !this.checked">
-              I understand Red Carpet Player is an empty media player utility that includes NO TV channels, playlists, or media streams, and that software license purchases are non-refundable due to lack of third-party content.
+              I understand Red Carpet Player is an empty media player utility that includes NO TV channels, playlists, or media streams, and I'm only loading sources I'm legally authorised to access. I understand this purchase isn't refundable solely because the app doesn't include that content — my rights under the Australian Consumer Law are unaffected.
             </label>
             <button class="btn-pro" id="pro-btn" type="button" disabled onclick="window.open('https://redcarpetplayer.lemonsqueezy.com/checkout/buy/70a50843-75c3-4fd5-9a25-379bd2b058e0','_blank')">Get Red Carpet Pro ($4.99)</button>
           </div>
@@ -743,6 +802,34 @@
             <p>On your TV app, open <b>Settings → Red Carpet Pro</b> (or tap any Pro feature) and enter your Pro License Key to unlock Pro permanently. Type it with the remote, or paste it instantly using the official Google TV / Fire TV remote app on your phone.</p></div>
           </div>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== FAQ: real search queries, real answers ========== -->
+  <section class="section section-tight" id="faq">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Common Questions</span>
+        <h2>Frequently Asked <span class="gold-text">Questions</span></h2>
+      </div>
+      <div class="faq-list">
+        <details class="faq-item">
+          <summary>How do I load a huge 50,000+ channel M3U or Xtream playlist on Fire TV without memory crashes or EPG freezes?</summary>
+          <p>Red Carpet Player never loads your whole catalogue into memory at once. Live channels, movies and series are fetched and cached one provider category at a time into a lightweight on-device index, so even a playlist with tens of thousands of channels and titles opens instantly and stays responsive on a base Fire TV Stick. Search runs against that same lean index instead of a full grouped catalogue, so it can't balloon memory either. The TV guide (EPG) updates in the background and only patches the fixtures that actually changed, instead of rebuilding the whole guide and freezing the screen every time a match goes live.</p>
+        </details>
+        <details class="faq-item">
+          <summary>How do I install Red Carpet Player on a Firestick or Google TV device?</summary>
+          <p>Install the free <b>Downloader</b> app (by AFTVnews) from the Amazon or Google Play store on your Fire TV, Google TV, Android TV box, or NVIDIA Shield, open it, and enter code <code>3149413</code> (or visit <code>aftv.news/3149413</code> in any browser). It installs the current APK directly — no sideloading files or a USB drive needed.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Is there a native Windows desktop M3U/Xtream player with hardware playback and EPG search?</summary>
+          <p>Yes. The Windows build is a native desktop app with hardware-decoded video playback (Chromium's own decoder, with mpv bundled as a fallback for formats it can't handle, such as MKV or Dolby/DTS/TrueHD audio) and the same instant local search and Event Guide fixture matching as the TV app. It installs from a small .zip — no Microsoft Store listing or admin rights required.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Does the same app support touch navigation as well as a TV remote?</summary>
+          <p>Yes. The same app runs full D-pad/remote navigation on a TV and real touch input — native scrolling, larger tap targets, swipe-friendly lists — on a phone, tablet, touch laptop, or desktop PC. One codebase, the right input method for whichever screen it's running on.</p>
+        </details>
       </div>
     </div>
   </section>
@@ -808,13 +895,14 @@
       <li>Users must hold lawful rights to any playlist or tuner feed they connect to the player in their own jurisdiction.</li>
       <li>Public event titles and competition names displayed in the Event Guide are used strictly for factual, nominative EPG schedule indexing, and imply no endorsement by or affiliation with any sports league or broadcaster.</li>
     </ul>
-    <h4>3. Pro Software License &amp; Refund Policy</h4>
+    <h4>3. Pro Software License &amp; Refunds</h4>
     <ul>
-      <li>Because the Free tier allows complete verification of device and playlist compatibility before purchasing, Red Carpet Pro license fees are strictly for unlocking local software features and are non-refundable for claims that the app lacks television channels or streams.</li>
+      <li>The Free tier lets you fully verify device and playlist compatibility before you ever pay. Because of that, we don't offer a refund solely on the basis that the app itself doesn't include TV channels, streams, or playlists — that's accurately described everywhere before purchase, not a fault with the software.</li>
+      <li>This does not limit or exclude your rights under the Australian Consumer Law. Our software comes with guarantees that cannot be excluded under the ACL. If Red Carpet Pro has a major failure to meet those guarantees — for example, a genuine software fault that stops it working as described — you're entitled to a remedy, which may include a repair, replacement, or refund. Contact <a href="mailto:support@redcarpetplayer.store">support@redcarpetplayer.store</a> to make a claim.</li>
     </ul>
     <h4>4. Disclaimer of Warranties &amp; Limitation of Liability</h4>
     <ul>
-      <li>The software is provided "AS IS" without warranty of any kind. Our maximum aggregate liability is strictly limited to the software license fee paid ($4.99 USD/AUD), subject to any non-excludable statutory guarantees under the Australian Consumer Law.</li>
+      <li>Outside of the non-excludable guarantees described above, the software is provided "AS IS" without warranty of any kind, and our maximum aggregate liability is limited to the software license fee paid ($4.99 USD/AUD), to the extent the Australian Consumer Law allows that limit.</li>
     </ul>
     <h4>5. Governing Law</h4>
     <ul>
