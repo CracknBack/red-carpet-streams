@@ -923,7 +923,7 @@ html.phone #pk-qr{width:min(36rem, 70vw);height:min(36rem, 70vw)}
    this has to be the LAST thing, not grouped up near the top with the html.phone rules above (which
    don't have this problem, since html.phone's extra class genuinely outranks the base rule's
    specificity regardless of position). */
-@media (max-width:820px){
+@media (max-width:1024px),(orientation:portrait){
   html{font-size:clamp(8px,1.2vw,12px)}
   .hints{display:none}
   .page{bottom:0}
@@ -949,8 +949,16 @@ html.phone #pk-qr{width:min(36rem, 70vw);height:min(36rem, 70vw)}
      size, which was cropping the entire login screen off-edge. Collapsing to one fluid column,
      capped to the viewport, is what the "flexible widths ... not fixed pixel dimensions" fix is
      really about here -- .field/input already use width:100% so they just follow the column. */
-  .login-box{grid-template-columns:1fr;column-gap:0;row-gap:1.6rem;width:min(60rem,92vw)}
+  .login-box{grid-template-columns:1fr;column-gap:0;row-gap:1.6rem;width:100%;max-width:480px}
   #login-logo{grid-row:auto;width:min(34rem,60vw);margin:0 auto 1rem;justify-self:center}
+  /* #login is .screen (position:fixed;inset:0) with no overflow handling of its own -- fine on a TV
+     where the form always fits, but a stacked form plus the on-screen keyboard (now resizing the
+     WebView itself, see windowSoftInputMode="adjustResize" in the manifest) can genuinely be taller
+     than what's left of a phone screen. align-items switches to flex-start, not center, specifically
+     because a vertically-centered flex item that overflows its container clips at the TOP in most
+     engines when there's no scroll container -- top-anchored plus real scroll is what actually lets
+     every field, including Sign In at the bottom, be reached. */
+  #login{align-items:flex-start;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px;box-sizing:border-box}
 }
 /*LIGHT-START*/
 html.light .touch-back{background:rgba(252,248,238,0.72)}
@@ -1729,8 +1737,16 @@ function memLog(label) {
       m ? 'heapTotalMB=' + (m.totalJSHeapSize / 1048576).toFixed(1) : '',
       'liveCh=' + (DATA && DATA.live ? DATA.live.items.length : '-'),
       'liveRaw=' + (DATA && DATA.live && DATA.live.vers ? DATA.live.vers.length : '-'),
+      /* .items.length is the whole-catalog array, which the per-category fetch path (ensureCategoryItems)
+         deliberately never populates for Xtream accounts -- it reads 0 even with real categories loaded,
+         which is why the actual per-category caches (catItems/verToTitle, the ones capCatItems bounds)
+         had no visibility here at all before this. */
       'vodItems=' + (DATA && DATA.vod ? DATA.vod.items.length : '-'),
       'seriesItems=' + (DATA && DATA.series ? DATA.series.items.length : '-'),
+      'vodCats=' + (DATA && DATA.vod && DATA.vod.catItems ? DATA.vod.catItems.size : '-'),
+      'seriesCats=' + (DATA && DATA.series && DATA.series.catItems ? DATA.series.catItems.size : '-'),
+      'vodVers=' + (DATA && DATA.vod && DATA.vod.verToTitle ? DATA.vod.verToTitle.size : '-'),
+      'seriesVers=' + (DATA && DATA.series && DATA.series.verToTitle ? DATA.series.verToTitle.size : '-'),
       'guideItems=' + (GUIDE ? GUIDE.items.length : '-'),
       'guideChans=' + (GUIDE && GUIDE.chans ? Object.keys(GUIDE.chans).length : '-'),
       'events=' + (EVENTS ? EVENTS.length : '-'),
@@ -5639,12 +5655,18 @@ function catNameOf(t, catId) {
    back to the original full-catalog path -- unavoidable there, but M3U catalogs are the user's own
    playlist file, not an Xtream provider's hundred-thousand-stream library, so the same crash risk doesn't
    apply the same way. */
+/* Deliberately its own 24h TTL, not tied to DATA.updated (the live channel list's own refresh
+   stamp, see boot()) -- that coupling meant any ordinary list refresh (cheap, happens automatically
+   every 12h) forced this expensive flat-catalog re-fetch too, even though a provider's movie/series
+   catalog rarely changes meaningfully within a day. A stale SRCHIDX just means search is up to 24h
+   behind the provider's own catalog, same tradeoff "Update lists now" already accepts elsewhere. */
+const SRCHIDX_TTL_MS = 24 * 3600e3;
 let SRCHIDX = {vod: null, series: null};
 async function ensureSearchIndex(t) {
   if (!DATA || SRCHIDX[t]) return;
   const own = cacheKey() + ':srchidx:' + t;
   const cached = await idb.get(own);
-  if (cached && cached._updated === DATA.updated) { SRCHIDX[t] = cached.items; return; }
+  if (cached && cached.savedAt && (Date.now() - cached.savedAt) < SRCHIDX_TTL_MS) { SRCHIDX[t] = cached.items; return; }
   const raw = await api(t === 'vod' ? 'get_vod_streams' : 'get_series');
   let items = await runSliced(procSearchIndexG(raw, t));
   /* A lean {id,name,cat} entry is a small fraction of a full grouped title (see procSearchIndexG), so
@@ -5655,7 +5677,7 @@ async function ensureSearchIndex(t) {
     items = items.slice(0, 250000);
   }
   SRCHIDX[t] = items;
-  await idb.set(own, {items, _updated: DATA.updated});
+  await idb.set(own, {items, savedAt: Date.now()});
 }
 async function ensureSearchCatalog() {
   if (!DATA) return;
@@ -5674,6 +5696,35 @@ async function ensureSearchCatalog() {
    - "Other versions" during playback (verToTitle) and "remembered preferred copy" (ui.vpick, keyed by
      item id) both still work for items opened this way — verToTitle is accumulated here too;
      ui.vpick needs nothing, it only ever reads the item object handed to it, never a global lookup. */
+/* d.catItems (below) never had an eviction policy -- every category a session ever opened stayed
+   in memory, grouped titles and all, for the rest of that session. Confirmed live on a Fire TV
+   Stick HD 2026-11-07: a single "English" series category alone took ~2 minutes to fetch+group:
+   fine once, but a provider with dozens of categories (this one has English, English-Netflix,
+   English-Disney+, English-HBO Max, English-Showtime, ...) means a normal browsing session that
+   taps through many of them keeps accumulating all of their grouped items at once, with nothing
+   ever freed -- exactly the slow, unbounded growth that ends in the OOM crash reported ("indexing
+   movies and series for many minutes, crashes, doesn't pick back up, just starts again"). Capping
+   at the 12 most recently fetched categories per type (vod and series separately) bounds that
+   regardless of how long or how many categories a session browses; CAT_ITEMS_CAP is intentionally
+   conservative given this device's limited heap. */
+/* Evicting the array from d.catItems alone doesn't actually free any of it -- d.verToTitle holds
+   those exact same group objects too (same references, not copies), forever, for every item any
+   category has ever handed it, with its own no eviction at all. Without clearing the evicted
+   category's own entries out of it too, the objects stay reachable and nothing is actually
+   collected. The one tradeoff: a title that happens to appear in both an evicted category and a
+   still-cached one loses its verToTitle entry early, so "other versions" can miss that copy until
+   its own category is revisited -- a minor feature glitch, not a correctness break, and strictly
+   better than the OOM crash this is fixing. */
+const CAT_ITEMS_CAP = 12;
+function capCatItems(d, keepId) {
+  while (d.catItems.size > CAT_ITEMS_CAP) {
+    const oldest = d.catItems.keys().next().value;
+    if (oldest === keepId) { const v = d.catItems.get(oldest); d.catItems.delete(oldest); d.catItems.set(oldest, v); continue; }
+    const evicted = d.catItems.get(oldest);
+    d.catItems.delete(oldest);
+    if (d.verToTitle && evicted) evicted.forEach(g => (g.vers || []).forEach(v => d.verToTitle.delete(v.id)));
+  }
+}
 async function ensureCategoryItems(t, catId) {
   const d = DATA && DATA[t];
   if (!d) return;
@@ -5706,6 +5757,7 @@ async function ensureCategoryItems(t, catId) {
     if (!d.verToTitle) d.verToTitle = new Map();
     items.forEach(g => (g.vers || []).forEach(v => d.verToTitle.set(v.id, g)));
     d.catItems.set(catId, items);
+    capCatItems(d, catId);
   } catch (err) {
     toast('Couldn’t load that category: ' + err.message);
   } finally { loading(false); }
@@ -5724,6 +5776,7 @@ async function ensureCategoryReady(t, c) {
       if (!d.catItems.has(c.id)) {
         const real = new Set(c.realCats);
         d.catItems.set(c.id, (d.items || []).filter(it => it.cats ? [...it.cats].some(x => real.has(x)) : real.has(it.cat)));
+        capCatItems(d, c.id);
       }
       return;
     }
@@ -6227,6 +6280,7 @@ async function ensureGroupCategoryItems(t, grp) {
     const items = [...byKey.values()];
     items.forEach(g => { if (g.vers.length > 1) g.vers.sort(verCmp); g.vers.forEach(v => d.verToTitle.set(v.id, g)); });
     d.catItems.set(grp.id, items);
+    capCatItems(d, grp.id);
   } finally { loading(false); }
 }
 /* ---------- movies and series: a short menu instead of the provider's hundreds of categories ---------- */
@@ -6897,7 +6951,15 @@ async function showPage(p) {
      demand via ensureCategoryItems, same as Movies/Series browsing already does (see openItem). */
   if (isSearchPage(p) && DATA && !(SRCHIDX.vod && SRCHIDX.series) && !(isM3u() && DATA.vod.grouped && DATA.series.grouped)) {
     ensureSearchCatalog().then(() => {
-      if (isSearchPage(S.page)) { Q.last = null; renderMain(); }
+      if (!isSearchPage(S.page)) return;
+      Q.last = null;
+      /* renderSearchHead() already correctly flips its "still indexing…" text off the instant
+         SRCHIDX is populated (it reads SRCHIDX fresh on every render) -- but the result LIST itself
+         is just whatever Q.all/Q.counts were left at, which is still whatever searching Live TV
+         alone produced if the owner typed a query before this resolved. A bare renderMain() never
+         recomputes that, so the query had to be retyped by hand to actually pick up vod/series --
+         that's what looked like "search failed". Re-running it here instead closes that gap. */
+      if (Q.text) runSearch(); else renderMain();
     }).catch(err => toast(err && err.message ? err.message : 'Could not load movies/series.'));
   }
   if (S.page !== p) return;

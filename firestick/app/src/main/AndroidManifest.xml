@@ -15,15 +15,19 @@
         android:largeHeap="true"
         android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
 
-        <!-- "sensor" (not "sensorLandscape"): a Fire TV Stick has no accelerometer at all, so this
-             is still always landscape there regardless of the value, but a real phone/tablet does
-             have one, and sensorLandscape was hard locking the whole app to landscape on those
-             devices no matter how the user held them, which is what made the UI fail to rotate. -->
+        <!-- "unspecified" here, not a fixed value: MainActivity.applyScreenOrientation() decides
+             between SCREEN_ORIENTATION_SENSOR_LANDSCAPE (TV, via UiModeManager) and
+             SCREEN_ORIENTATION_FULL_USER (phone/tablet) at runtime, since a Fire TV Stick (no
+             accelerometer) and a real phone/tablet (has one, and needs free rotation to not be
+             stuck sideways) genuinely need different answers that one static manifest value can't
+             express. adjustResize so the on-screen keyboard resizes the WebView instead of covering
+             or pushing the login fields off-screen on a phone. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
-            android:screenOrientation="sensor"
+            android:screenOrientation="unspecified"
+            android:windowSoftInputMode="adjustResize"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|uiMode|smallestScreenSize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
