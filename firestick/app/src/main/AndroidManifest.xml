@@ -15,19 +15,18 @@
         android:largeHeap="true"
         android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
 
-        <!-- "unspecified" here, not a fixed value: MainActivity.applyScreenOrientation() decides
-             between SCREEN_ORIENTATION_SENSOR_LANDSCAPE (TV, via UiModeManager) and
-             SCREEN_ORIENTATION_FULL_USER (phone/tablet) at runtime, since a Fire TV Stick (no
-             accelerometer) and a real phone/tablet (has one, and needs free rotation to not be
-             stuck sideways) genuinely need different answers that one static manifest value can't
-             express. adjustResize so the on-screen keyboard resizes the WebView instead of covering
-             or pushing the login fields off-screen on a phone. -->
+        <!-- Locked to landscape on every device, TV or handheld: the compact phone layout (see
+             tv-app/index.html's @media max-height:540px) is engineered around a fixed real screen
+             height, and portrait would just be that same UI rotated 90 degrees with no layout built
+             for it at all. adjustPan, not adjustResize: this compact layout's math assumes the
+             WebView's own height never changes, so the keyboard should pan the fixed-size canvas to
+             keep the focused field visible rather than resizing the canvas itself out from under it. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
-            android:screenOrientation="unspecified"
-            android:windowSoftInputMode="adjustResize"
+            android:screenOrientation="sensorLandscape"
+            android:windowSoftInputMode="adjustPan"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|uiMode|smallestScreenSize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

@@ -1,9 +1,6 @@
 package com.tyre.redcarpetstreams;
 
 import android.app.Activity;
-import android.app.UiModeManager;
-import android.content.pm.ActivityInfo;
-import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.media.AudioFormat;
@@ -113,24 +110,9 @@ public class MainActivity extends Activity {
        not dropped by chance. */
     private volatile boolean typingActive = false;
 
-    /* The manifest declares screenOrientation="unspecified" and leaves the real decision to here,
-       at runtime, because the right answer genuinely differs by device class and a single static
-       manifest value can't express that: a Fire TV Stick has no accelerometer at all, so it was
-       always going to render landscape regardless of which fixed value the manifest named, but a
-       real phone or tablet does have one and needs free rotation to not be stuck sideways. Checking
-       UI_MODE_TYPE_TELEVISION (true for Fire TV/Android TV, false for a handheld) is what actually
-       tells those two cases apart, rather than inferring it from screen size the way the web layer's
-       own PHONE flag does. */
-    private void applyScreenOrientation() {
-        UiModeManager uiModeManager = (UiModeManager) getSystemService(UI_MODE_SERVICE);
-        boolean isTv = uiModeManager != null && uiModeManager.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION;
-        setRequestedOrientation(isTv ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE : ActivityInfo.SCREEN_ORIENTATION_FULL_USER);
-    }
-
     @Override
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
-        applyScreenOrientation();
         /* Debug-only: lets chrome://inspect attach over the existing ADB connection, so Phase B's
            Checkpoint B test case (and anything later) can drive window.RCS.play(<test-clip-url>)
            directly from the DevTools console -- without touching the owner's actual playlist/login

@@ -67,6 +67,7 @@ button,input{font:inherit;color:inherit}
 .lm.on{color:var(--amber);border-color:rgba(231,185,111,.6)}
 .lmode.focus .lm.on{background:rgba(160,28,42,.55);color:#fff;border-color:var(--amber)}
 .field{display:block;margin-bottom:2.4rem;min-width:0}
+.row2,.row2b{display:contents}
 .field span{display:block;color:var(--muted);font-size:1.7rem;margin-bottom:.6rem}
 input{width:100%;min-width:0;background:var(--panel);border:.2rem solid var(--line);border-radius:.6rem;padding:1.2rem 1.6rem;font-size:2.4rem;outline:none}
 .field.focus input,input:focus{border-color:var(--amber);box-shadow:0 0 0 .4rem var(--amber-soft)}
@@ -912,53 +913,65 @@ html.phone .pkbox{flex-direction:column;gap:2rem}
 html.phone #pk-qr{width:min(36rem, 70vw);height:min(36rem, 70vw)}
 .svl{align-self:center;margin-right:1.2rem;color:var(--muted);font-size:1.8rem}
 .osdh{font-size:1.7rem;opacity:.75;margin-top:.6rem}
-/* Same treatment as html.phone above, but keyed on the actual viewport instead of the one-time
-   PHONE JS flag (which deliberately excludes tablets -- see its own comment -- and, being computed
-   once at load, can't react to a rotation anyway). A plain media query covers tablets in portrait
-   too and always recalculates live when the viewport changes, including on rotation, with no JS
-   involved. Fire TV never sees this: its viewport is always a wide landscape well over 820px.
-   Placed here, at the very end of the stylesheet (specifically before the generated light-theme
-   block, never inside it): every selector below has the exact same specificity as its unqualified
-   base rule declared earlier in this file, so which one wins is decided purely by source order --
-   this has to be the LAST thing, not grouped up near the top with the html.phone rules above (which
-   don't have this problem, since html.phone's extra class genuinely outranks the base rule's
-   specificity regardless of position). */
-@media (max-width:1024px),(orientation:portrait){
-  html{font-size:clamp(8px,1.2vw,12px)}
-  .hints{display:none}
-  .page{bottom:0}
-  #rail{bottom:0;padding-top:1rem}
-  .gmwrap,.mwrap{bottom:0}
-  #rail-logo,#clock{display:none}
-  .ri{padding:.9rem 1.2rem;margin:.1rem 1rem .1rem 0}
-  #page-browse.collapsed #preview{display:none!important}
-  /* #cats (the category list beside Live TV/Movies/Series) is a second fixed-width sidebar this
-     file never looked at before -- 23.4rem (nearly 190px even at the smallest clamped font) sitting
-     next to .content, which is what was actually squeezing the real content down to almost nothing
-     on a phone; the .collapsed swap above only ever covers #preview, for live playback specifically,
-     never this. .row .name inside it already truncates with an ellipsis (min-width:0 on itself), so
-     narrowing the column is enough -- no markup or JS change needed. */
-  #cats{width:13rem}
-  #qstat{display:none}
-  .gchips{row-gap:.8rem}
-  .pkbox{flex-direction:column;gap:2rem}
-  #pk-qr{width:min(36rem,70vw);height:min(36rem,70vw)}
-  /* .login-box's grid-template-columns below is two FIXED-width tracks (34rem logo + 60rem form)
-     totalling 102rem -- on a TV or Windows window that's always comfortably less than the available
-     width, but on any phone/tablet-portrait viewport it's wider than the screen itself at any font
-     size, which was cropping the entire login screen off-edge. Collapsing to one fluid column,
-     capped to the viewport, is what the "flexible widths ... not fixed pixel dimensions" fix is
-     really about here -- .field/input already use width:100% so they just follow the column. */
-  .login-box{grid-template-columns:1fr;column-gap:0;row-gap:1.6rem;width:100%;max-width:480px}
-  #login-logo{grid-row:auto;width:min(34rem,60vw);margin:0 auto 1rem;justify-self:center}
-  /* #login is .screen (position:fixed;inset:0) with no overflow handling of its own -- fine on a TV
-     where the form always fits, but a stacked form plus the on-screen keyboard (now resizing the
-     WebView itself, see windowSoftInputMode="adjustResize" in the manifest) can genuinely be taller
-     than what's left of a phone screen. align-items switches to flex-start, not center, specifically
-     because a vertically-centered flex item that overflows its container clips at the TOP in most
-     engines when there's no scroll container -- top-anchored plus real scroll is what actually lets
-     every field, including Sign In at the bottom, be reached. */
-  #login{align-items:flex-start;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px;box-sizing:border-box}
+/* Real whole-app redesign for landscape phones/small tablets (max-height:540px -- a TV or any
+   desktop window is always comfortably taller than that, so none of this ever touches that case).
+   Placed at the very end of the stylesheet, same reasoning as always in this file: every selector
+   below has the same specificity as its base rule declared earlier, so source order is what decides
+   the winner, and this has to be last. Supersedes the earlier uniform body{zoom} approach entirely
+   -- that shrank the whole TV canvas proportionally rather than actually redesigning it, which
+   still left things too small/cramped to use comfortably; this restructures the handful of screens
+   that actually needed it instead. */
+@media (max-height:540px){
+  html,body{width:100vw;height:100vh;overflow:hidden}
+  #login{overflow:hidden}
+  /* ---- compact login: left 30% = logo/version, right 70% = a 4-row form, no scrolling ---- */
+  .login-box{
+    display:grid;grid-template-columns:30% 70%;column-gap:3vw;align-items:center;
+    width:100vw;height:100vh;max-width:none;box-sizing:border-box;
+    padding:0 max(20px,env(safe-area-inset-right,0)) max(10px,env(safe-area-inset-bottom,0)) max(20px,env(safe-area-inset-left,0));
+  }
+  #login-logo{width:100%;max-width:130px;max-height:130px;margin:0 auto;text-align:center}
+  #login-logo img{max-height:90px;width:auto}
+  #login-logo .rc-word{font-size:11px;margin-top:2px}
+  #login-ver{font-size:11px;text-align:center;margin-top:4px}
+  /* Verbose subtitle and the stacked <span> labels above each input are what was actually
+     costing the vertical room on TV -- placeholder text (added to the inputs themselves, see the
+     markup) carries the same information in zero extra rows. */
+  /* :not(.authfield) matters -- .authfield is also .field, and its own <span> is the checkbox's
+     only label ("I confirm I'm authorised..."), not a redundant stacked field label like the
+     others; hiding that one would leave an unlabeled consent checkbox. */
+  .lede,.field:not(.authfield)>span{display:none}
+  .field{margin-bottom:8px}
+  .lmode{display:flex;gap:8px;margin-bottom:8px}
+  .lmode .lm{height:40px;font-size:14px;flex:1}
+  /* type-scoped, not a bare "input" -- .authfield's checkbox is also an <input> inside .login-box,
+     with its own deliberate 2.4rem square sizing (custom appearance:none styling); a blanket
+     override here would stretch it into a 40px-tall rectangle instead of leaving it a checkbox. */
+  .login-box input[type="text"],.login-box input[type="password"]{height:40px;font-size:14px;padding:0 10px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .row2b{display:flex;align-items:center;gap:12px;margin-top:4px}
+  .row2b .authfield{flex:0 0 62%;font-size:12px;line-height:1.2;margin-bottom:0}
+  .row2b #f-go{flex:0 0 38%;height:42px;font-size:15px;margin:0}
+  #login-err{font-size:11px}
+  /* ---- nav rail: this app's real nav is a vertical left rail, not a top bar -- compacted the
+     same way: narrow enough to leave room for content, touch-sized rows, and the category list
+     beside Live TV/Movies/Series (the one other fixed-width sidebar, see #cats above) narrowed the
+     same way it was before this file tried the uniform-zoom approach instead. */
+  #main,#main.slim{--railw:84px}
+  .ri{min-height:36px;padding:.6rem 1rem}
+  #cats{width:100px}
+  /* ---- inner lists/grids: explicit touch-action:pan-y on top of the existing touch-device
+     overflow-y:auto (html.touch-device .list/#rail, near the top of this file) -- manipulation
+     (set on every element for touch devices already) permits panning already, pan-y here is just
+     more explicit about which axis, and costs nothing extra to state. ---- */
+  html.touch-device .list,html.touch-device #rail,html.touch-device #cats{touch-action:pan-y}
+  /* ---- modals: hard-capped to the real viewport height minus a small margin, never 80vh's worth
+     of a phone's already-short screen, with their own internal scroll untouched (#opts-list already
+     has it; .obox itself gets it too here in case a tall message/menu doesn't use #opts-list). ---- */
+  .obox{max-height:calc(100vh - 24px);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:1rem 1.4rem 1.4rem}
+  /* ---- movie/series detail (.mwrap): the one other fixed two-column grid in this file besides
+     login, same shape, same risk -- collapses to a single scrollable column instead. ---- */
+  .mwrap{display:block;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:1rem 1.2rem}
 }
 /*LIGHT-START*/
 html.light .touch-back{background:rgba(252,248,238,0.72)}
@@ -1114,12 +1127,22 @@ html.light .hs-pool{background:radial-gradient(ellipse at 50% 50%,rgba(255,252,2
     <div class="lmode" id="lmode"><button class="lm" data-m="xtream">Xtream Codes</button><button class="lm" data-m="m3u">M3U playlist</button></div>
     <p class="lede" id="lede"></p>
     <label class="field" id="f-server"><span>Server address</span><input id="in-server" type="text" placeholder="http://example.com:8080" autocomplete="off" spellcheck="false"></label>
-    <label class="field" id="f-user"><span>Username</span><input id="in-user" type="text" autocomplete="off" spellcheck="false"></label>
-    <label class="field" id="f-pass"><span>Password</span><input id="in-pass" type="password" autocomplete="off"></label>
+    <!-- .row2/.row2b are display:contents everywhere except the compact landscape-phone media
+         query (see tv-app/index.html's @media max-height:540px) -- "contents" removes the div from
+         the box tree entirely, so #f-user/#f-pass/#f-auth/#f-go stay direct auto-placed children of
+         .login-box's own grid exactly as before on TV, and the Xtream/M3U field-visibility toggle
+         (LFIELDS, keyed by these same ids) is untouched since it looks elements up by id, never by
+         parent. Only inside the compact query does the wrapper become a real 2-column grid. -->
+    <div class="row2">
+      <label class="field" id="f-user"><span>Username</span><input id="in-user" type="text" placeholder="Username" autocomplete="off" spellcheck="false"></label>
+      <label class="field" id="f-pass"><span>Password</span><input id="in-pass" type="password" placeholder="Password" autocomplete="off"></label>
+    </div>
     <label class="field" id="f-m3u"><span>Playlist link</span><input id="in-m3u" type="text" placeholder="http://example.com/playlist.m3u" autocomplete="off" spellcheck="false"></label>
     <label class="field" id="f-epg"><span>TV guide link (XMLTV, optional)</span><input id="in-epg" type="text" placeholder="http://example.com/guide.xml.gz" autocomplete="off" spellcheck="false"></label>
-    <label class="field authfield" id="f-auth"><input id="in-auth" type="checkbox"><span class="authtext">I confirm I am authorised to access the playlist and media sources I am adding.</span></label>
-    <button id="f-go" class="btn">Sign in</button>
+    <div class="row2b">
+      <label class="field authfield" id="f-auth"><input id="in-auth" type="checkbox"><span class="authtext">I confirm I am authorised to access the playlist and media sources I am adding.</span></label>
+      <button id="f-go" class="btn">Sign in</button>
+    </div>
     <p id="login-err" class="err"></p>
     <p id="login-ver" class="note"></p>
   </div>
