@@ -15,11 +15,15 @@
         android:largeHeap="true"
         android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
 
+        <!-- "sensor" (not "sensorLandscape"): a Fire TV Stick has no accelerometer at all, so this
+             is still always landscape there regardless of the value, but a real phone/tablet does
+             have one, and sensorLandscape was hard locking the whole app to landscape on those
+             devices no matter how the user held them, which is what made the UI fail to rotate. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
-            android:screenOrientation="sensorLandscape"
+            android:screenOrientation="sensor"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|uiMode|smallestScreenSize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

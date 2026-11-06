@@ -250,6 +250,19 @@ public class MainActivity extends Activity {
         s.setAllowUniversalAccessFromFileURLs(true);
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        /* Without setUseWideViewPort, WebView ignores the page's own <meta viewport> tag entirely
+           and always sizes the viewport to the device's width anyway -- so this pair is a no-op for
+           what the viewport WIDTH ends up being (same as before on both phone and the Fire TV
+           Stick's big landscape screen), but it's what makes the WebView actually read that meta
+           tag's other directives (initial-scale, user-scalable) instead of silently discarding them.
+           Pinch/double-tap zoom is turned off at the WebView level too (belt and suspenders with the
+           meta tag) since the app already has its own touch gestures (video scrub, chip drag) that a
+           native zoom gesture would otherwise fight with on a phone or tablet. */
+        s.setUseWideViewPort(true);
+        s.setLoadWithOverviewMode(true);
+        s.setSupportZoom(false);
+        s.setBuiltInZoomControls(false);
+        s.setDisplayZoomControls(false);
         w.setWebViewClient(new WebViewClient() {
             @Override
             public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
