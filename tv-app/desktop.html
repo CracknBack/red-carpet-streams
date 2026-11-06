@@ -66,9 +66,9 @@ button,input{font:inherit;color:inherit}
 .lm{background:none;border:.2rem solid var(--line);border-radius:2.4rem;padding:.8rem 2.4rem;font-size:2rem;color:var(--muted);cursor:pointer}
 .lm.on{color:var(--amber);border-color:rgba(231,185,111,.6)}
 .lmode.focus .lm.on{background:rgba(160,28,42,.55);color:#fff;border-color:var(--amber)}
-.field{display:block;margin-bottom:2.4rem}
+.field{display:block;margin-bottom:2.4rem;min-width:0}
 .field span{display:block;color:var(--muted);font-size:1.7rem;margin-bottom:.6rem}
-input{width:100%;background:var(--panel);border:.2rem solid var(--line);border-radius:.6rem;padding:1.2rem 1.6rem;font-size:2.4rem;outline:none}
+input{width:100%;min-width:0;background:var(--panel);border:.2rem solid var(--line);border-radius:.6rem;padding:1.2rem 1.6rem;font-size:2.4rem;outline:none}
 .field.focus input,input:focus{border-color:var(--amber);box-shadow:0 0 0 .4rem var(--amber-soft)}
 .authfield{display:flex;align-items:flex-start;gap:1.2rem;cursor:pointer}
 .authfield input{width:2.4rem;height:2.4rem;flex:none;margin:.2rem 0 0;appearance:none;-webkit-appearance:none;border-radius:.4rem;border:.2rem solid var(--line);background:var(--panel);cursor:pointer;position:relative}
@@ -932,6 +932,13 @@ html.phone #pk-qr{width:min(36rem, 70vw);height:min(36rem, 70vw)}
   #rail-logo,#clock{display:none}
   .ri{padding:.9rem 1.2rem;margin:.1rem 1rem .1rem 0}
   #page-browse.collapsed #preview{display:none!important}
+  /* #cats (the category list beside Live TV/Movies/Series) is a second fixed-width sidebar this
+     file never looked at before -- 23.4rem (nearly 190px even at the smallest clamped font) sitting
+     next to .content, which is what was actually squeezing the real content down to almost nothing
+     on a phone; the .collapsed swap above only ever covers #preview, for live playback specifically,
+     never this. .row .name inside it already truncates with an ellipsis (min-width:0 on itself), so
+     narrowing the column is enough -- no markup or JS change needed. */
+  #cats{width:13rem}
   #qstat{display:none}
   .gchips{row-gap:.8rem}
   .pkbox{flex-direction:column;gap:2rem}
