@@ -2796,13 +2796,17 @@ function proUpsell(feature) {
   const items = [
     {l: feature + ' is a Red Carpet Pro feature.', a: () => {}}
   ];
-  if (PHONE || PC) items.push({l: 'Open Checkout on This Device ($4.99)', a: () => openInSystemBrowser(proCheckoutUrl())});
+  /* No price baked into this label on purpose -- it's compiled into every APK already out in the
+     world, so a price change on Lemon Squeezy/the website later would otherwise leave old installs
+     showing a stale number forever. The checkout page itself (opened fresh each time) is the one
+     place that's always showing the real, current price. */
+  if (PHONE || PC) items.push({l: 'Open Checkout on This Device', a: () => openInSystemBrowser(proCheckoutUrl())});
   items.push({l: 'Enter a Red Carpet Pro license key…', a: proActivateMenu});
   items.push({l: 'Not now', a: () => {}});
   openMenu(items, {
     title: 'Red Carpet Pro — Checkout',
     img: qr,
-    msg: 'Scan with your phone’s camera to open checkout and get your $4.99 Launch Pro Key (reg. $9.99), then enter it below.' +
+    msg: 'Scan with your phone’s camera, or use the button below, to open checkout and get your Pro Key at today’s price, then enter it below.' +
       ' Pro unlocks software utilities only — local guide matching, categories, multi-EPG merging and pinned channels. It does not provide access to any media content.'
   });
 }
