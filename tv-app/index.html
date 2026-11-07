@@ -293,13 +293,13 @@ h2{font-size:3rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overfl
    screen -- that protection now comes from renderHome() itself (it snaps the transition off for any
    jump bigger than a normal step), so making ±3 a real visible tier doesn't reopen that bug. */
 .hslot[data-offset="0"]{transform:translate3d(-50%,-50%,0) scale(1) rotateY(0deg);z-index:5;opacity:1}
-.hslot[data-offset="-1"]{transform:translate3d(calc(-50% - 23rem),-50%,-3.75rem) scale(.74) rotateY(14deg);z-index:4;opacity:.88}
-.hslot[data-offset="1"]{transform:translate3d(calc(-50% + 23rem),-50%,-3.75rem) scale(.74) rotateY(-14deg);z-index:4;opacity:.88}
-.hslot[data-offset="-2"]{transform:translate3d(calc(-50% - 41rem),-50%,-7.5rem) scale(.60) rotateY(22deg);z-index:3;opacity:.65}
-.hslot[data-offset="2"]{transform:translate3d(calc(-50% + 41rem),-50%,-7.5rem) scale(.60) rotateY(-22deg);z-index:3;opacity:.65}
+.hslot[data-offset="-1"]{transform:translate3d(calc(-50% - 23rem),-50%,-3.75rem) scale(.74) rotateY(7deg);z-index:4;opacity:.88}
+.hslot[data-offset="1"]{transform:translate3d(calc(-50% + 23rem),-50%,-3.75rem) scale(.74) rotateY(-7deg);z-index:4;opacity:.88}
+.hslot[data-offset="-2"]{transform:translate3d(calc(-50% - 41rem),-50%,-7.5rem) scale(.60) rotateY(11deg);z-index:3;opacity:.65}
+.hslot[data-offset="2"]{transform:translate3d(calc(-50% + 41rem),-50%,-7.5rem) scale(.60) rotateY(-11deg);z-index:3;opacity:.65}
 .hslot[data-offset="-3"],.hslot[data-offset="3"]{z-index:2;opacity:.42}
-.hslot[data-offset="-3"]{transform:translate3d(calc(-50% - 56rem),-50%,-11.25rem) scale(.36) rotateY(28deg)}
-.hslot[data-offset="3"]{transform:translate3d(calc(-50% + 56rem),-50%,-11.25rem) scale(.36) rotateY(-28deg)}
+.hslot[data-offset="-3"]{transform:translate3d(calc(-50% - 56rem),-50%,-11.25rem) scale(.36) rotateY(14deg)}
+.hslot[data-offset="3"]{transform:translate3d(calc(-50% + 56rem),-50%,-11.25rem) scale(.36) rotateY(-14deg)}
 /* the live sports banner */
 .hstrip{margin-top:1rem;margin-bottom:.4rem}
 .hstrip .slabel{font-size:2.6rem;letter-spacing:.1em;color:#E9CBA0;text-transform:uppercase;font-weight:300;margin-bottom:.8rem}
@@ -980,12 +980,12 @@ html.phone .hslot .hd{font-size:1.6rem;margin:-.8rem 0 1.7rem}
    center card proportionally instead of using the TV's wider spacing. ±3 is pushed out less and
    shrunk more than on TV (42rem/.34 vs TV's 56rem/.36) since phone's stage is narrower -- opacity
    still comes from the base (non-phone) [data-offset="-3"],[data-offset="3"] rule, no override needed. */
-html.phone .hslot[data-offset="-1"]{transform:translate3d(calc(-50% - 17.5rem),-50%,-3.75rem) scale(.74) rotateY(14deg)}
-html.phone .hslot[data-offset="1"]{transform:translate3d(calc(-50% + 17.5rem),-50%,-3.75rem) scale(.74) rotateY(-14deg)}
-html.phone .hslot[data-offset="-2"]{transform:translate3d(calc(-50% - 31rem),-50%,-7.5rem) scale(.60) rotateY(22deg)}
-html.phone .hslot[data-offset="2"]{transform:translate3d(calc(-50% + 31rem),-50%,-7.5rem) scale(.60) rotateY(-22deg)}
-html.phone .hslot[data-offset="-3"]{transform:translate3d(calc(-50% - 42rem),-50%,-11.25rem) scale(.34) rotateY(28deg)}
-html.phone .hslot[data-offset="3"]{transform:translate3d(calc(-50% + 42rem),-50%,-11.25rem) scale(.34) rotateY(-28deg)}
+html.phone .hslot[data-offset="-1"]{transform:translate3d(calc(-50% - 17.5rem),-50%,-3.75rem) scale(.74) rotateY(7deg)}
+html.phone .hslot[data-offset="1"]{transform:translate3d(calc(-50% + 17.5rem),-50%,-3.75rem) scale(.74) rotateY(-7deg)}
+html.phone .hslot[data-offset="-2"]{transform:translate3d(calc(-50% - 31rem),-50%,-7.5rem) scale(.60) rotateY(11deg)}
+html.phone .hslot[data-offset="2"]{transform:translate3d(calc(-50% + 31rem),-50%,-7.5rem) scale(.60) rotateY(-11deg)}
+html.phone .hslot[data-offset="-3"]{transform:translate3d(calc(-50% - 42rem),-50%,-11.25rem) scale(.34) rotateY(14deg)}
+html.phone .hslot[data-offset="3"]{transform:translate3d(calc(-50% + 42rem),-50%,-11.25rem) scale(.34) rotateY(-14deg)}
 /* 3. login's tabs/version sit right at the very top/bottom edge with no breathing room -- login-box
    has no spare height of its own for #login's centering to create margin with, so this trims the
    internal row gaps instead of adding new height (which would risk overflowing again). */
