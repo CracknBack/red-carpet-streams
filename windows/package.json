@@ -1,7 +1,7 @@
 {
   "name": "red-carpet-streams",
   "productName": "Red Carpet Streams",
-  "version": "3.2.0",
+  "version": "4.0.0",
   "description": "Red Carpet Streams for Windows",
   "author": "Tyre",
   "main": "main.js",

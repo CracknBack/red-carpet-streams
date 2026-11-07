@@ -53,7 +53,7 @@ jobs:
           Set-Location "$env:ROOT/windows"
           npm install
           if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
-          npx electron-builder --win nsis --x64 --publish never --config.extraMetadata.version=2.8.${{ github.run_number }}
+          npx electron-builder --win nsis --x64 --publish never --config.extraMetadata.version=4.0.${{ github.run_number }}
           if ($LASTEXITCODE -ne 0) { throw "electron-builder failed" }
 
       - name: Name the file
