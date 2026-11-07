@@ -269,25 +269,36 @@ h2{font-size:3rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overfl
 .hcard .sbar{margin-top:1rem}
 .hcard.focus{border-color:var(--amber);background:var(--focus-bg)}
 .hver{position:absolute;right:6rem;bottom:1.4rem;font-size:1.5rem;color:var(--muted)}
-/* the carousel: the chosen tile large in the middle, the others shrinking and fading away on each side */
-.hcar{display:flex;justify-content:center;align-items:center;gap:2rem;flex:1 1 auto;min-height:0;margin-top:.4rem;perspective:120rem}
-.hslot{position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer;border-radius:2.4rem;color:#E9CBA0;text-align:center;
+/* the carousel: the chosen tile large in the middle, the others shrinking and fading away on each side.
+   One persistent, never-recreated .hslot element per tile (see renderHome()) -- every slot shares the
+   same base box (the old .s0 size) and is purely repositioned/scaled/rotated via transform, keyed off
+   its own data-offset (-3..+3, the shortest signed circular distance from the active tile). That's what
+   makes the card itself glide/bank between positions instead of text popping between static boxes. */
+.hcar{position:relative;display:flex;justify-content:center;align-items:center;flex:1 1 auto;min-height:0;margin-top:.4rem;perspective:68.75rem}
+.hslot{position:absolute;top:50%;left:50%;width:26rem;height:37rem;display:flex;flex-direction:column;align-items:center;cursor:pointer;border-radius:2.4rem;color:#E9CBA0;text-align:center;
   background:linear-gradient(180deg,rgba(20,29,42,.94),rgba(10,16,25,.97));border:.3rem solid #B98B55;
-  box-shadow:inset 0 0 0 .5rem #0B121B,inset 0 0 0 .62rem rgba(150,20,36,.85),0 1rem 3rem rgba(0,0,0,.45);transition:transform .18s,opacity .18s}
+  box-shadow:inset 0 0 0 .5rem #0B121B,inset 0 0 0 .62rem rgba(150,20,36,.85),0 1rem 3rem rgba(0,0,0,.45);
+  transition:transform .34s cubic-bezier(.22,1,.36,1),opacity .28s ease,filter .34s ease,border-color .28s ease;will-change:transform,opacity}
 .hslot .hg{flex:1;display:flex;align-items:center;justify-content:center;width:100%;min-height:0;padding:2rem 2rem 0}
 .hslot .hg img{max-width:50%;max-height:72%;object-fit:contain}
-.hslot .hl{text-transform:uppercase;letter-spacing:.06em;font-weight:300;margin-bottom:2rem}
+.hslot .hl{text-transform:uppercase;letter-spacing:.06em;font-weight:300;margin-bottom:1.4rem;font-size:3.5rem}
 .hslot .hd{text-transform:uppercase;letter-spacing:.08em;font-size:2rem;margin:-1rem 0 2.2rem;color:#D9B98F}
-.hslot.s0{width:26rem;height:37rem;border-color:#E6B86F}
-.hslot.s0 .hl{font-size:3.5rem;margin-bottom:1.4rem}
+.hslot.s0{border-color:#E6B86F}
 .hslot.s0.focus{border-color:#F4C97E;box-shadow:inset 0 0 0 .5rem #0B121B,inset 0 0 0 .62rem rgba(170,24,40,.95),0 0 3rem rgba(231,185,111,.28),0 0 1rem rgba(231,185,111,.22)}
-.hslot.s1{width:20rem;height:25.5rem}.hslot.s1 .hl{font-size:2.3rem}
-.hslot.s2{width:17rem;height:21.5rem;opacity:.85}.hslot.s2 .hl{font-size:2rem}
-.hslot.s3{width:14.5rem;height:18.5rem;opacity:.42}.hslot.s3 .hl{font-size:1.75rem}
 .hslot.ghost{visibility:hidden}
-.hslot.s1.L{transform:rotateY(10deg)}.hslot.s1.R{transform:rotateY(-10deg)}
-.hslot.s2.L{transform:rotateY(17deg)}.hslot.s2.R{transform:rotateY(-17deg)}
-.hslot.s3.L{transform:rotateY(24deg)}.hslot.s3.R{transform:rotateY(-24deg)}
+/* data-offset drives every bit of position/scale/depth -- 0 is the active centre card, ±1/±2 are the
+   visible wings, ±3 is a holding bay kept fully invisible (opacity:0, pointer-events:none, lowest
+   z-index) on BOTH sides. That's also what makes wrap-around safe for free: when the active tile
+   changes, the one card that jumps straight from -3 to +3 (or back) has opacity:0 at both ends of its
+   transition, so it's invisible for the whole glide across, never visibly flying through the centre. */
+.hslot[data-offset="0"]{transform:translate3d(-50%,-50%,0) scale(1) rotateY(0deg);z-index:5;opacity:1}
+.hslot[data-offset="-1"]{transform:translate3d(calc(-50% - 23rem),-50%,-3.75rem) scale(.74) rotateY(14deg);z-index:4;opacity:.88}
+.hslot[data-offset="1"]{transform:translate3d(calc(-50% + 23rem),-50%,-3.75rem) scale(.74) rotateY(-14deg);z-index:4;opacity:.88}
+.hslot[data-offset="-2"]{transform:translate3d(calc(-50% - 41rem),-50%,-7.5rem) scale(.60) rotateY(22deg);z-index:3;opacity:.65}
+.hslot[data-offset="2"]{transform:translate3d(calc(-50% + 41rem),-50%,-7.5rem) scale(.60) rotateY(-22deg);z-index:3;opacity:.65}
+.hslot[data-offset="-3"],.hslot[data-offset="3"]{opacity:0;pointer-events:none;z-index:1}
+.hslot[data-offset="-3"]{transform:translate3d(calc(-50% - 57rem),-50%,-11.25rem) scale(.48) rotateY(28deg)}
+.hslot[data-offset="3"]{transform:translate3d(calc(-50% + 57rem),-50%,-11.25rem) scale(.48) rotateY(-28deg)}
 /* the live sports banner */
 .hstrip{margin-top:1rem;margin-bottom:.4rem}
 .hstrip .slabel{font-size:2.6rem;letter-spacing:.1em;color:#E9CBA0;text-transform:uppercase;font-weight:300;margin-bottom:.8rem}
@@ -357,7 +368,6 @@ h2{font-size:3rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overfl
 .hb-game.focus{box-shadow:inset 0 0 0 .4rem var(--amber)}
 .hb-find.focus{color:#fff;text-shadow:0 0 2rem rgba(231,185,111,.7)}
 .hb-chip.focus .hb-badge{border-color:var(--amber);box-shadow:0 0 1.1rem rgba(231,185,111,.4)}
-html.phone .hslot.s2,html.phone .hslot.s3{display:none}
 html.phone .hb-chips{display:none}
 html.phone .hb-find{font-size:3.4rem;padding:0 2rem}
 /* landing banner: only games that are live now, cycling; no placeholder text */
@@ -625,6 +635,14 @@ mark{background:none;color:var(--amber);font-weight:600}
 .bar{height:.7rem;background:var(--line);border-radius:.35rem;margin:1.6rem 0 .8rem;overflow:hidden}
 .bar i{display:block;height:100%;background:var(--amber)}
 .times{display:flex;justify-content:space-between;color:var(--muted)}
+/* IS_TOUCH-only OSD buttons (see renderOsd()) -- a touchscreen has no D-pad LEFT/RIGHT-scan or
+   ENTER/PLAY/PAUSE remote keys, so without these there was no way at all to unpause or seek a
+   movie on phone. Plain rem sizing, no html.phone override needed: the OSD already scales correctly
+   under the root min(vw,vh) formula same as everything else. */
+.tcontrols{display:flex;justify-content:center;align-items:center;gap:1.6rem;margin-top:1.2rem}
+.tctl{min-width:4.8rem;min-height:4.4rem;padding:.6rem 1.6rem;border-radius:.8rem;border:.15rem solid var(--line);background:rgba(255,255,255,.08);color:var(--text);font-size:1.7rem;font-weight:600;cursor:pointer}
+.tctl:active{background:rgba(231,185,111,.3);border-color:var(--amber)}
+.tctl-pp{font-size:2rem;min-width:5.6rem}
 .pmsg{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(10,17,26,.88);padding:2rem 3.2rem;border-radius:1rem;max-width:72rem;text-align:center}
 
 .loading{position:fixed;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2.4rem;background:rgba(10,17,26,.92);z-index:10}
@@ -929,25 +947,33 @@ html.phone #pk-qr{width:min(36rem, 70vw);height:min(36rem, 70vw)}
    height is 100vh minus its own bottom:6.5rem reserve minus its own top padding:2.4rem = 58.6rem.
    Header (~10rem) + the unshrunk center tile (37rem) + the Event Guide banner (~22rem) = ~70rem,
    ~11.4rem (19%) over budget -- a top-margin alone was never going to be enough, the tile itself has
-   to come down. Shrunk ~22% (same aspect ratio each: 26/37, 20/25.5, 17/21.5, 14.5/18.5 preserved) so
-   header+tile+banner actually fits with real clearance on both sides instead of a marginal/guessed one. */
+   to come down. Shrunk ~22% (26/37 -> 20/28.5, same aspect ratio) so header+tile+banner actually fits
+   with real clearance on both sides instead of a marginal/guessed one. Every tier now shares this one
+   box (only the base .hslot rule needs a size override here -- see the base stylesheet's .hslot[data-
+   offset] rules for why the s1/s2/s3 modifier classes no longer carry their own dimensions). */
 html.phone .hhead{margin-bottom:1.5rem}
-html.phone .hslot.s0{width:20rem;height:28.5rem}
-html.phone .hslot.s1{width:15.5rem;height:19.8rem}
-html.phone .hslot.s2{width:13.2rem;height:16.7rem}
-html.phone .hslot.s3{width:11.2rem;height:14.4rem}
+html.phone .hslot{width:20rem;height:28.5rem}
 /* .hl/.hd (the card's own title/channel-count text) are plain rem values tied to html's font-size,
    not to the card's own width/height -- shrinking the CARD above without also shrinking these would
    leave "LIVE TV"/"48,763 CHANNELS" at their original size fighting for room inside a ~22% narrower
    card (no white-space:nowrap on either, so the realistic failure mode is an ugly wrap to 2 lines,
    not literally overflowing past the border, but still not what a card title should do). Scaled by
    the same ~22% (x0.78) as the cards themselves so the typography stays proportional to the card
-   it's inside, not just the screen. */
-html.phone .hslot.s0 .hl{font-size:2.7rem;margin-bottom:1.1rem}
-html.phone .hslot.s1 .hl{font-size:1.8rem}
-html.phone .hslot.s2 .hl{font-size:1.6rem}
-html.phone .hslot.s3 .hl{font-size:1.4rem}
+   it's inside, not just the screen. Every tier shares this one font-size too -- the data-offset
+   transform's scale() shrinks the smaller text together with the rest of the card, same as the TV side. */
+html.phone .hslot .hl{font-size:2.7rem;margin-bottom:1.1rem}
 html.phone .hslot .hd{font-size:1.6rem;margin:-.8rem 0 1.7rem}
+/* X-spread scaled by the same ~0.77 ratio as the card width (20/26) so the wings flank the smaller
+   center card proportionally instead of using the TV's wider spacing. ±2 stays visible at the same
+   .65 opacity as TV (five cards on screen: -2,-1,0,+1,+2) -- only ±3 is the invisible holding bay,
+   same as TV, so the wrap-suppression logic in renderHome() only ever needs to worry about a jump
+   landing on/leaving an opacity:0 tier here too. */
+html.phone .hslot[data-offset="-1"]{transform:translate3d(calc(-50% - 17.5rem),-50%,-3.75rem) scale(.74) rotateY(14deg)}
+html.phone .hslot[data-offset="1"]{transform:translate3d(calc(-50% + 17.5rem),-50%,-3.75rem) scale(.74) rotateY(-14deg)}
+html.phone .hslot[data-offset="-2"]{transform:translate3d(calc(-50% - 31rem),-50%,-7.5rem) scale(.60) rotateY(22deg)}
+html.phone .hslot[data-offset="2"]{transform:translate3d(calc(-50% + 31rem),-50%,-7.5rem) scale(.60) rotateY(-22deg)}
+html.phone .hslot[data-offset="-3"]{transform:translate3d(calc(-50% - 43rem),-50%,-11.25rem) scale(.48) rotateY(28deg)}
+html.phone .hslot[data-offset="3"]{transform:translate3d(calc(-50% + 43rem),-50%,-11.25rem) scale(.48) rotateY(-28deg)}
 /* 3. login's tabs/version sit right at the very top/bottom edge with no breathing room -- login-box
    has no spare height of its own for #login's centering to create margin with, so this trims the
    internal row gaps instead of adding new height (which would risk overflowing again). */
@@ -4873,7 +4899,7 @@ function catList() {
   askText('Category list', lines.join('\n') + '\n\nSelect all and copy, then send it. Press OK or Back to close.', '', () => {}, true);
 }
 /* ================= start screen ================= */
-const HOME = {zone: 'tiles', tile: 2, cards: [], cardKind: '', liveIdx: 0, fade: false, sportsOpen: false, sportCard: 0};
+const HOME = {zone: 'tiles', tile: 2, cards: [], cardKind: '', liveIdx: 0, fade: false, sportsOpen: false, sportCard: 0, slotEls: {}};
 /* Deliberately NOT adding a dedicated "Sports Hub" tile here: a 7th carousel tile needs its own full
    page (another showPage() target, another S.zone, its own key handling) duplicating what the hlive
    box below already does -- live/replay/upcoming game + sport chips, now with explicit tabs. That's a
@@ -5120,15 +5146,44 @@ function renderHome() {
   $('h-trial').classList.toggle('hidden', !showTrialBadge);
   if (showTrialBadge) $('h-trial').textContent = 'PRO TRIAL — ' + trialDaysLeft() + ' DAY' + (trialDaysLeft() === 1 ? '' : 'S') + ' LEFT';
   $('h-ver').innerHTML = (GUIDE_BUSY ? '<span class="hbd"></span>Updating the TV guide…&nbsp;&nbsp;·&nbsp;&nbsp;' : '') + 'Version ' + esc(APP_VERSION);
-  /* the carousel: seven slots around the chosen tile (it wraps round) */
-  const tiles = homeTiles(), n = tiles.length;
-  let html = '';
-  for (let dd = -3; dd <= 3; dd++) {
-    const i = (((HOME.tile + dd) % n) + n) % n, ghost = false, id = tiles[i][0], label = tiles[i][1];
-    html += '<div class="hslot s' + Math.abs(dd) + (dd < 0 ? ' L' : dd > 0 ? ' R' : '') + (ghost ? ' ghost' : '') + (dd === 0 && HOME.zone === 'tiles' ? ' focus' : '') + '" data-i="' + i + '" data-id="' + id + '">' +
-      '<div class="hg"><img src="glyph-' + id + '.png" alt=""></div><div class="hl">' + esc(label) + '</div>' + (dd === 0 ? '<div class="hd">' + esc(homeDetail(id)) + '</div>' : '') + '</div>';
-  }
-  $('h-tiles').innerHTML = html;
+  /* persistent carousel: one real DOM node per tile, created once and never innerHTML-rebuilt --
+     each render only updates its data-offset (shortest signed circular distance from the active
+     tile, -3..+3) and lets CSS transform the card itself into position, so it physically glides/
+     scales/banks between slots instead of text popping between static boxes. Keyed by tile id (not
+     array index) since "Continue" can appear/disappear at the end of homeTiles() without disturbing
+     the others. */
+  const tiles = homeTiles(), n = tiles.length, seenTiles = new Set(), tileHost = $('h-tiles');
+  tiles.forEach((t, i) => {
+    const id = t[0], label = t[1];
+    seenTiles.add(id);
+    let el = HOME.slotEls[id];
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'hslot';
+      el.innerHTML = '<div class="hg"><img src="glyph-' + id + '.png" alt=""></div><div class="hl"></div><div class="hd"></div>';
+      tileHost.appendChild(el);
+      HOME.slotEls[id] = el;
+    }
+    let offset = (((i - HOME.tile) % n) + n) % n;
+    if (offset > n / 2) offset -= n;
+    /* When n=6 the occupied offsets are {-2,-1,0,1,2,3} (no -3) -- one card always sits at the +3
+       holding bay, so a single step can jump it straight to -2, which IS visible (.65 opacity). A
+       plain CSS transition would animate across every slot in between, streaking across the whole
+       stage. Any jump bigger than a normal ±1 (or ±2 for a direct multi-step tap) means this is that
+       wrap, not a real glide -- snap it with the transition suppressed instead of animating through. */
+    const prevOffset = el._offset, isWrapJump = prevOffset !== undefined && Math.abs(offset - prevOffset) > 2;
+    if (isWrapJump) el.style.transition = 'none';
+    const centered = offset === 0 && HOME.zone === 'tiles';
+    el.dataset.offset = offset;
+    el.dataset.i = i;
+    el.dataset.id = id;
+    el.className = 'hslot s' + Math.min(Math.abs(offset), 3) + (centered ? ' focus' : '');
+    el.querySelector('.hl').textContent = label;
+    el.querySelector('.hd').textContent = offset === 0 ? homeDetail(id) : '';
+    if (isWrapJump) { void el.offsetWidth; el.style.transition = ''; }
+    el._offset = offset;
+  });
+  Object.keys(HOME.slotEls).forEach(id => { if (!seenTiles.has(id)) { HOME.slotEls[id].remove(); delete HOME.slotEls[id]; } });
   /* the banner: a live game when there is one, then "find your game" */
   const hb = homeBanner();
   HOME.cards = hb.cards; HOME.cardKind = 'banner';
@@ -8310,7 +8365,7 @@ function seriesKey(k) {
 
 /* ================= player ================= */
 const video = FIRE ? NV : $('video');
-const P = {list: [], idx: 0, hls: null, att: [], tries: 0, stallT: 0, oT: 0, epg: null, resume: 0, back: 'main', saveT: 0};
+const P = {list: [], idx: 0, hls: null, att: [], tries: 0, stallT: 0, oT: 0, epg: null, resume: 0, back: 'main', saveT: 0, userPaused: false};
 const cur = () => P.list[P.idx];
 function pmsg(t) { $('pmsg').textContent = t; $('pmsg').classList.toggle('hidden', !t); }
 /* Volume: the app's own UI never had any -- Fire TV and LG remotes have physical volume keys that
@@ -8391,7 +8446,7 @@ function urlsForOne0(it) {
 }
 function startStream() {
   const it = cur(); if (!it) return;
-  P.att = urlsFor(it); P.tries = 0; P.epg = null; P.resume = 0; P.saveT = Date.now(); P.speed = 1; try { video.playbackRate = 1; } catch (e) { }
+  P.att = urlsFor(it); P.tries = 0; P.epg = null; P.resume = 0; P.saveT = Date.now(); P.speed = 1; P.userPaused = false; try { video.playbackRate = 1; } catch (e) { }
   applyVolume();
   if (it.t === 'live') { loadEpg(it); pushRecent('live', it.id); }
   else {
@@ -8494,6 +8549,11 @@ function playVideo(v) {
   if (p && p.catch) p.catch(err => { if (err && err.name === 'NotAllowedError' && !v.muted) { v.muted = true; v.play().catch(() => {}); } });
 }
 const safePlay = () => playVideo(video);
+/* The single place that flips video.paused for VOD/Series -- tracks WHY it's paused (P.userPaused)
+   separately from the raw boolean, since "the user hit pause" and "still loading, hasn't played a
+   frame yet" both look like video.paused===true but must not both say "Paused" in the OSD (see
+   renderOsd()) or both get auto-nudged back to playing (see NativeStreamer's loadedmetadata watchdog). */
+function togglePlayPause() { if (video.paused) { safePlay(); P.userPaused = false; } else { video.pause(); P.userPaused = true; } showOsd(); }
 
 /* Plays one stream in one video element, trying each playback method in turn.
    Used by both the full-screen player and the Live TV preview window. */
@@ -8579,13 +8639,29 @@ function classifyPlaybackError(codeName) {
 /* Firestick version of Streamer: hands the link to Android's player. */
 class NativeStreamer {
   constructor(msg) {
-    this.msg = msg; this.on = false; this.att = []; this.tries = 0; this.stallT = 0; this.lastErrorMsg = null;
+    this.msg = msg; this.on = false; this.att = []; this.tries = 0; this.stallT = 0; this.readyStallT = 0; this.lastErrorMsg = null;
     NV.addEventListener('error', () => { this.lastErrorMsg = classifyPlaybackError(NV._lastErrorCode); if (this.on) this.next(); });
-    NV.addEventListener('playing', () => { clearTimeout(this.stallT); if (this.on) this.msg(''); });
+    NV.addEventListener('playing', () => { clearTimeout(this.stallT); clearTimeout(this.readyStallT); if (this.on) this.msg(''); });
     NV.addEventListener('waiting', () => { if (this.on) this.msg('Buffering…'); });
+    /* Reported symptom (TV and phone, VOD/Series): the OSD sits on "0:00 Paused" under "Buffering…"
+       until a D-pad/tap nudges it. The native side does reach STATE_READY (readyState hits 4 here,
+       via 'loadedmetadata') but onIsPlayingChanged(true) doesn't always follow on its own -- a manual
+       pause/play toggle (what the D-pad press or a screen tap already does, via safePlay()) is the
+       known fix. P.userPaused (set only by togglePlayPause(), never by this code) is what tells the
+       difference between "still starting up" and "the user genuinely paused it" -- this must never
+       fight a real user pause. currentTime<1 is the other half of that: a fresh start (or a seek back
+       to the very start) is unambiguous, so that gets nudged the instant the data's ready, not after a
+       wait; a rebuffer stall further into playback is less certain to be the same bug (could just be
+       briefly slow), so that case still gets the original 1.5s grace period instead of an instant one. */
+    NV.addEventListener('loadedmetadata', () => {
+      clearTimeout(this.readyStallT);
+      if (P.userPaused) return;
+      if (NV._p && NV._t < 1) { safePlay(); return; }
+      this.readyStallT = setTimeout(() => { if (this.on && NV._p && !P.userPaused) safePlay(); }, 1500);
+    });
   }
   start(it) { const seen = new Set(); this.on = true; this.isLive = it.t === 'live'; this.lastErrorMsg = null; this.att = urlsFor(it).filter(a => a.how !== 'hls' && !seen.has(a.url) && seen.add(a.url)); this.tries = 0; this.next(); }
-  clear() { clearTimeout(this.stallT); try { window.RCS.stop(); } catch (e) {} NV.readyState = 0; NV._d = NaN; NV._t = 0; NV._p = true; }
+  clear() { clearTimeout(this.stallT); clearTimeout(this.readyStallT); try { window.RCS.stop(); } catch (e) {} NV.readyState = 0; NV._d = NaN; NV._t = 0; NV._p = true; }
   stop() { this.on = false; this.clear(); this.msg(''); document.documentElement.classList.remove('native'); }
   next() {
     this.clear();
@@ -8756,8 +8832,11 @@ function renderOsd() {
   } else {
     const c = video.currentTime || 0, d = video.duration, ok = isFinite(d) && d > 0;
     const title = it.t === 'ep' ? esc(disp({name: it.sname})) + '<div class="prog now">Season ' + esc(it.season) + ', episode ' + esc(it.n) + ': ' + esc(it.name) + '</div>' : esc(disp(it)) + star;
-    h = '<div class="info"><div class="title">' + title + '</div><div class="bar"><i style="width:' + (ok ? (c / d * 100).toFixed(2) : 0) + '%"></i></div>' +
-      '<div class="times"><span>' + fmt(c) + (video.paused ? '   Paused' : '') + '</span><span>' + (ok ? fmt(d) : '') + '</span></div>' +
+    /* IS_TOUCH only -- a D-pad already has LEFT/RIGHT scan and ENTER/PLAY/PAUSE (playerKey()) for
+       everything these buttons do; a touchscreen with no remote had no equivalent at all before this. */
+    const tcontrols = IS_TOUCH ? '<div class="tcontrols"><button class="tctl" data-act="back10">−10s</button><button class="tctl tctl-pp" data-act="playpause">' + (video.paused ? '▶' : '❚❚') + '</button><button class="tctl" data-act="fwd30">+30s</button></div>' : '';
+    h = '<div class="info"><div class="title">' + title + '</div><div class="bar" id="osd-bar"><i style="width:' + (ok ? (c / d * 100).toFixed(2) : 0) + '%"></i></div>' +
+      '<div class="times"><span>' + fmt(c) + (video.paused && P.userPaused ? '   Paused' : '') + '</span><span>' + (ok ? fmt(d) : '') + '</span></div>' + tcontrols +
       (() => { const gg = it.t === 'vod' ? (DATA.vod.verToTitle && DATA.vod.verToTitle.get(it.id)) : (it.t === 'ep' ? SER.g : null), nn = gg && gg.vers ? gg.vers.length : 0; return nn > 1 ? '<div class="osdh">Menu: other versions (' + nn + ')</div>' : ''; })() + '</div>';
   }
   $('osd').innerHTML = h;
@@ -8787,6 +8866,27 @@ function scanKey(dir) {
   }, 200);
 }
 function seek(d) { if (!isFinite(video.duration)) return; video.currentTime = Math.max(0, Math.min(video.duration - 1, video.currentTime + d)); showOsd(); }
+/* The OSD's own buttons/bar (see renderOsd()'s IS_TOUCH branch) -- delegated since the OSD's
+   innerHTML is fully rebuilt by every renderOsd() call, so a listener on the buttons themselves
+   wouldn't survive a re-render. stopPropagation keeps #player's own click listener (tap anywhere to
+   toggle play/pause) from also firing for the same tap and immediately undoing what the button did. */
+$('osd').addEventListener('click', e => {
+  const btn = e.target.closest('.tctl');
+  if (btn) {
+    e.stopPropagation();
+    if (btn.dataset.act === 'back10') seek(-10);
+    else if (btn.dataset.act === 'fwd30') seek(30);
+    else togglePlayPause();
+    return;
+  }
+  const bar = e.target.closest('#osd-bar');
+  if (bar && isFinite(video.duration) && video.duration > 0) {
+    e.stopPropagation();
+    const r = bar.getBoundingClientRect();
+    video.currentTime = Math.max(0, Math.min(video.duration - 1, (e.clientX - r.left) / r.width * video.duration));
+    showOsd();
+  }
+});
 function closePlayer() {
   stopScan();
   if (GUIDE_RETRY) { GUIDE_RETRY = false; setTimeout(() => { if (S.screen !== 'player' && !GUIDE_BUSY) loadGuide(false); }, 60000); }
@@ -8813,7 +8913,7 @@ function playerKey(k) {
     else if (k === KEY.ENTER) toggleOsd();
     return;
   }
-  if (k === KEY.ENTER || k === KEY.PLAY || k === KEY.PAUSE || k === KEY.PLAYPAUSE) { if (video.paused) safePlay(); else video.pause(); showOsd(); }
+  if (k === KEY.ENTER || k === KEY.PLAY || k === KEY.PAUSE || k === KEY.PLAYPAUSE) togglePlayPause();
   else if (k === KEY.LEFT || k === KEY.REW) scanKey(-1);
   else if (k === KEY.RIGHT || k === KEY.FF) scanKey(1);
   else if (k === KEY.UP || k === KEY.DOWN) toggleOsd();
@@ -9552,7 +9652,7 @@ $('m-vers').addEventListener('click', e => { const i = idxOf(e); if (i < 0) retu
 $('s-vers').addEventListener('click', e => { const i = idxOf(e); if (i < 0) return; openSeries(SER.g, i, 'svers'); });
 $('seasons').addEventListener('click', e => { const i = idxOf(e); if (i < 0) return; SER.s = i; SER.e = 0; SER.zone = 'seasons'; epView.reset(); renderSeries(); });
 $('eps').addEventListener('click', e => { const i = idxOf(e); if (i < 0) return; SER.e = i; SER.zone = 'eps'; play(SER.eps[SER.seasons[SER.s]], i); });
-$('player').addEventListener('click', () => { const it = cur(); if (it && it.t !== 'live') { if (video.paused) safePlay(); else video.pause(); } toggleOsd(); });
+$('player').addEventListener('click', () => { const it = cur(); if (it && it.t !== 'live') { if (video.paused) { safePlay(); P.userPaused = false; } else { video.pause(); P.userPaused = true; } } toggleOsd(); });
 if (PC) {
   const hover = (el, fn) => el.addEventListener('mousemove', e => { const i = idxOf(e); if (i >= 0) fn(i); });
   hover($('list'), i => { const b = B[S.page]; if (S.zone !== 'items' || b.item !== i) { S.zone = 'items'; b.item = i; renderMain(); } });
