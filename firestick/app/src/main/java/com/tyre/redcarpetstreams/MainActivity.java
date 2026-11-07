@@ -628,6 +628,14 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void setSpeed(final double speed) {
             ui.post(() -> player.setPlaybackSpeed((float) Math.max(0.25, Math.min(4.0, speed))));
         }
+        /* "Fill" here is RESIZE_MODE_ZOOM (crop to fill, aspect ratio kept), not RESIZE_MODE_FILL
+           (stretch to fill, distorts the picture) -- ZOOM is what every mainstream streaming app's own
+           "Fit/Fill" toggle actually means by "Fill". The page's own object-fit:cover on its web <video>
+           fallback (PC/LG) means the same thing, so the two playback paths end up with matching behavior
+           under one label. */
+        @JavascriptInterface public void setAspect(final boolean fill) {
+            ui.post(() -> pv.setResizeMode(fill ? AspectRatioFrameLayout.RESIZE_MODE_ZOOM : AspectRatioFrameLayout.RESIZE_MODE_FIT));
+        }
         /* The page asks for the tracks; the player is read on the main thread and the answer handed back. */
         @JavascriptInterface public String getTracks() {
             final String[] out = new String[1];

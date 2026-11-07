@@ -623,7 +623,12 @@ mark{background:none;color:var(--amber);font-weight:600}
 /* player */
 #player{background:#000}
 #video{width:100%;height:100%;object-fit:contain;background:#000}
-.osd{position:absolute;left:4rem;right:4rem;bottom:4rem;display:flex;align-items:center;gap:3.2rem;padding:2.4rem 3.2rem;background:rgba(10,17,26,.9);border:.1rem solid var(--line);border-radius:1rem;border-top:.3rem solid var(--red2)}
+#video.aspect-fill{object-fit:cover}
+/* Premium cinema control deck: an edge-to-edge glassmorphism bar anchored to the bottom of the
+   screen, not a small floating box -- gold accent top border instead of the old all-round red-bordered
+   box, per the requested look. Still shared with the live-TV OSD layout (logo+info+clock in a row);
+   only the non-live branch below (bar/times/cinema-bar) needs the new column of controls. */
+.osd{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:3.2rem;padding:2.4rem 4rem 2.8rem;background:rgba(10,10,12,.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:.1rem solid rgba(212,175,55,.3)}
 .dial{font-weight:700;font-size:8.5rem;line-height:1;color:var(--amber);text-shadow:0 0 2.4rem rgba(231,185,111,.45);min-width:14rem;text-align:right}
 .info{flex:1;min-width:0}
 .title{font-size:3.4rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -632,17 +637,24 @@ mark{background:none;color:var(--amber);font-weight:600}
 .prog.now{color:var(--text)}
 .t{width:9rem;flex:none}
 .osd-clock{font-size:2.8rem;color:var(--muted);align-self:flex-start}
-.bar{height:.7rem;background:var(--line);border-radius:.35rem;margin:1.6rem 0 .8rem;overflow:hidden}
-.bar i{display:block;height:100%;background:var(--amber)}
+/* overflow:visible (not hidden) -- the thumb is a circle taller than the thin bar itself and needs to
+   poke out past it. cursor:pointer plus a taller invisible hit area (padding via :before would change
+   layout, so the pointerdown handler below just reads the bar's own rect directly instead). */
+.bar{position:relative;height:.7rem;background:rgba(255,255,255,.18);border-radius:.35rem;margin:1.8rem 0 .8rem;overflow:visible;cursor:pointer}
+.bar i{display:block;height:100%;background:var(--amber);border-radius:.35rem;pointer-events:none}
+.bar .thumb{position:absolute;top:50%;width:1.7rem;height:1.7rem;border-radius:50%;background:var(--amber);box-shadow:0 0 .8rem rgba(231,185,111,.65);transform:translate(-50%,-50%);pointer-events:none}
 .times{display:flex;justify-content:space-between;color:var(--muted)}
-/* IS_TOUCH-only OSD buttons (see renderOsd()) -- a touchscreen has no D-pad LEFT/RIGHT-scan or
-   ENTER/PLAY/PAUSE remote keys, so without these there was no way at all to unpause or seek a
-   movie on phone. Plain rem sizing, no html.phone override needed: the OSD already scales correctly
-   under the root min(vw,vh) formula same as everything else. */
-.tcontrols{display:flex;justify-content:center;align-items:center;gap:1.6rem;margin-top:1.2rem}
-.tctl{min-width:4.8rem;min-height:4.4rem;padding:.6rem 1.6rem;border-radius:.8rem;border:.15rem solid var(--line);background:rgba(255,255,255,.08);color:var(--text);font-size:1.7rem;font-weight:600;cursor:pointer}
-.tctl:active{background:rgba(231,185,111,.3);border-color:var(--amber)}
-.tctl-pp{font-size:2rem;min-width:5.6rem}
+/* The cinema toolbar (see cinemaButtons()/renderOsd()) -- D-pad focusable (gold focus ring, moved
+   with LEFT/RIGHT once DOWN enters the row, see playerKey()) and touch-tappable, so the same seven
+   controls work identically whether there's a remote or a finger. Plain rem sizing, no html.phone
+   override needed: the OSD already scales correctly under the root min(vw,vh) formula. */
+.cinema-bar{display:flex;align-items:center;justify-content:center;gap:1.2rem;margin-top:1.4rem}
+.cbtn{min-width:4.6rem;min-height:4.2rem;padding:.6rem 1.4rem;border-radius:.8rem;border:.15rem solid rgba(255,255,255,.18);background:rgba(255,255,255,.07);color:var(--text);font-size:1.5rem;font-weight:600;cursor:pointer;white-space:nowrap}
+.cbtn.disabled{opacity:.35;cursor:default}
+.cbtn:active{background:rgba(212,175,55,.3);border-color:#D4AF37}
+.cbtn.focus{border-color:#D4AF37;box-shadow:0 0 1.2rem rgba(212,175,55,.55);background:rgba(212,175,55,.2)}
+.cbtn.cbtn-active{border-color:var(--amber);color:var(--amber)}
+.cbtn.cbtn-pp{font-size:2.3rem;min-width:6.2rem;min-height:5.4rem;border-color:#D4AF37}
 .pmsg{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(10,17,26,.88);padding:2rem 3.2rem;border-radius:1rem;max-width:72rem;text-align:center}
 
 .loading{position:fixed;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2.4rem;background:rgba(10,17,26,.92);z-index:10}
@@ -1403,7 +1415,7 @@ function reloadAccountData() {
   Object.assign(recent, {live: [], series: []}, load(acctKey('sp_recent'), {}));
   prog = load(acctKey('sp_prog'), {}); recentQ = load(acctKey('sp_rq'), []);
 }
-const ui = Object.assign({fdKey: '', orig: false, liveLayout: 'provider', lang: 'en', sort: {live: 0, vod: 1, series: 1}, vol: 1, muted: false}, load('sp_ui', {}));
+const ui = Object.assign({fdKey: '', orig: false, liveLayout: 'provider', lang: 'en', sort: {live: 0, vod: 1, series: 1}, vol: 1, muted: false, aspectFill: false}, load('sp_ui', {}));
 if (FIRE && ui.gpvOff === undefined) ui.gpvOff = true;     /* inside the Android app the game-page preview starts off: weak TV sticks play better without it (Settings can turn it on) */
 document.documentElement.classList.toggle('light', !!ui.light);
 const favs = Object.assign({live: [], vod: [], series: []}, load(acctKey('sp_favs'), {}));
@@ -8365,7 +8377,7 @@ function seriesKey(k) {
 
 /* ================= player ================= */
 const video = FIRE ? NV : $('video');
-const P = {list: [], idx: 0, hls: null, att: [], tries: 0, stallT: 0, oT: 0, epg: null, resume: 0, back: 'main', saveT: 0, userPaused: false};
+const P = {list: [], idx: 0, hls: null, att: [], tries: 0, stallT: 0, oT: 0, epg: null, resume: 0, back: 'main', saveT: 0, userPaused: false, osdFocus: -1};
 const cur = () => P.list[P.idx];
 function pmsg(t) { $('pmsg').textContent = t; $('pmsg').classList.toggle('hidden', !t); }
 /* Volume: the app's own UI never had any -- Fire TV and LG remotes have physical volume keys that
@@ -8376,6 +8388,14 @@ function pmsg(t) { $('pmsg').textContent = t; $('pmsg').classList.toggle('hidden
    where `video` is the actual HTML5 element, i.e. PC and LG webOS both. */
 let volT = 0;
 function applyVolume() { if (FIRE) return; try { video.volume = ui.vol; video.muted = ui.muted; } catch (e) {} }
+/* Re-applied at the start of every stream, not just on toggle -- the native PlayerView's resize mode
+   (and the web <video>'s object-fit) both reset to the default on a fresh Activity/page, independent
+   of ui.aspectFill, which is what's actually persisted (see setAspect()/toggleAspect() below). */
+function applyAspect() {
+  if (FIRE) { try { window.RCS.setAspect(!!ui.aspectFill); } catch (e) {} }
+  else { try { video.classList.toggle('aspect-fill', !!ui.aspectFill); } catch (e) {} }
+}
+function toggleAspect() { ui.aspectFill = !ui.aspectFill; save('sp_ui', ui); applyAspect(); toast(ui.aspectFill ? 'Fill screen' : 'Fit screen'); showOsd(); }
 function volMsg() {
   if (SCAN.dir) return;   /* don't stomp the scan-speed message if a seek-hold is in progress */
   pmsg((ui.muted || ui.vol <= 0 ? '🔇 Muted' : '🔊 Volume ' + Math.round(ui.vol * 100) + '%'));
@@ -8446,8 +8466,8 @@ function urlsForOne0(it) {
 }
 function startStream() {
   const it = cur(); if (!it) return;
-  P.att = urlsFor(it); P.tries = 0; P.epg = null; P.resume = 0; P.saveT = Date.now(); P.speed = 1; P.userPaused = false; try { video.playbackRate = 1; } catch (e) { }
-  applyVolume();
+  P.att = urlsFor(it); P.tries = 0; P.epg = null; P.resume = 0; P.saveT = Date.now(); P.speed = 1; P.userPaused = false; P.osdFocus = -1; try { video.playbackRate = 1; } catch (e) { }
+  applyVolume(); applyAspect();
   if (it.t === 'live') { loadEpg(it); pushRecent('live', it.id); }
   else {
     const p = prog[pk(it)];
@@ -8830,13 +8850,15 @@ function renderOsd() {
     else if (e) g = '<div class="epg prog">No programme guide for this channel.</div>';
     h = logoTile(it, 'osd-l') + '<div class="info"><div class="title">' + esc(disp(it)) + badges(it) + star + '</div>' + g + '</div><div class="osd-clock">' + esc(clockStr()) + '</div>';
   } else {
-    const c = video.currentTime || 0, d = video.duration, ok = isFinite(d) && d > 0;
+    const c = video.currentTime || 0, d = video.duration, ok = isFinite(d) && d > 0, pct = ok ? (c / d * 100) : 0;
     const title = it.t === 'ep' ? esc(disp({name: it.sname})) + '<div class="prog now">Season ' + esc(it.season) + ', episode ' + esc(it.n) + ': ' + esc(it.name) + '</div>' : esc(disp(it)) + star;
-    /* IS_TOUCH only -- a D-pad already has LEFT/RIGHT scan and ENTER/PLAY/PAUSE (playerKey()) for
-       everything these buttons do; a touchscreen with no remote had no equivalent at all before this. */
-    const tcontrols = IS_TOUCH ? '<div class="tcontrols"><button class="tctl" data-act="back10">−10s</button><button class="tctl tctl-pp" data-act="playpause">' + (video.paused ? '▶' : '❚❚') + '</button><button class="tctl" data-act="fwd30">+30s</button></div>' : '';
-    h = '<div class="info"><div class="title">' + title + '</div><div class="bar" id="osd-bar"><i style="width:' + (ok ? (c / d * 100).toFixed(2) : 0) + '%"></i></div>' +
-      '<div class="times"><span>' + fmt(c) + (video.paused && P.userPaused ? '   Paused' : '') + '</span><span>' + (ok ? fmt(d) : '') + '</span></div>' + tcontrols +
+    /* Same seven controls, D-pad focusable (playerKey(), .cbtn.focus) and touch-tappable (the
+       delegated click/pointer* listeners below) -- cinemaButtons() is the one shared list both this
+       and playerKey() read, so the two can't drift apart. */
+    const btns = cinemaButtons();
+    const cinemaBar = '<div class="cinema-bar">' + btns.map((b, i) => '<button class="cbtn' + (b.pp ? ' cbtn-pp' : '') + (b.disabled ? ' disabled' : '') + (b.active ? ' cbtn-active' : '') + (P.osdFocus === i ? ' focus' : '') + '" data-act="' + b.act + '" data-i="' + i + '">' + b.label + '</button>').join('') + '</div>';
+    h = '<div class="info"><div class="title">' + title + '</div><div class="bar" id="osd-bar"><i style="width:' + pct.toFixed(2) + '%"></i><i class="thumb" style="left:' + pct.toFixed(2) + '%"></i></div>' +
+      '<div class="times"><span>' + fmt(c) + (video.paused && P.userPaused ? '   Paused' : '') + '</span><span>' + (ok ? fmt(d) : '') + '</span></div>' + cinemaBar +
       (() => { const gg = it.t === 'vod' ? (DATA.vod.verToTitle && DATA.vod.verToTitle.get(it.id)) : (it.t === 'ep' ? SER.g : null), nn = gg && gg.vers ? gg.vers.length : 0; return nn > 1 ? '<div class="osdh">Menu: other versions (' + nn + ')</div>' : ''; })() + '</div>';
   }
   $('osd').innerHTML = h;
@@ -8844,9 +8866,9 @@ function renderOsd() {
 function showOsd() {
   renderOsd(); $('osd').classList.remove('hidden');
   clearTimeout(P.oT);
-  P.oT = setTimeout(() => { const it = cur(); if (!(it && it.t !== 'live' && video.paused)) $('osd').classList.add('hidden'); }, IS_TOUCH ? 4000 : 6000);
+  P.oT = setTimeout(() => { const it = cur(); if (!(it && it.t !== 'live' && video.paused)) { $('osd').classList.add('hidden'); P.osdFocus = -1; } }, IS_TOUCH ? 4000 : 6000);
 }
-function toggleOsd() { if ($('osd').classList.contains('hidden')) showOsd(); else $('osd').classList.add('hidden'); }
+function toggleOsd() { if ($('osd').classList.contains('hidden')) showOsd(); else { $('osd').classList.add('hidden'); P.osdFocus = -1; } }
 /* Left and Right: a tap jumps (10 s back, 30 s forward). Hold the key and it scans faster the longer you hold (8x, 16x, 32x, 64x);
    let go and it carries on playing from where you stopped. */
 const SCAN = {dir: 0, t0: 0, last: 0, iv: null};
@@ -8863,29 +8885,50 @@ function scanKey(dir) {
     const held = t - SCAN.t0, rate = held < 1500 ? 8 : held < 3500 ? 16 : held < 6500 ? 32 : 64;
     video.currentTime = Math.max(0, Math.min(video.duration - 1, video.currentTime + dir * rate * 0.2));
     pmsg((dir < 0 ? '◀◀ ' : '▶▶ ') + rate + '×   ' + fmt(video.currentTime));
+    if (!$('osd').classList.contains('hidden')) renderOsd();   /* keeps the scrub bar/thumb live during a held D-pad seek, not just pmsg's own message */
   }, 200);
 }
 function seek(d) { if (!isFinite(video.duration)) return; video.currentTime = Math.max(0, Math.min(video.duration - 1, video.currentTime + d)); showOsd(); }
-/* The OSD's own buttons/bar (see renderOsd()'s IS_TOUCH branch) -- delegated since the OSD's
-   innerHTML is fully rebuilt by every renderOsd() call, so a listener on the buttons themselves
-   wouldn't survive a re-render. stopPropagation keeps #player's own click listener (tap anywhere to
-   toggle play/pause) from also firing for the same tap and immediately undoing what the button did. */
+/* The cinema toolbar's buttons -- delegated since the OSD's innerHTML is fully rebuilt by every
+   renderOsd() call, so a listener on the buttons themselves wouldn't survive a re-render.
+   stopPropagation keeps #player's own click listener (tap anywhere to toggle play/pause) from also
+   firing for the same tap and immediately undoing what the button did. */
 $('osd').addEventListener('click', e => {
-  const btn = e.target.closest('.tctl');
-  if (btn) {
-    e.stopPropagation();
-    if (btn.dataset.act === 'back10') seek(-10);
-    else if (btn.dataset.act === 'fwd30') seek(30);
-    else togglePlayPause();
-    return;
-  }
+  if (e.target.closest('#osd-bar')) { e.stopPropagation(); return; }   /* handled by the pointer* trio below */
+  const btn = e.target.closest('.cbtn');
+  if (!btn || btn.classList.contains('disabled')) return;
+  e.stopPropagation();
+  activateCinemaButton(Number(btn.dataset.i));
+});
+/* Drag-to-scrub the progress bar (not just tap-to-seek): setPointerCapture means pointermove/up keep
+   targeting the bar even once a dragging finger strays off its thin hit area, so delegating on #osd
+   still sees them via normal bubbling. lastScrubTime mirrors the carousel's lastSwipeTime pattern --
+   a drag still fires a synthetic click on release, which must not also reach #player's generic
+   tap-to-toggle-play/pause listener. */
+let lastScrubTime = 0;
+function scrubAt(bar, e) {
+  if (!isFinite(video.duration) || video.duration <= 0) return;
+  const r = bar.getBoundingClientRect(), frac = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+  video.currentTime = frac * video.duration; showOsd();
+}
+$('osd').addEventListener('pointerdown', e => {
   const bar = e.target.closest('#osd-bar');
-  if (bar && isFinite(video.duration) && video.duration > 0) {
-    e.stopPropagation();
-    const r = bar.getBoundingClientRect();
-    video.currentTime = Math.max(0, Math.min(video.duration - 1, (e.clientX - r.left) / r.width * video.duration));
-    showOsd();
-  }
+  if (!bar || !isFinite(video.duration) || video.duration <= 0) return;
+  e.stopPropagation();
+  try { bar.setPointerCapture(e.pointerId); } catch (x) {}
+  scrubAt(bar, e);
+});
+$('osd').addEventListener('pointermove', e => {
+  const bar = e.target.closest('#osd-bar');
+  if (!bar || !bar.hasPointerCapture(e.pointerId)) return;
+  e.preventDefault();
+  scrubAt(bar, e);
+});
+$('osd').addEventListener('pointerup', e => {
+  const bar = e.target.closest('#osd-bar');
+  if (!bar || !bar.hasPointerCapture(e.pointerId)) return;
+  lastScrubTime = Date.now();
+  try { bar.releasePointerCapture(e.pointerId); } catch (x) {}
 });
 function closePlayer() {
   stopScan();
@@ -8904,6 +8947,16 @@ function closePlayer() {
 }
 function playerKey(k) {
   const it = cur(); if (!it) return;
+  /* The cinema toolbar's own D-pad focus zone -- DOWN (below) enters it, BACK/UP here leave it
+     (rather than closing the player outright or re-toggling the OSD) before falling through to
+     everything else's normal meaning. Only reachable for non-live, same as the toolbar itself. */
+  if (it.t !== 'live' && P.osdFocus >= 0 && !$('osd').classList.contains('hidden')) {
+    const n = cinemaButtons().length;
+    if (k === KEY.LEFT) { P.osdFocus = (P.osdFocus - 1 + n) % n; showOsd(); return; }
+    if (k === KEY.RIGHT) { P.osdFocus = (P.osdFocus + 1) % n; showOsd(); return; }
+    if (k === KEY.ENTER) { activateCinemaButton(P.osdFocus); return; }
+    if (k === KEY.UP || k === KEY.BACK) { P.osdFocus = -1; showOsd(); return; }
+  }
   if (k === KEY.BACK || k === KEY.STOP) { closePlayer(); return; }
   if (k === KEY.RED && it.t !== 'ep') { toggleFav(it); showOsd(); return; }
   if (it.t === 'live') {
@@ -8916,7 +8969,8 @@ function playerKey(k) {
   if (k === KEY.ENTER || k === KEY.PLAY || k === KEY.PAUSE || k === KEY.PLAYPAUSE) togglePlayPause();
   else if (k === KEY.LEFT || k === KEY.REW) scanKey(-1);
   else if (k === KEY.RIGHT || k === KEY.FF) scanKey(1);
-  else if (k === KEY.UP || k === KEY.DOWN) toggleOsd();
+  else if (k === KEY.UP) toggleOsd();
+  else if (k === KEY.DOWN) { if ($('osd').classList.contains('hidden')) showOsd(); else { P.osdFocus = 0; showOsd(); } }
   else if (it.t === 'ep' && k === KEY.CH_UP && P.idx < P.list.length - 1) { saveProgress(); P.idx++; SER.e = P.idx; startStream(); }
   else if (it.t === 'ep' && k === KEY.CH_DOWN && P.idx > 0) { saveProgress(); P.idx--; SER.e = P.idx; startStream(); }
 }
@@ -8950,6 +9004,52 @@ function trackInfo() {
 }
 function setAudioTrack(i) { if (FIRE) window.RCS.setAudio(i); else if (main.hls) { try { main.hls.audioTrack = i; } catch (e) { } } }
 function setTextTrack(i) { if (FIRE) window.RCS.setText(i); else if (main.hls) { try { main.hls.subtitleTrack = i; main.hls.subtitleDisplay = i >= 0; } catch (e) { } } }
+/* The cinema toolbar's quick-cycle versions of the Options-menu's own audio/subtitle pickers (same
+   trackInfo()/setAudioTrack()/setTextTrack() underneath, not a parallel implementation) -- a cycle
+   suits a single toolbar button better than opening a whole picker list over the video. */
+function cycleAudioTrack() {
+  const tr = trackInfo();
+  if (!tr || !tr.audio || tr.audio.length < 2) { toast('No alternate audio tracks'); return; }
+  const cur = tr.audio.findIndex(x => x.sel), next = tr.audio[(cur + 1) % tr.audio.length];
+  setAudioTrack(next.i); toast('Audio: ' + next.l); showOsd();
+}
+function cycleSubtitleTrack() {
+  const tr = trackInfo();
+  if (!tr || !tr.text || !tr.text.length) { toast('No subtitles available'); return; }
+  if (!tr.textOn) { setTextTrack(tr.text[0].i); toast('Subtitles: ' + tr.text[0].l); }
+  else {
+    const next = tr.text.findIndex(x => x.sel) + 1;
+    if (next >= tr.text.length) { setTextTrack(-1); toast('Subtitles off'); }
+    else { setTextTrack(tr.text[next].i); toast('Subtitles: ' + tr.text[next].l); }
+  }
+  showOsd();
+}
+/* The toolbar's own ordered list of buttons -- renderOsd() reads it to build the HTML, playerKey()
+   reads it to know how many buttons LEFT/RIGHT can move across, and activateCinemaButton() reads it
+   to run whatever's focused. One shared list so all three can never drift out of sync with each other. */
+function cinemaButtons() {
+  const tr = trackInfo(), audioN = tr && tr.audio ? tr.audio.length : 0, textN = tr && tr.text ? tr.text.length : 0;
+  return [
+    {act: 'audio', label: 'AUD', disabled: audioN < 2},
+    {act: 'cc', label: 'CC', disabled: !textN, active: tr && tr.textOn},
+    {act: 'back10', label: '−10s'},
+    {act: 'playpause', label: video.paused ? '▶' : '❚❚', pp: true},
+    {act: 'fwd30', label: '+30s'},
+    {act: 'speed', label: (P.speed || 1) + '×'},
+    {act: 'aspect', label: ui.aspectFill ? 'FILL' : 'FIT'}
+  ];
+}
+function activateCinemaButton(i) {
+  const b = cinemaButtons()[i];
+  if (!b || b.disabled) return;
+  if (b.act === 'back10') seek(-10);
+  else if (b.act === 'fwd30') seek(30);
+  else if (b.act === 'playpause') togglePlayPause();
+  else if (b.act === 'audio') cycleAudioTrack();
+  else if (b.act === 'cc') cycleSubtitleTrack();
+  else if (b.act === 'speed') { setSpeed(SPEEDS[(SPEEDS.indexOf(P.speed || 1) + 1) % SPEEDS.length]); showOsd(); }
+  else if (b.act === 'aspect') toggleAspect();
+}
 function optItems() {
   const it = [], sc = S.screen;
   if (sc === 'main' && ['live', 'vod', 'series', 'favs'].includes(S.page)) {
@@ -9652,7 +9752,10 @@ $('m-vers').addEventListener('click', e => { const i = idxOf(e); if (i < 0) retu
 $('s-vers').addEventListener('click', e => { const i = idxOf(e); if (i < 0) return; openSeries(SER.g, i, 'svers'); });
 $('seasons').addEventListener('click', e => { const i = idxOf(e); if (i < 0) return; SER.s = i; SER.e = 0; SER.zone = 'seasons'; epView.reset(); renderSeries(); });
 $('eps').addEventListener('click', e => { const i = idxOf(e); if (i < 0) return; SER.e = i; SER.zone = 'eps'; play(SER.eps[SER.seasons[SER.s]], i); });
-$('player').addEventListener('click', () => { const it = cur(); if (it && it.t !== 'live') { if (video.paused) { safePlay(); P.userPaused = false; } else { video.pause(); P.userPaused = true; } } toggleOsd(); });
+$('player').addEventListener('click', () => {
+  if (Date.now() - lastScrubTime < 350) return;
+  const it = cur(); if (it && it.t !== 'live') { if (video.paused) { safePlay(); P.userPaused = false; } else { video.pause(); P.userPaused = true; } } toggleOsd();
+});
 if (PC) {
   const hover = (el, fn) => el.addEventListener('mousemove', e => { const i = idxOf(e); if (i >= 0) fn(i); });
   hover($('list'), i => { const b = B[S.page]; if (S.zone !== 'items' || b.item !== i) { S.zone = 'items'; b.item = i; renderMain(); } });
