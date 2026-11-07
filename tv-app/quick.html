@@ -921,6 +921,67 @@ html:not(.phone) #g-chans .csec{grid-template-columns:repeat(var(--gc,4),1fr)}
    than many phones. */
 html.phone .pkbox{flex-direction:column;gap:2rem}
 html.phone #pk-qr{width:min(36rem, 70vw);height:min(36rem, 70vw)}
+/* Confirmed against real phone screenshots after the min(vw,vh) root-cause fix landed: the fix
+   itself is correct (everything scales together, nothing overflows any more), but a handful of
+   spots were still tight/uneven on a real device. All scoped under html.phone, same as everything
+   else on this list, so TV is never touched. */
+/* 1. Re-done with the actual math, not a guess from a small screenshot: .hwrap's available content
+   height is 100vh minus its own bottom:6.5rem reserve minus its own top padding:2.4rem = 58.6rem.
+   Header (~10rem) + the unshrunk center tile (37rem) + the Event Guide banner (~22rem) = ~70rem,
+   ~11.4rem (19%) over budget -- a top-margin alone was never going to be enough, the tile itself has
+   to come down. Shrunk ~22% (same aspect ratio each: 26/37, 20/25.5, 17/21.5, 14.5/18.5 preserved) so
+   header+tile+banner actually fits with real clearance on both sides instead of a marginal/guessed one. */
+html.phone .hhead{margin-bottom:1.5rem}
+html.phone .hslot.s0{width:20rem;height:28.5rem}
+html.phone .hslot.s1{width:15.5rem;height:19.8rem}
+html.phone .hslot.s2{width:13.2rem;height:16.7rem}
+html.phone .hslot.s3{width:11.2rem;height:14.4rem}
+/* .hl/.hd (the card's own title/channel-count text) are plain rem values tied to html's font-size,
+   not to the card's own width/height -- shrinking the CARD above without also shrinking these would
+   leave "LIVE TV"/"48,763 CHANNELS" at their original size fighting for room inside a ~22% narrower
+   card (no white-space:nowrap on either, so the realistic failure mode is an ugly wrap to 2 lines,
+   not literally overflowing past the border, but still not what a card title should do). Scaled by
+   the same ~22% (x0.78) as the cards themselves so the typography stays proportional to the card
+   it's inside, not just the screen. */
+html.phone .hslot.s0 .hl{font-size:2.7rem;margin-bottom:1.1rem}
+html.phone .hslot.s1 .hl{font-size:1.8rem}
+html.phone .hslot.s2 .hl{font-size:1.6rem}
+html.phone .hslot.s3 .hl{font-size:1.4rem}
+html.phone .hslot .hd{font-size:1.6rem;margin:-.8rem 0 1.7rem}
+/* 3. login's tabs/version sit right at the very top/bottom edge with no breathing room -- login-box
+   has no spare height of its own for #login's centering to create margin with, so this trims the
+   internal row gaps instead of adding new height (which would risk overflowing again). */
+html.phone .lede{margin-bottom:1.6rem}
+html.phone .lmode{margin-bottom:1.4rem}
+html.phone .field{margin-bottom:1.4rem}
+/* Margin trims alone were also an unverified guess, same mistake as item 1 -- shrinking the inputs
+   and their labels directly is what actually moves the needle, since input height (font-size 2.4rem
+   + 2.4rem padding + border) was the single biggest line item in the form's total height, not the
+   margins between lines. Scoped to .login-box specifically (not a bare "input"), so Settings/search
+   text entry elsewhere isn't touched by this. */
+html.phone .login-box input{padding:.8rem 1.2rem;font-size:1.8rem}
+html.phone .login-box .field span{font-size:1.4rem;margin-bottom:.4rem}
+html.phone #f-go{padding:.9rem 2.4rem;font-size:1.8rem}
+html.phone #login-logo{width:26rem}
+/* 4. #rail-items (the actual icon list; #rail itself is just its container, see the markup) had no
+   height or justify-content of its own, so it only ever took its own content's height and sat at
+   the top of #rail with the rest unused below -- #rail-logo/#clock are already display:none on
+   phone, so #rail-items claiming the rest of #rail's height via flex:1 is safe. */
+html.phone #rail-items{display:flex;flex-direction:column;justify-content:space-evenly;flex:1;min-height:0}
+/* 5. .touch-back is a fixed 44px regardless of rem scale (deliberately -- a touch target shouldn't
+   shrink with everything else), positioned absolute at top:1rem/left:1rem of its container. At TV
+   scale that offset is already close to 44px on its own, barely missing the content that starts at
+   .page's own 3rem left padding; at a phone's much smaller rem, the same fixed 44px button now
+   reaches well past where that content starts, overlapping the search bar's magnifying-glass icon.
+   static, not absolute, sidesteps that entirely: normal document flow can't overlap anything, it
+   just pushes the search bar down a little instead. */
+/* static (an earlier version of this fix) was wrong -- it took the button out of absolute
+   positioning entirely, but as a normal block-flow element that still costs a full row of real
+   vertical height (44px + its own margin) on an already-tight 67.5rem screen, pushing the search
+   bar, chips, and results down for no reason. Left it absolutely positioned (the TV default) and
+   instead opened a gap for it to sit in: .qbox now starts further right, so the two can never
+   collide, with zero vertical cost either way. */
+html.phone #page-search .qbox{margin-left:calc(44px + 1.5rem)}
 .svl{align-self:center;margin-right:1.2rem;color:var(--muted);font-size:1.8rem}
 .osdh{font-size:1.7rem;opacity:.75;margin-top:.6rem}
 /*LIGHT-START*/
@@ -5196,12 +5257,35 @@ function homeKey(k) {
   } else return;
   renderHome();
 }
+/* lastSwipeTime guards against the synthetic click a touchend still fires afterward (standard
+   WebView/browser behaviour, there to support legacy click-only code) -- without it, a swipe that
+   starts and ends over the same tile rotates the carousel once from the swipe below, then a second
+   time (or opens the tile outright) from this click firing right after it. 350ms is comfortably
+   longer than how late that synthetic click can land. */
+let lastSwipeTime = 0;
 $('h-tiles').addEventListener('click', e => {
+  if (Date.now() - lastSwipeTime < 350) return;
   const el = e.target.closest('.hslot');
   if (!el) return;
   const i = Number(el.dataset.i);
   if (el.classList.contains('s0')) homeOpenTile(i); else { HOME.zone = 'tiles'; HOME.tile = i; renderHome(); }
 });
+/* Tapping a tile (above) already opens/rotates it -- the one thing genuinely missing for touch was
+   a swipe to rotate without needing to land a tap on a specific side tile. homeKey already does both
+   the state change and the re-render for the remote's Left/Right, so this just turns a left/right
+   drag into the same call tapping a tile or the remote already use, rather than a separate path that
+   could drift from either of those. */
+let hSwipeX = null;
+$('h-tiles').addEventListener('touchstart', e => { hSwipeX = e.touches[0].clientX; }, {passive: true});
+$('h-tiles').addEventListener('touchend', e => {
+  if (hSwipeX == null) return;
+  const dx = e.changedTouches[0].clientX - hSwipeX;
+  hSwipeX = null;
+  if (Math.abs(dx) < 30) return;
+  lastSwipeTime = Date.now();
+  HOME.zone = 'tiles';
+  homeKey(dx < 0 ? KEY.RIGHT : KEY.LEFT);
+}, {passive: true});
 $('h-strip-wrap').addEventListener('click', e => {
   const sp = e.target.closest('#h-find [data-i]');
   if (sp) { const i = Number(sp.dataset.i); if (i === SPORT_GROUPS.length) { askShortcuts(); return; } const g = SPORT_GROUPS[i]; if (g) homeOpenSportGroup(g[0]); return; }
