@@ -274,7 +274,13 @@ h2{font-size:3rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overfl
    same base box (the old .s0 size) and is purely repositioned/scaled/rotated via transform, keyed off
    its own data-offset (-3..+3, the shortest signed circular distance from the active tile). That's what
    makes the card itself glide/bank between positions instead of text popping between static boxes. */
-.hcar{position:relative;display:flex;justify-content:center;align-items:center;flex:1 1 auto;min-height:0;margin-top:.4rem;perspective:68.75rem}
+/* height:37rem matches .hslot's own base height -- position:absolute children (the cards) don't
+   contribute to a parent's content height at all, so without this explicit height the flex column
+   above (.hwrap) has no idea how tall the carousel actually renders and collapses this box down to
+   whatever flex-shrink allows. The cards themselves would still draw at full size regardless (absolute
+   positioning draws outside the parent's own box), just overlapping the next flex sibling below (the
+   Event Guide banner) instead of being properly spaced from it. */
+.hcar{position:relative;display:flex;justify-content:center;align-items:center;flex:1 1 auto;min-height:0;height:37rem;margin-top:.4rem;perspective:68.75rem}
 .hslot{position:absolute;top:50%;left:50%;width:26rem;height:37rem;display:flex;flex-direction:column;align-items:center;cursor:pointer;border-radius:2.4rem;color:#E9CBA0;text-align:center;
   background:linear-gradient(180deg,rgba(20,29,42,.94),rgba(10,16,25,.97));border:.3rem solid #B98B55;
   box-shadow:inset 0 0 0 .5rem #0B121B,inset 0 0 0 .62rem rgba(150,20,36,.85),0 1rem 3rem rgba(0,0,0,.45);
@@ -966,6 +972,7 @@ html.phone #pk-qr{width:min(36rem, 70vw);height:min(36rem, 70vw)}
    box (only the base .hslot rule needs a size override here -- see the base stylesheet's .hslot[data-
    offset] rules for why the s1/s2/s3 modifier classes no longer carry their own dimensions). */
 html.phone .hhead{margin-bottom:1.5rem}
+html.phone .hcar{height:28.5rem}
 html.phone .hslot{width:20rem;height:28.5rem}
 /* .hl/.hd (the card's own title/channel-count text) are plain rem values tied to html's font-size,
    not to the card's own width/height -- shrinking the CARD above without also shrinking these would
@@ -985,8 +992,13 @@ html.phone .hslot[data-offset="-1"]{transform:translate3d(calc(-50% - 17.5rem),-
 html.phone .hslot[data-offset="1"]{transform:translate3d(calc(-50% + 17.5rem),-50%,-3.75rem) scale(.74) rotateY(-7deg)}
 html.phone .hslot[data-offset="-2"]{transform:translate3d(calc(-50% - 31rem),-50%,-7.5rem) scale(.60) rotateY(11deg)}
 html.phone .hslot[data-offset="2"]{transform:translate3d(calc(-50% + 31rem),-50%,-7.5rem) scale(.60) rotateY(-11deg)}
-html.phone .hslot[data-offset="-3"]{transform:translate3d(calc(-50% - 42rem),-50%,-11.25rem) scale(.34) rotateY(14deg)}
-html.phone .hslot[data-offset="3"]{transform:translate3d(calc(-50% + 42rem),-50%,-11.25rem) scale(.34) rotateY(-14deg)}
+/* min(42rem, 36vw) instead of a flat 42rem -- confirmed via real screenshots that a fixed rem guess put
+   ±3 off the edge of the screen on at least one real phone's aspect ratio (only 5 of 7 cards visible).
+   vw is a direct percentage of the actual viewport width regardless of aspect ratio or the root
+   min(vw,vh) font formula, so capping at 36vw guarantees the card's centre never passes 36% of the way
+   to the true screen edge (50vw) -- the wider 42rem spacing still applies on any phone roomy enough for it. */
+html.phone .hslot[data-offset="-3"]{transform:translate3d(calc(-50% - min(42rem,36vw)),-50%,-11.25rem) scale(.34) rotateY(14deg)}
+html.phone .hslot[data-offset="3"]{transform:translate3d(calc(-50% + min(42rem,36vw)),-50%,-11.25rem) scale(.34) rotateY(-14deg)}
 /* 3. login's tabs/version sit right at the very top/bottom edge with no breathing room -- login-box
    has no spare height of its own for #login's centering to create margin with, so this trims the
    internal row gaps instead of adding new height (which would risk overflowing again). */
@@ -3147,59 +3159,88 @@ function mergeChan(list, have, c) {
    row with how confident this particular match actually is -- same out-of-band pattern NEAR_AMBIG
    already uses just above, not a new idiom. */
 let TSDB_GROUPS_TIER = null;
+/* temporary call-count instrumentation (cheap counters, not timing) -- see buildEventsG's own memLog
+   around the v2Events() call for how to read this. */
+const TSDB_GROUPS_STATS = {calls: 0, hits: 0, misses: 0, groupsOut: 0, ms: 0};
 function tsdbGroups(chName, cc) {
+  const __t0 = performance.now();
+  TSDB_GROUPS_STATS.calls++;
   if (!DATA.live.tidx) { const m = new Map(); DATA.live.items.forEach(g => { const k = chKey(g.name); (m.get(k) || m.set(k, []).get(k)).push(g); }); DATA.live.tidx = m; }
-  TSDB_GROUPS_TIER = null;
   const k = chKey(chName);
-  if (!k) return [];
-  /* A confirmed alias skips the country check entirely, on purpose -- it's exactly the kind of case
-     where that check is most likely to be WRONG (a provider mistagging or blanking a channel's country
-     is a plausible reason the automatic match failed in the first place). Once a person has actually
-     looked at this exact pairing and confirmed it, re-applying the same heuristic that may have caused
-     the original miss would silently undo the fix it was created to provide. */
-  const aliased = resolveAlias(k);
-  if (aliased) { TSDB_GROUPS_TIER = 'alias'; return aliased; }
-  let gs = DATA.live.tidx.get(k) || [];
-  if (gs.length) TSDB_GROUPS_TIER = 'exact';
-  if (!gs.length && k.length >= 7) {
-    gs = nearMatchUnique(DATA.live.tidx, k);
-    if (gs.length) TSDB_GROUPS_TIER = 'near';
-    else if (NEAR_AMBIG) noteAmbiguous(k, chName, NEAR_AMBIG);
-  }
-  if (!gs.length) {
-    /* Last resort: some providers number a brand's own per-event feeds ("Stan Sport AU" shows up on
-       air as "STAN 01".."STAN NN", real account confirmed to run past 80; "DAZN PPV 1".."DAZN PPV 99";
-       "BEIN Sports 1"...) -- the curated broadcaster phrase never appears in any one channel's own name,
-       so no amount of substring matching above finds a SPECIFIC feed. Matched here by brand (name minus
-       its trailing feed number) via the same length-bucketed containment scan tier 2 already uses, just
-       against a brand-keyed index instead of a full-name one -- so "stansport" (guide-v2's own cleaned
-       brand, no number) correctly contains "stan" (the real "STAN 01" feed's brand) the same way tier 2
-       already matches "TNT Sports 1" against "TNT Sports". Every feed sharing the ONE matching brand is
-       returned together, tagged tier:'brand' -- this is deliberately not narrowed to a single feed (nothing
-       in a bare broadcaster name like "Stan Sport AU" says WHICH numbered feed is airing a given match);
-       buildEventsG()'s own prune step removes these again for any event where a different signal (the
-       EPG scan, a PPV channel-name match, or tier 1/2 above) already confirms one specific feed. Still
-       refuses on genuine ambiguity -- more than one DISTINCT brand family near-matching -- same as tier 2,
-       just over a smaller, brand-only index so an 80-feed family is one candidate, not eighty. */
-    if (!DATA.live.bidx) {
-      const m = new Map();
-      DATA.live.items.forEach(g => { const b = brandKeyOf(g.name); if (b) (m.get(b) || m.set(b, []).get(b)).push(g); });
-      DATA.live.bidx = m;
-    }
-    const gBrand = brandKeyOf(chName);
-    if (gBrand && gBrand.length >= 4 && !BRAND_WORD_STOP.has(gBrand)) {
-      gs = DATA.live.bidx.get(gBrand) || [];
-      if (gs.length) TSDB_GROUPS_TIER = 'brand';
+  if (!k) { TSDB_GROUPS_TIER = null; TSDB_GROUPS_STATS.ms += performance.now() - __t0; return []; }
+  /* Everything below (tiers 1-3) depends only on k/chName, never on cc -- the country filter at the
+     very end is the one cc-dependent step, and it's cheap. guide-v2.json repeats the same broadcaster
+     name (e.g. "Sky Sports Main Event") across dozens of fixtures in one buildEvents pass, and a miss
+     at tier 1 used to re-run the full near-match bucket scan (tier 2) and brand-index scan (tier 3) from
+     scratch every single time for that exact same name -- measured as the single largest cost in the
+     whole buildEvents pass on a real account (20+ seconds of a ~30s pass, confirmed via memLog
+     checkpoints). Caching the tier result by k turns every repeat of the same broadcaster name into a
+     Map lookup; DATA.live.tsdbCache lives on the live DATA object itself, same as .tidx/.bidx just
+     above, so it's automatically fresh on any account refresh without needing its own invalidation. */
+  if (!DATA.live.tsdbCache) DATA.live.tsdbCache = new Map();
+  let hit = DATA.live.tsdbCache.get(k);
+  if (hit) TSDB_GROUPS_STATS.hits++;
+  if (!hit) {
+    TSDB_GROUPS_STATS.misses++;
+    TSDB_GROUPS_TIER = null;
+    /* A confirmed alias skips the country check entirely, on purpose -- it's exactly the kind of case
+       where that check is most likely to be WRONG (a provider mistagging or blanking a channel's country
+       is a plausible reason the automatic match failed in the first place). Once a person has actually
+       looked at this exact pairing and confirmed it, re-applying the same heuristic that may have caused
+       the original miss would silently undo the fix it was created to provide. */
+    const aliased = resolveAlias(k);
+    let gs;
+    if (aliased) { TSDB_GROUPS_TIER = 'alias'; gs = aliased; }
+    else {
+      gs = DATA.live.tidx.get(k) || [];
+      if (gs.length) TSDB_GROUPS_TIER = 'exact';
+      if (!gs.length && k.length >= 7) {
+        gs = nearMatchUnique(DATA.live.tidx, k);
+        if (gs.length) TSDB_GROUPS_TIER = 'near';
+        else if (NEAR_AMBIG) noteAmbiguous(k, chName, NEAR_AMBIG);
+      }
       if (!gs.length) {
-        gs = nearMatchUnique(DATA.live.bidx, gBrand, 4);
-        if (gs.length) TSDB_GROUPS_TIER = 'brand';
-        else if (NEAR_AMBIG) noteAmbiguous(gBrand, chName, NEAR_AMBIG);
+        /* Last resort: some providers number a brand's own per-event feeds ("Stan Sport AU" shows up on
+           air as "STAN 01".."STAN NN", real account confirmed to run past 80; "DAZN PPV 1".."DAZN PPV 99";
+           "BEIN Sports 1"...) -- the curated broadcaster phrase never appears in any one channel's own name,
+           so no amount of substring matching above finds a SPECIFIC feed. Matched here by brand (name minus
+           its trailing feed number) via the same length-bucketed containment scan tier 2 already uses, just
+           against a brand-keyed index instead of a full-name one -- so "stansport" (guide-v2's own cleaned
+           brand, no number) correctly contains "stan" (the real "STAN 01" feed's brand) the same way tier 2
+           already matches "TNT Sports 1" against "TNT Sports". Every feed sharing the ONE matching brand is
+           returned together, tagged tier:'brand' -- this is deliberately not narrowed to a single feed (nothing
+           in a bare broadcaster name like "Stan Sport AU" says WHICH numbered feed is airing a given match);
+           buildEventsG()'s own prune step removes these again for any event where a different signal (the
+           EPG scan, a PPV channel-name match, or tier 1/2 above) already confirms one specific feed. Still
+           refuses on genuine ambiguity -- more than one DISTINCT brand family near-matching -- same as tier 2,
+           just over a smaller, brand-only index so an 80-feed family is one candidate, not eighty. */
+        if (!DATA.live.bidx) {
+          const m = new Map();
+          DATA.live.items.forEach(g => { const b = brandKeyOf(g.name); if (b) (m.get(b) || m.set(b, []).get(b)).push(g); });
+          DATA.live.bidx = m;
+        }
+        const gBrand = brandKeyOf(chName);
+        if (gBrand && gBrand.length >= 4 && !BRAND_WORD_STOP.has(gBrand)) {
+          gs = DATA.live.bidx.get(gBrand) || [];
+          if (gs.length) TSDB_GROUPS_TIER = 'brand';
+          if (!gs.length) {
+            gs = nearMatchUnique(DATA.live.bidx, gBrand, 4);
+            if (gs.length) TSDB_GROUPS_TIER = 'brand';
+            else if (NEAR_AMBIG) noteAmbiguous(gBrand, chName, NEAR_AMBIG);
+          }
+        }
       }
     }
+    hit = {gs, tier: TSDB_GROUPS_TIER};
+    DATA.live.tsdbCache.set(k, hit);
   }
-  if (!cc) return gs;
+  TSDB_GROUPS_TIER = hit.tier;
+  const gs = hit.gs;
+  if (!cc) { TSDB_GROUPS_STATS.groupsOut += gs.length; TSDB_GROUPS_STATS.ms += performance.now() - __t0; return gs; }
   const filtered = gs.filter(g => !g.cc || g.cc === 'ZZ' || g.cc === cc || (cc === 'UK' && g.cc === 'IE'));
   if (!filtered.length) TSDB_GROUPS_TIER = null;
+  TSDB_GROUPS_STATS.groupsOut += filtered.length;
+  TSDB_GROUPS_STATS.ms += performance.now() - __t0;
   return filtered;
 }
 
@@ -4271,15 +4312,17 @@ function* addNameEvents(out) {
   const teamIdx = new Map();
   const idxEv = ev => { if (!ev.teams) return; for (const tn of ev.teams) for (const key of [tn, norm(tn)]) { let a = teamIdx.get(key); if (!a) { a = []; teamIdx.set(key, a); } a.push(ev); } };
   out.forEach((ev, i) => { ev._seq = i; idxEv(ev); });
-  let n = 0;
+  let n = 0, passedFilter = 0, hadTeams = 0;
   for (const g of DATA.live.items) {
     if ((++n & 1023) === 0) yield;
     if (g.g !== 'Sports' && !/\b(ppv|events?|match|epl|football|soccer|fight)\b/i.test(g.raw + ' ' + (DATA.live.catName.get(g.cat) || ''))) continue;
+    passedFilter++;
     let raw = String(g.raw || g.name), kick = 0;
     const tm = raw.match(/(?:@\s*)?\b([01]?\d|2[0-3])[:.h]([0-5]\d)\b\s*(UK|GMT|BST|CET|CEST|ET|EST|EDT|AEST|AEDT)?/i);
     if (tm) { kick = nameTime(+tm[1], +tm[2], tm[3]); raw = raw.slice(0, tm.index); }
     const info = parseEvent(raw.replace(/[@|]\s*$/, ''), '', '');
     if (!info.teams) continue;
+    hadTeams++;
     /* a guide fixture involving the same club within the day: add this channel to it */
     const cands = new Set();
     info.known.forEach(k => (teamIdx.get(k) || []).forEach(ev => cands.add(ev)));
@@ -4299,6 +4342,7 @@ function* addNameEvents(out) {
       text: info.text + norm(g.name) + ' ', kick: kick || now, start: kick ? kick - 15 * 60e3 : now, stop: kick ? kick + 2.5 * 3600e3 : now + 24 * 3600e3, chans: [entry], reps: [], _seq: out.length};
     out.push(newEv); idxEv(newEv);
   }
+  memLog('buildEvents: addNameEvents scanned=' + n + ' passedFilter=' + passedFilter + ' hadTeams=' + hadTeams);
 }
 /* buildEvents() used to be one fully synchronous function. On a big enough guide (this was diagnosed
    against a 49,121-channel provider) it's a genuine multi-second block, and on constrained hardware
@@ -4309,7 +4353,9 @@ function* addNameEvents(out) {
    buildEvents() (sync, via runSync -- every existing caller except Home's banner, unchanged behaviour)
    and ensureEventsAsync() (sliced, via runSliced -- Home's banner only, see there for why). */
 function* buildEventsG() {
+  memLog('buildEvents: epgMap start');
   const epgMap = sportsEpgMap(true), perCh = new Map(), now = nowMs();
+  memLog('buildEvents: epgMap done');
   /* 1. read every guide entry once, channel by channel */
   let n = 0;
   for (const [ci, st, en, title, sub] of ((GUIDE && GUIDE.items) || [])) {
@@ -4320,6 +4366,7 @@ function* buildEventsG() {
     if ((++n & 511) === 0) yield;
   }
   yield;
+  memLog('buildEvents: stage1 guide-scan done');
   /* 2. a pre-match show that runs straight into a match on the same channel counts as that match's coverage */
   perCh.forEach(list => {
     list.sort((a, b) => a.st - b.st);
@@ -4332,6 +4379,7 @@ function* buildEventsG() {
     }
   });
   yield;
+  memLog('buildEvents: stage2 premerge done');
   /* 3. gather every airing of the same fixture. A club can't play two matches within 20 hours,
         so listings that share a known club in that time are the same match, whatever language they're in. */
   const all = [];
@@ -4376,6 +4424,7 @@ function* buildEventsG() {
     if ((++n & 511) === 0) yield;
   }
   yield;
+  memLog('buildEvents: stage3 fixture-match done, fixtures=' + fixtures.length);
   /* 4. split each club's airings into broadcasts (airings within 45 minutes of each other).
         The first broadcast is the live match. A later broadcast is a new match (say, a second leg)
         only if it's at least 2 days later and on several channels at once; anything else is a replay. */
@@ -4413,6 +4462,7 @@ function* buildEventsG() {
     if ((++n & 255) === 0) yield;
   }
   yield;
+  memLog('buildEvents: stage4a casts-grouping done, groups=' + groups.length);
   for (const grp of groups) {
     const items = grp.items, isMatch = grp.isMatch;
     const liveItems = grp.live.length ? grp.live : [items[0]], repItems = grp.reps;
@@ -4478,15 +4528,22 @@ function* buildEventsG() {
     if ((++n & 255) === 0) yield;
   }
   yield;
+  memLog('buildEvents: stage4b ev-objects done, out=' + out.length);
   learnBroadcasters(out);
+  memLog('buildEvents: learnBroadcasters done');
   yield* addNameEvents(out);
+  memLog('buildEvents: addNameEvents done, out=' + out.length);
   const f1 = f1Events();
+  memLog('buildEvents: f1Events done, f1=' + f1.length);
   /* guide-v2 (see above) is resolved server-side for whichever competitions rcs-guide covers -- those
      take priority over this app's own client-side guide-merge/fixture-matching for the SAME
      competitions, so the two never show conflicting answers for one game. Everything guide-v2 doesn't
      cover (Champions League, Europa League, AFL, NRL, Cricket, Rugby, A-League...) still runs through
      the existing fx/f1/out path exactly as before. */
+  TSDB_GROUPS_STATS.calls = 0; TSDB_GROUPS_STATS.hits = 0; TSDB_GROUPS_STATS.misses = 0; TSDB_GROUPS_STATS.groupsOut = 0; TSDB_GROUPS_STATS.ms = 0;
+  const __v2t0 = performance.now();
   const v2 = v2Events(), v2Comps = new Set((GUIDE_V2 && GUIDE_V2.competitions) || []);
+  memLog('buildEvents: v2Events done, v2=' + v2.length + ' totalMs=' + (performance.now() - __v2t0).toFixed(0) + ' tsdbCalls=' + TSDB_GROUPS_STATS.calls + ' tsdbMs=' + TSDB_GROUPS_STATS.ms.toFixed(0) + ' tsdbHits=' + TSDB_GROUPS_STATS.hits + ' tsdbMisses=' + TSDB_GROUPS_STATS.misses + ' tsdbGroupsOut=' + TSDB_GROUPS_STATS.groupsOut);
   /* TheSportsDB's own TV listings have real gaps -- confirmed live for several sports (Eredivisie,
      MotoGP, NASCAR, PGA Tour, European Tour all came back with zero channels for every fixture), and
      it's the same eventstv.php mechanism for every guide-v2 sport, tennis (ATP/WTA) included. A v2
@@ -4614,9 +4671,11 @@ function* buildEventsG() {
     }
     v2.forEach(v => { v.chans = pruneBrandSiblings(v.chans); v.reps = pruneBrandSiblings(v.reps); v.pres = pruneBrandSiblings(v.pres); });
     EVENTS = v2.concat(fx, f1.filter(ev => !v2Comps.has(ev.comp)), out.filter(ev => !FD_NAMES.has(ev.comp) && !v2Comps.has(ev.comp) && !(f1.length && ev.comp === 'Formula 1') && !covered(ev)));
+    memLog('buildEvents: FD merge done, EVENTS=' + EVENTS.length);
   } else {
     v2.forEach(v => { v.chans = pruneBrandSiblings(v.chans); v.reps = pruneBrandSiblings(v.reps); v.pres = pruneBrandSiblings(v.pres); });
     EVENTS = v2.concat(f1.filter(ev => !v2Comps.has(ev.comp)), out.filter(ev => !v2Comps.has(ev.comp) && !(f1.length && ev.comp === 'Formula 1')));
+    memLog('buildEvents: v2-only merge done, EVENTS=' + EVENTS.length);
   }
 }
 const buildEvents = () => runSync(buildEventsG());
@@ -5100,10 +5159,29 @@ function homeUpcoming() {
    something genuinely live. Used to also take a mode to pin to one list explicitly, for the Live Now/
    Replay/Upcoming tab row -- that row's gone (the owner's own framing: the box is highlighted, or the
    sport selector is, nothing to pick a mode from in between), so this is always just the one order now. */
+/* renderHome() calls this on every keypress AND every 3s banner tick (see the setInterval above) while
+   on Home -- homeLives()/homeReplays()/homeUpcoming() each filter+sort the WHOLE EVENTS array (often
+   4000+ entries) from scratch, up to three of them in a row whenever nothing's live. The most likely
+   source of "Home feels laggy to navigate" outside of the one-time buildEvents() pass itself -- same
+   repeated-full-array-scan shape as the buildEvents() costs profiled and fixed alongside this (see
+   tsdbGroups' own cache comment). Cached by everything that can actually change the result: EVENTS/FD.list/F1.list are always
+   replaced wholesale (never mutated in place) when their data changes, so a reference check is both
+   correct and free; chipsList() (pinned teams/competitions) is cheap enough to just compare directly;
+   minute granularity covers a fixture's live/replay/upcoming state crossing a boundary. */
+const HOME_SPORTS_CACHE = {events: null, fdList: null, f1List: null, minute: -1, chips: '', val: null};
 function homeSportsList() {
-  const lives = homeLives(); if (lives.length) return {list: lives, kind: 'live'};
-  const reps = homeReplays(); if (reps.length) return {list: reps, kind: 'replay'};
-  return {list: homeUpcoming(), kind: 'upcoming'};
+  const minute = Math.floor(nowMs() / 60000), chips = (ui.chips || DEFAULT_CHIPS).join(',');
+  const c = HOME_SPORTS_CACHE;
+  if (c.events === EVENTS && c.fdList === FD.list && c.f1List === F1.list && c.minute === minute && c.chips === chips) return c.val;
+  const lives = homeLives();
+  let val;
+  if (lives.length) val = {list: lives, kind: 'live'};
+  else {
+    const reps = homeReplays();
+    val = reps.length ? {list: reps, kind: 'replay'} : {list: homeUpcoming(), kind: 'upcoming'};
+  }
+  Object.assign(HOME_SPORTS_CACHE, {events: EVENTS, fdList: FD.list, f1List: F1.list, minute, chips, val});
+  return val;
 }
 /* No more Live Now/Replay/Upcoming tab selector -- there's nothing left to pick a mode FOR, so this
    always runs "auto" (live beats replay beats upcoming, whichever's first non-empty). */
