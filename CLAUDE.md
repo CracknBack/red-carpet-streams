@@ -24,6 +24,7 @@ no framework, ~7000 lines) wrapped for three platforms:
 - **The owner prefers batching fixes before building.** Don't trigger a CI build after every single
   change — stack fixes up in code (running `gen_light.py` after each) and build once when asked to ship.
 - Only build `firestick.yml` unless told otherwise.
+- **Local builds (`gradle assemblePlayerRelease` run directly, bypassing CI): `firestick/app/src/main/assets/www/` is a separate, gitignored, physical copy of `tv-app/`, NOT the same file and NOT auto-synced by Gradle.** `firestick.yml` has its own explicit step for this (`cp -r tv-app/. firestick/app/src/main/assets/www/`) — any local build command must do the same copy first, every time, or it silently packages whatever stale snapshot is already sitting in `assets/www/`, with a clean `BUILD SUCCESSFUL` and no error of any kind. Confirmed the hard way 2026-11-09/10: an entire session's worth of real fixes were built and installed repeatedly with zero effect, because `assets/www/` was frozen at a single morning snapshot and every local build silently reused it. **Always verify the fix actually landed in the built artifact before trusting it**: `unzip -p app/build/outputs/apk/.../app-*.apk assets/www/index.html | grep -c '<marker from the edit>'` before installing, not after.
 
 ## Critical: working-directory layout gotcha
 
