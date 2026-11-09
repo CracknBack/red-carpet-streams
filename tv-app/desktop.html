@@ -3625,10 +3625,26 @@ const EPL_GUESS = new Set(['Arsenal', 'Aston Villa', 'Bournemouth', 'Brentford',
 const COMPS = [
   ['Premier League', 'premier league,english premier league,epl,super sunday,monday night football,match of the day,soccer saturday,the football show,premier league review'],
   ['Champions League', 'champions league,ucl'], ['Europa League', 'europa league,uel'], ['FA Cup', 'fa cup'], ['League Cup', 'carabao cup,league cup,efl cup'],
+  ['UEFA Nations League', 'uefa nations league,nations league'], ['Copa del Rey', 'copa del rey'], ['Coupe de France', 'coupe de france'],
+  ['DFB-Pokal', 'dfb-pokal,dfb pokal,german cup'], ['English League One', 'league one,efl league one'], ['English League Two', 'league two,efl league two'],
+  ['MLS', 'mls,major league soccer'], ['Mexican Liga MX', 'liga mx,mexican league'],
   ['Formula 1', 'formula 1,formula one,f1,grand prix,ted kravitz'], ['MotoGP', 'motogp,moto gp'], ['La Liga', 'la liga,laliga'], ['Serie A', 'serie a'], ['Ligue 1', 'ligue 1,ligue un'],
-  ['Bundesliga', 'bundesliga'], ['A-League', 'a league'], ['AFL', 'afl'], ['NRL', 'nrl'], ['Cricket', 'cricket,test match,the ashes,t20,odi'], ['Rugby', 'rugby'],
+  ['Bundesliga', 'bundesliga'], ['A-League', 'a league'], ['AFL', 'afl'], ['NRL', 'nrl'],
+  ['Rugby League World Cup', 'rugby league world cup,rlwc,rlwc2026'],
+  ['Rugby League Super League', 'super league,betfred super league,rugby league super league'],
+  ['World Club Challenge', 'world club challenge'], ['State of Origin', 'state of origin'],
+  ['Rugby World Cup', 'rugby world cup,rwc'], ['Six Nations Championship', 'six nations'],
+  ['Rugby Championship', 'the rugby championship'], ['Super Rugby', 'super rugby'],
+  ['United Rugby Championship', 'united rugby championship,urc'], ['French Top 14', 'top 14,french top 14'],
+  ['Indian Premier League', 'indian premier league,ipl'], ['Australian Big Bash League', 'big bash,bbl'],
+  ['Caribbean Premier League', 'caribbean premier league,cpl'], ['The Hundred', 'the hundred'],
+  ['One Day International Series', 'odi,one day international'], ['Twenty20 International Series', 't20i,twenty20 international'],
   /* resolved server-side (see guide-v2 above / rcs-guide's resolve_v2.py) -- these names must match
      that script's LEAGUES comp names exactly, or v2Comps there won't recognise them as covered. */
+  /* WNBA/EuroLeague/FIBA World Cup must all be checked BEFORE NBA below -- NBA's own bare "basketball"
+     keyword would otherwise swallow any of their text too (compOf returns the first array match). */
+  ['WNBA', 'wnba'], ['EuroLeague Basketball', 'euroleague'], ['FIBA Basketball World Cup', 'fiba world cup,fiba basketball world cup'],
+  ['Russian KHL', 'khl,kontinental hockey league'], ['IIHF World Championship', 'iihf,ice hockey world championship'],
   ['NBA', 'nba,national basketball association,basketball'], ['NHL', 'nhl,national hockey league,ice hockey'],
   ['MLB', 'mlb,major league baseball,baseball'], ['NFL', 'nfl,national football league,american football'],
   ['Eredivisie', 'eredivisie,dutch league'], ['Primeira Liga', 'primeira liga,portuguese league'],
@@ -3636,8 +3652,17 @@ const COMPS = [
   ['League of Ireland', 'league of ireland,irish premier division'], ['Austrian Bundesliga', 'austrian bundesliga,austria league'],
   ['Greek Super League', 'greek super league,greece league'], ['Turkish Super Lig', 'turkish super lig,super lig,turkey league'],
   ['Swiss Super League', 'swiss super league,switzerland league'], ['IndyCar', 'indycar,indy car,indy 500'], ['NASCAR', 'nascar,nascar cup'],
-  ['ATP Tour', 'atp,atp tour,mens tennis'], ['WTA Tour', 'wta,wta tour,womens tennis'], ['PGA Tour', 'pga,pga tour,golf'],
-  ['European Tour', 'european tour,dp world tour'], ['UFC', 'ufc,mma,mixed martial arts'], ['Boxing', 'boxing,heavyweight,boxing match'],
+  ['Moto2', 'moto2'], ['Moto3', 'moto3'], ['World Superbike', 'world superbike,wsbk,superbike'], ['WRC', 'wrc,world rally championship'],
+  ['Formula E', 'formula e'], ['Formula 2', 'formula 2,f2'], ['NASCAR Truck Series', 'nascar truck series,truck series'],
+  ['ATP Tour', 'atp,atp tour,mens tennis'], ['WTA Tour', 'wta,wta tour,womens tennis'],
+  /* LPGA/Champions/LIV must be checked BEFORE PGA Tour -- its own bare "golf" keyword would otherwise
+     swallow their text too. */
+  ['LPGA Tour', 'lpga,lpga tour,womens golf'], ['PGA Tour Champions', 'pga tour champions,champions tour'], ['LIV Golf', 'liv golf'],
+  ['PGA Tour', 'pga,pga tour,golf'], ['European Tour', 'european tour,dp world tour'],
+  /* ONE/BKFC must be checked BEFORE UFC -- UFC's own bare "mma" keyword would otherwise swallow ONE's text too. */
+  ['ONE Championship', 'one championship,one fc'], ['BKFC', 'bkfc,bare knuckle'],
+  ['UFC', 'ufc,mma,mixed martial arts'],
+  ['Boxing', 'boxing,heavyweight,boxing match'],
   ['Cycling', 'cycling,uci world tour,tour de france,giro,giro d\'italia,vuelta,vuelta a espana,classics,paris roubaix,tour of flanders'],
   /* added 2026-10-31 alongside rcs-guide's resolve_v2.py LEAGUES -- same exact-match requirement as the
      block above. Keywords deliberately narrow (not bare "championship"/"world cup") since those words
@@ -3704,20 +3729,20 @@ const PIN_COMPS = COMPS.map(([c]) => c);
 /* the Sports Hub icon row groups every competition under one icon per SPORT (not one per competition --
    that was 8 nearly-identical footballs). Order matches the owner's own reference mockup. */
 const SPORT_GROUPS = [
-  ['soccer', 'Soccer', 'lg-football.png', ['Premier League', 'Champions League', 'Europa League', 'FA Cup', 'League Cup', 'La Liga', 'Serie A', 'Ligue 1', 'Bundesliga', 'A-League', 'Eredivisie', 'Primeira Liga', 'Belgian Pro League', 'Scottish Premiership', 'League of Ireland', 'Austrian Bundesliga', 'Greek Super League', 'Turkish Super Lig', 'Swiss Super League', 'Championship', 'Brazilian Serie A', 'Copa Libertadores', 'European Championship', 'World Cup']],
-  ['basketball', 'Basketball', 'lg-basketball.png', ['NBA']],
-  ['icehockey', 'Ice Hockey', 'lg-ice-hockey.png', ['NHL']],
+  ['soccer', 'Soccer', 'lg-football.png', ['Premier League', 'Champions League', 'Europa League', 'FA Cup', 'League Cup', 'La Liga', 'Serie A', 'Ligue 1', 'Bundesliga', 'A-League', 'Eredivisie', 'Primeira Liga', 'Belgian Pro League', 'Scottish Premiership', 'League of Ireland', 'Austrian Bundesliga', 'Greek Super League', 'Turkish Super Lig', 'Swiss Super League', 'Championship', 'Brazilian Serie A', 'Copa Libertadores', 'European Championship', 'World Cup', 'UEFA Nations League', 'Copa del Rey', 'Coupe de France', 'DFB-Pokal', 'English League One', 'English League Two', 'MLS', 'Mexican Liga MX']],
+  ['basketball', 'Basketball', 'lg-basketball.png', ['NBA', 'WNBA', 'EuroLeague Basketball', 'FIBA Basketball World Cup']],
+  ['icehockey', 'Ice Hockey', 'lg-ice-hockey.png', ['NHL', 'Russian KHL', 'IIHF World Championship']],
   ['baseball', 'Baseball', 'lg-baseball.png', ['MLB']],
   ['amfootball', 'American Football', 'lg-american-football.png', ['NFL']],
-  ['motorsport', 'Motorsport', 'lg-motor-racing.png', ['Formula 1', 'MotoGP', 'IndyCar', 'NASCAR']],
+  ['motorsport', 'Motorsport', 'lg-motor-racing.png', ['Formula 1', 'MotoGP', 'IndyCar', 'NASCAR', 'Moto2', 'Moto3', 'World Superbike', 'WRC', 'Formula E', 'Formula 2', 'NASCAR Truck Series']],
   ['tennis', 'Tennis', 'lg-tennis.png', ['ATP Tour', 'WTA Tour']],
-  ['golf', 'Golf', 'lg-golf.png', ['PGA Tour', 'European Tour']],
-  ['mma', 'MMA', 'lg-mma.png', ['UFC']],
+  ['golf', 'Golf', 'lg-golf.png', ['PGA Tour', 'European Tour', 'LPGA Tour', 'PGA Tour Champions', 'LIV Golf']],
+  ['mma', 'MMA', 'lg-mma.png', ['UFC', 'ONE Championship', 'BKFC']],
   ['boxing', 'Boxing', 'lg-boxing.png', ['Boxing']],
-  ['rugby', 'Rugby', 'lg-rugby.png', ['Rugby']],
+  ['rugby', 'Rugby', 'lg-rugby.png', ['Rugby World Cup', 'Six Nations Championship', 'Rugby Championship', 'Super Rugby', 'United Rugby Championship', 'French Top 14']],
   ['afl', 'AFL', 'lg-afl.png', ['AFL']],
-  ['nrl', 'Rugby League / NRL', 'lg-rugby-league.png', ['NRL']],
-  ['cricket', 'Cricket', 'lg-cricket.png', ['Cricket']],
+  ['nrl', 'Rugby League / NRL', 'lg-rugby-league.png', ['NRL', 'Rugby League World Cup', 'Rugby League Super League', 'World Club Challenge', 'State of Origin']],
+  ['cricket', 'Cricket', 'lg-cricket.png', ['One Day International Series', 'Twenty20 International Series', 'Indian Premier League', 'Australian Big Bash League', 'Caribbean Premier League', 'The Hundred']],
   /* Added 2026-11-09. lg-cycling.png does not exist yet -- none of the existing lg-*.png icons (same
      gold/burgundy line-art style as lg-open-wheel-racing.png) are a bicycle, and reusing an unrelated
      one (e.g. the open-wheel racing car icon, otherwise unused) would show the wrong pictogram, not a
