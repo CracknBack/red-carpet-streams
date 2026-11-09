@@ -2327,23 +2327,40 @@ async function loadFixtures(force) {
   if (!force && FD.ts && Date.now() - FD.ts < (liveSoon ? 10 * 60e3 : 6 * 3600e3)) return;
   FD.busy = true;
   try {
-    const from = ymd(new Date(nowMs() - 3 * 864e5)), to = ymd(new Date(nowMs() + 7 * 864e5)), all = [];
+    /* Was a single ±10-day window (free-plan dateFrom/dateTo calls are capped at a 10-day span --
+       confirmed by the existing 400 handling a few lines down, from an earlier session hitting that
+       cap directly), so any gap between rounds longer than a week (an international break, a bye
+       week) left the Sports Hub showing "No <comp> games found yet" despite the competition having a
+       perfectly normal, scheduled next fixture -- just outside the window this ever looked at. Walks
+       the same proven per-call shape forward in ≤10-day chunks instead of widening the one call (which
+       would just trade the 7-day miss for a longer one, or a straight 400 past 10 days): chunks covers
+       ~5 weeks out, comfortably past any realistic domestic-league gap, at a bounded extra request
+       cost (4 windows instead of 1 per competition) the existing rate-limit wait/backoff below already
+       paces safely regardless of how many calls that turns into. */
+    const WINDOW_D = 10, HORIZON_D = 35;
+    const windows = [];
+    for (let d = -3; d < HORIZON_D; d += WINDOW_D) windows.push([ymd(new Date(nowMs() + d * 864e5)), ymd(new Date(nowMs() + Math.min(d + WINDOW_D, HORIZON_D) * 864e5))]);
+    const all = [];
     for (const [code, name, optional] of FD_COMPS) {
-      if (FD.waitUntil && Date.now() < FD.waitUntil) await new Promise(res => setTimeout(res, FD.waitUntil - Date.now()));
-      const r = await fetch('https://api.football-data.org/v4/competitions/' + code + '/matches?dateFrom=' + from + '&dateTo=' + to, {headers: {'X-Auth-Token': ui.fdKey}});
-      /* the service says how many calls are left this minute and when the count resets; wait rather than hit the limit */
-      const left = Number(r.headers.get('X-Requests-Available-Minute')), reset = Number(r.headers.get('X-RequestCounter-Reset'));
-      if (!isNaN(left) && left <= 1 && reset > 0) FD.waitUntil = Date.now() + (reset + 1) * 1000;
-      if (r.status === 429) FD.waitUntil = Date.now() + ((reset > 0 ? reset : 60) + 1) * 1000;
-      if (optional && (r.status === 403 || r.status === 404)) { FD_NAMES.delete(name); continue; }
-      if (r.status === 403 || r.status === 400) throw new Error(r.status === 403 ? 'the key was refused (check it in Settings)' : 'the fixture service rejected the request');
-      if (r.status === 429) throw new Error('too many requests; it will try again shortly');
-      if (!r.ok) throw new Error('the fixture service replied with error ' + r.status);
-      const j = await r.json();
-      if (optional) FD_NAMES.add(name);
-      (j.matches || []).forEach(m => all.push({id: m.id, comp: name, utcDate: m.utcDate, status: m.status,
-        home: (m.homeTeam && (m.homeTeam.shortName || m.homeTeam.name)) || 'TBC', away: (m.awayTeam && (m.awayTeam.shortName || m.awayTeam.name)) || 'TBC',
-        homeFull: m.homeTeam && m.homeTeam.name || '', awayFull: m.awayTeam && m.awayTeam.name || ''}));
+      let compDropped = false;
+      for (const [from, to] of windows) {
+        if (compDropped) break;
+        if (FD.waitUntil && Date.now() < FD.waitUntil) await new Promise(res => setTimeout(res, FD.waitUntil - Date.now()));
+        const r = await fetch('https://api.football-data.org/v4/competitions/' + code + '/matches?dateFrom=' + from + '&dateTo=' + to, {headers: {'X-Auth-Token': ui.fdKey}});
+        /* the service says how many calls are left this minute and when the count resets; wait rather than hit the limit */
+        const left = Number(r.headers.get('X-Requests-Available-Minute')), reset = Number(r.headers.get('X-RequestCounter-Reset'));
+        if (!isNaN(left) && left <= 1 && reset > 0) FD.waitUntil = Date.now() + (reset + 1) * 1000;
+        if (r.status === 429) FD.waitUntil = Date.now() + ((reset > 0 ? reset : 60) + 1) * 1000;
+        if (optional && (r.status === 403 || r.status === 404)) { FD_NAMES.delete(name); compDropped = true; continue; }
+        if (r.status === 403 || r.status === 400) throw new Error(r.status === 403 ? 'the key was refused (check it in Settings)' : 'the fixture service rejected the request');
+        if (r.status === 429) throw new Error('too many requests; it will try again shortly');
+        if (!r.ok) throw new Error('the fixture service replied with error ' + r.status);
+        const j = await r.json();
+        if (optional) FD_NAMES.add(name);
+        (j.matches || []).forEach(m => all.push({id: m.id, comp: name, utcDate: m.utcDate, status: m.status,
+          home: (m.homeTeam && (m.homeTeam.shortName || m.homeTeam.name)) || 'TBC', away: (m.awayTeam && (m.awayTeam.shortName || m.awayTeam.name)) || 'TBC',
+          homeFull: m.homeTeam && m.homeTeam.name || '', awayFull: m.awayTeam && m.awayTeam.name || ''}));
+      }
     }
     /* buildEvents() is a large, fully synchronous pass over the whole guide (not sliced -- the
        fixture-matching logic is the most correctness-sensitive code in the app, so it isn't touched
@@ -3596,6 +3613,7 @@ const COMPS = [
   ['Swiss Super League', 'swiss super league,switzerland league'], ['IndyCar', 'indycar,indy car,indy 500'], ['NASCAR', 'nascar,nascar cup'],
   ['ATP Tour', 'atp,atp tour,mens tennis'], ['WTA Tour', 'wta,wta tour,womens tennis'], ['PGA Tour', 'pga,pga tour,golf'],
   ['European Tour', 'european tour,dp world tour'], ['UFC', 'ufc,mma,mixed martial arts'], ['Boxing', 'boxing,heavyweight,boxing match'],
+  ['Cycling', 'cycling,uci world tour,tour de france,giro,giro d\'italia,vuelta,vuelta a espana,classics,paris roubaix,tour of flanders'],
   /* added 2026-10-31 alongside rcs-guide's resolve_v2.py LEAGUES -- same exact-match requirement as the
      block above. Keywords deliberately narrow (not bare "championship"/"world cup") since those words
      alone collide with boxing/MMA title fights, Cricket/Rugby World Cup, and other sports' own
@@ -3674,7 +3692,13 @@ const SPORT_GROUPS = [
   ['rugby', 'Rugby', 'lg-rugby.png', ['Rugby']],
   ['afl', 'AFL', 'lg-afl.png', ['AFL']],
   ['nrl', 'Rugby League / NRL', 'lg-rugby-league.png', ['NRL']],
-  ['cricket', 'Cricket', 'lg-cricket.png', ['Cricket']]
+  ['cricket', 'Cricket', 'lg-cricket.png', ['Cricket']],
+  /* Added 2026-11-09. lg-cycling.png does not exist yet -- none of the existing lg-*.png icons (same
+     gold/burgundy line-art style as lg-open-wheel-racing.png) are a bicycle, and reusing an unrelated
+     one (e.g. the open-wheel racing car icon, otherwise unused) would show the wrong pictogram, not a
+     missing one. This tile will render a broken image in the Sport Selector strip until that asset is
+     added -- matching art needs to come from the owner the same way the rest of this set did. */
+  ['cycling', 'Cycling', 'lg-cycling.png', ['Cycling']]
 ];
 function parseShortcut(x) {
   const n = norm(x);
@@ -9696,7 +9720,7 @@ function handleKey(k, e) {
   else if (S.screen === 'home') homeKey(k);
   else if (S.screen === 'player') playerKey(k);
 }
-document.addEventListener('keydown', e => handleKey(e.keyCode, e));
+document.addEventListener('keydown', e => { const _t0 = performance.now(); handleKey(e.keyCode, e); const _dt = performance.now() - _t0; if (_dt > 8) console.error('PERFPROBE handleKey k=' + e.keyCode + ' screen=' + S.screen + ' page=' + S.page + ' zone=' + S.zone + ' ms=' + _dt.toFixed(1)); });
 window.__rcsKey = k => handleKey(k, fakeEv());
 
 /* Touch Back/Close buttons (Fixture Detail, Search, Settings, Pro modal, Player HUD) all just
