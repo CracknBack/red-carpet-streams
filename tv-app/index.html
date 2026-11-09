@@ -1427,7 +1427,7 @@ function reloadAccountData() {
   Object.assign(recent, {live: [], series: []}, load(acctKey('sp_recent'), {}));
   prog = load(acctKey('sp_prog'), {}); recentQ = load(acctKey('sp_rq'), []);
 }
-const ui = Object.assign({fdKey: '', orig: false, liveLayout: 'provider', lang: 'en', sort: {live: 0, vod: 1, series: 1}, vol: 1, muted: false, aspectFill: false}, load('sp_ui', {}));
+const ui = Object.assign({fdKey: '', orig: false, liveLayout: 'country', lang: 'en', sort: {live: 0, vod: 1, series: 1}, vol: 1, muted: false, aspectFill: false}, load('sp_ui', {}));
 if (FIRE && ui.gpvOff === undefined) ui.gpvOff = true;     /* inside the Android app the game-page preview starts off: weak TV sticks play better without it (Settings can turn it on) */
 document.documentElement.classList.toggle('light', !!ui.light);
 const favs = Object.assign({live: [], vod: [], series: []}, load(acctKey('sp_favs'), {}));
