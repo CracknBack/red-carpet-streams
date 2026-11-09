@@ -1347,7 +1347,15 @@ if (PHONE) document.documentElement.classList.add('phone');
    web) -- orthogonal to PHONE's phone-sized layout above: this is only about input behaviour
    (native scroll where D-pad focus-scroll normally substitutes for it, bigger Back/Close targets,
    safe-area padding), so it applies equally to e.g. a touch laptop running desktop.html. */
-const IS_TOUCH = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || ('ontouchstart' in window);
+/* Reported 2026-11-09: a real Fire TV Stick (remote-only, no touchscreen) was showing the touch-only
+   back/close buttons. Root cause: 'ontouchstart' in window and (pointer: coarse) are both known-
+   unreliable on Fire OS's WebView -- it exposes the touch event APIs regardless of actual hardware,
+   so either check alone false-positives on a plain stick. PHONE's own detection doesn't have this
+   problem (it additionally requires a small screen), so trust that instead of the raw API checks for
+   any FIRE device that isn't already PHONE -- a Fire device that fails PHONE's screen-size check is by
+   definition a TV, never a handheld, regardless of what the touch APIs claim. Left as-is for non-FIRE
+   platforms (PC/plain web), where a touch laptop is a real, correctly-detected case this doesn't affect. */
+const IS_TOUCH = PHONE || (!FIRE && ((window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || ('ontouchstart' in window)));
 if (IS_TOUCH) document.documentElement.classList.add('touch-device');
 const HAS_MPV = !!(window.RCSPC && window.RCSPC.mpv);
 const EXT = !!window.RCS_EXT;   /* Windows quick version: can hand videos to VLC */
@@ -1873,6 +1881,22 @@ async function applyData(d, show) {
     const liveMsg = 'Preparing channels…';
     await runSliced(classifyLiveG(), p => say(liveMsg, 70 + p * 15));
     await runSliced(applyLogosG(), p => say(liveMsg, 85 + p * 15));
+    /* addNameEvents' parseEvent cache (see there) only ever lived in memory, so every single app
+       restart paid its full ~7-8s cost again from zero, on this exact landing screen, with nothing on
+       screen to say why -- confirmed the owner's real complaint ("boots badly, stares at a screen").
+       Its keys are stable channel ids and its values are plain parseEvent() output (no live object
+       refs, confirmed at its definition), so it's safe to persist across restarts the same way GUIDE/
+       FD/F1/TSDB already are below. A channel that's gone next boot just never gets looked up again
+       (dead weight, not a correctness risk); a new channel is a normal cache miss, same as today. */
+    try { const saved = await idb.get(acctKey('peCache')); if (Array.isArray(saved)) d.live.parseEventCache = new Map(saved); } catch (e) {}
+    /* tsdbCache's rehydration: stored as {gsIds, tier}, turned back into {gs: [channel objs], tier} via
+       byId (built just above, in the per-type loop). A channel id that's gone from this catalog is
+       silently dropped from gs (.filter(Boolean)) rather than left as undefined -- the group is simply
+       smaller next lookup, same as if that channel had genuinely never matched; never a crash risk. */
+    try {
+      const savedT = await idb.get(acctKey('tsdbCache'));
+      if (Array.isArray(savedT)) d.live.tsdbCache = new Map(savedT.map(([k, v]) => [k, {gs: v.gsIds.map(id => d.live.byId.get(id)).filter(Boolean), tier: v.tier}]));
+    } catch (e) {}
     DATA = d; ALL = all;
     for (const t of ['live', 'vod', 'series']) B[t].cats = [];
     EVENTS = null;
@@ -4331,10 +4355,20 @@ function nameTime(h, m, tzw) {
    result is identical. Converted to a generator (yield* from buildEventsG) since the channel loop
    itself is large enough to be worth slicing even once the per-channel cost is cheap. */
 function* addNameEvents(out) {
-  const now = nowMs();
+  const __t0 = performance.now(), now = nowMs();
   const teamIdx = new Map();
   const idxEv = ev => { if (!ev.teams) return; for (const tn of ev.teams) for (const key of [tn, norm(tn)]) { let a = teamIdx.get(key); if (!a) { a = []; teamIdx.set(key, a); } a.push(ev); } };
   out.forEach((ev, i) => { ev._seq = i; idxEv(ev); });
+  /* parseEvent() (team-name/comp extraction, real regex+canonicalisation work) used to run fresh on
+     every one of the ~20,000 sports-flagged channels on every single buildEvents() pass -- confirmed via
+     memLog on a real account: ~7s of this generator's own time, every single rebuild, all day, since
+     unlike tsdbGroups' tiered cache just above this function nothing here was ever memoized. Its result
+     depends only on the channel's own (time-prefix-stripped) text, which doesn't change between rebuilds
+     within a session -- same reasoning, same DATA.live-scoped cache lifecycle (auto-fresh on account
+     reload) as tsdbCache/.tidx/.bidx already use. kick is NOT cached -- "the next real occurrence of
+     this clock time" is relative to now, so it has to be recomputed every call regardless of caching. */
+  if (!DATA.live.parseEventCache) DATA.live.parseEventCache = new Map();
+  const peCache = DATA.live.parseEventCache;
   let n = 0, passedFilter = 0, hadTeams = 0;
   for (const g of DATA.live.items) {
     if ((++n & 1023) === 0) yield;
@@ -4343,7 +4377,9 @@ function* addNameEvents(out) {
     let raw = String(g.raw || g.name), kick = 0;
     const tm = raw.match(/(?:@\s*)?\b([01]?\d|2[0-3])[:.h]([0-5]\d)\b\s*(UK|GMT|BST|CET|CEST|ET|EST|EDT|AEST|AEDT)?/i);
     if (tm) { kick = nameTime(+tm[1], +tm[2], tm[3]); raw = raw.slice(0, tm.index); }
-    const info = parseEvent(raw.replace(/[@|]\s*$/, ''), '', '');
+    const stripped = raw.replace(/[@|]\s*$/, '');
+    let info = peCache.get(g.id);
+    if (!info || info._raw !== stripped) { info = parseEvent(stripped, '', ''); info._raw = stripped; peCache.set(g.id, info); }
     if (!info.teams) continue;
     hadTeams++;
     /* a guide fixture involving the same club within the day: add this channel to it */
@@ -4365,7 +4401,11 @@ function* addNameEvents(out) {
       text: info.text + norm(g.name) + ' ', kick: kick || now, start: kick ? kick - 15 * 60e3 : now, stop: kick ? kick + 2.5 * 3600e3 : now + 24 * 3600e3, chans: [entry], reps: [], _seq: out.length};
     out.push(newEv); idxEv(newEv);
   }
-  memLog('buildEvents: addNameEvents scanned=' + n + ' passedFilter=' + passedFilter + ' hadTeams=' + hadTeams);
+  memLog('buildEvents: addNameEvents scanned=' + n + ' passedFilter=' + passedFilter + ' hadTeams=' + hadTeams + ' totalMs=' + (performance.now() - __t0).toFixed(0) + ' peCacheSize=' + peCache.size);
+  /* Fire-and-forget: persists the now-current cache so the NEXT app launch can load it back in
+     applyData() instead of rebuilding from zero. Never awaited -- this is a background disk write,
+     not something the render path (or this generator's own caller) should ever wait on. */
+  idb.set(acctKey('peCache'), [...peCache.entries()]).catch(() => {});
 }
 /* buildEvents() used to be one fully synchronous function. On a big enough guide (this was diagnosed
    against a 49,121-channel provider) it's a genuine multi-second block, and on constrained hardware
@@ -4567,6 +4607,17 @@ function* buildEventsG() {
   const __v2t0 = performance.now();
   const v2 = v2Events(), v2Comps = new Set((GUIDE_V2 && GUIDE_V2.competitions) || []);
   memLog('buildEvents: v2Events done, v2=' + v2.length + ' totalMs=' + (performance.now() - __v2t0).toFixed(0) + ' tsdbCalls=' + TSDB_GROUPS_STATS.calls + ' tsdbMs=' + TSDB_GROUPS_STATS.ms.toFixed(0) + ' tsdbHits=' + TSDB_GROUPS_STATS.hits + ' tsdbMisses=' + TSDB_GROUPS_STATS.misses + ' tsdbGroupsOut=' + TSDB_GROUPS_STATS.groupsOut);
+  /* Same persisted-cache fix as addNameEvents' parseEventCache just above, same proven win (measured
+     on-device: 9.47s cold to 1.87s warm for that one) -- this is the OTHER real cost in this pass
+     (tsdbMs, ~8-9s cold on a real account). tsdbCache's values hold live channel object references
+     (DATA.live items), not plain data, so unlike parseEventCache this needs an id round-trip to be
+     storage-safe: store each matched channel's stable id, not the object itself, and rehydrate via
+     DATA.live.byId (already built earlier in applyData, before this ever runs) on load. Fire-and-
+     forget, same reasoning as the other cache -- a background disk write, never awaited here. */
+  if (DATA.live.tsdbCache) {
+    const plain = [...DATA.live.tsdbCache.entries()].map(([k, v]) => [k, {gsIds: v.gs.map(g => g.id), tier: v.tier}]);
+    idb.set(acctKey('tsdbCache'), plain).catch(() => {});
+  }
   /* TheSportsDB's own TV listings have real gaps -- confirmed live for several sports (Eredivisie,
      MotoGP, NASCAR, PGA Tour, European Tour all came back with zero channels for every fixture), and
      it's the same eventstv.php mechanism for every guide-v2 sport, tennis (ATP/WTA) included. A v2
@@ -7724,9 +7775,17 @@ function maybeRefreshGuide(ev) {
   if ((ev.chans || []).some(c => c.epg) && ev.kick - nowMs() > 3 * 3600e3) return;          /* already has guide listings: no need */
   if (now - GUIDE_FORCE_T < 90 * 60e3 || now - (GUIDE.ts || 0) < 90 * 60e3) return;
   GUIDE_FORCE_T = now;
-  loadGuide(true).then(() => {
+  /* Was a blocking buildEvents() call here -- the exact ~2.2s-on-a-49k-catalog freeze every other
+     render-path caller (Home's banner, Search, Sports Hub) was already moved off of, documented right
+     above ensureEventsAsync(). This one got missed: it fires from the game page itself, so the owner
+     was staring straight at the freeze, on top of loadGuide(true)'s own real network time -- reported
+     as "clicking a game, 20+ seconds, nothing happening". Re-checks screen/game after the await too,
+     not just before it, since ensureEventsAsync() is now a real yield point the owner can navigate
+     away during. */
+  loadGuide(true).then(async () => {
     if (S.screen !== 'game' || !GS.ev || GS.ev.key !== ev.key) return;
-    buildEvents();
+    await ensureEventsAsync();
+    if (S.screen !== 'game' || !GS.ev || GS.ev.key !== ev.key) return;
     const nev = (EVENTS || []).find(e => e.key === ev.key);
     if (nev) { GS.ev = nev; GS.list = gameList(nev); GS.moved = false; }
     renderGame();
