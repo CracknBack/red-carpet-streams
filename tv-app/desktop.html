@@ -3937,7 +3937,12 @@ const PRO_RCS_GUIDE = 'https://cracknback.github.io/rcs-guide/sports.xml.gz';
 const rcsUrl = () => ui.rcsOff ? '' : (ui.rcsGuide || RCS_GUIDE || (isProActive() ? PRO_RCS_GUIDE : '') || '').trim();
 const EPGS = 'https://epgshare01.online/epgshare01/epg_ripper_';
 /* the free country guides confirmed to exist; a country's guide is used when any of its sports channels has no guide */
-const XG_BY_CC = {UK: ['UK', EPGS + 'UK1.xml.gz'], IE: ['UK', EPGS + 'UK1.xml.gz'], US: ['US sports', EPGS + 'US_SPORTS1.xml.gz'],
+/* US: 'US_SPORTS1' looks right by name but isn't -- confirmed by hand (same check rcs-guide's own
+   resolve_v2.py already did server-side): it's Minor League Baseball team channels, zero real network
+   content. 'US2' is the real one (ESPN/FOX/CBS Sports/Willow/etc.) -- that server-side finding never
+   got propagated to this client-side list until now, so this fallback was silently useless for every
+   US account this whole time. */
+const XG_BY_CC = {UK: ['UK', EPGS + 'UK1.xml.gz'], IE: ['UK', EPGS + 'UK1.xml.gz'], US: ['US sports', EPGS + 'US2.xml.gz'],
   CA: ['Canada', EPGS + 'CA2.xml.gz'], AU: ['Australia', EPGS + 'AU1.xml.gz'], IN: ['India', EPGS + 'IN1.xml.gz'],
   /* La Liga, Serie A, the Bundesliga, Ligue 1 and DStv SuperSport are carried by their own country's channels, so those guides matter too */
   DE: ['Germany', EPGS + 'DE1.xml.gz'], CH: ['Switzerland', EPGS + 'CH1.xml.gz'], ES: ['Spain', EPGS + 'ES1.xml.gz'], IT: ['Italy', EPGS + 'IT1.xml.gz'],
