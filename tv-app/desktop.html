@@ -5422,13 +5422,18 @@ function homeSportsList() {
   const minute = Math.floor(nowMs() / 60000), chips = (ui.chips || DEFAULT_CHIPS).join(',');
   const c = HOME_SPORTS_CACHE;
   if (c.events === EVENTS && c.fdList === FD.list && c.f1List === F1.list && c.minute === minute && c.chips === chips) return c.val;
-  const lives = homeLives();
-  let val;
-  if (lives.length) val = {list: lives, kind: 'live'};
-  else {
-    const reps = homeReplays();
-    val = reps.length ? {list: reps, kind: 'replay'} : {list: homeUpcoming(), kind: 'upcoming'};
-  }
+  /* Additive, not first-non-empty-wins. This used to return ONLY lives when any live event existed,
+     so a single live match hid every replay and every upcoming event behind it. That is the second
+     confirmed cause of "all the golf fixtures just disappeared": multi-day golf sits in upcoming, and
+     loosening isKnownEvent (same session) made homeLives() non-empty far more often, at which point
+     homeUpcoming() stopped being evaluated at all -- silently, and flipping mid-session on the
+     20-minute guide refresh with no user action. Each event carries its own _hbKind now (live/replay/
+     upcoming are mutually exclusive by evState, so an event is only ever tagged once) and the
+     list-level kind is kept as the dominant one for anything still reading it. */
+  const lives = homeLives(), reps = homeReplays(), ups = homeUpcoming();
+  const tag = (arr, k) => { arr.forEach(ev => { ev._hbKind = k; }); return arr; };
+  const list = tag(lives, 'live').concat(tag(reps, 'replay'), tag(ups, 'upcoming'));
+  const val = {list, kind: lives.length ? 'live' : reps.length ? 'replay' : 'upcoming'};
   Object.assign(HOME_SPORTS_CACHE, {events: EVENTS, fdList: FD.list, f1List: F1.list, minute, chips, val});
   return val;
 }
@@ -5460,7 +5465,9 @@ function heroBgStyle() {
 }
 function homeBanner() {
   const sel = homeSportsList(), shown = sel.list, out = {title: 'Event Guide', cards: [], n: shown.length, kind: sel.kind};
-  if (shown.length) out.cards.push({type: 'game', ev: shown[HOME.liveIdx % shown.length], kind: sel.kind});
+  /* per-event _hbKind, not the list-level kind -- the list is mixed now (see homeSportsList), so the
+     LIVE NOW / REPLAY / UPCOMING pill has to describe the card actually on screen. */
+  if (shown.length) { const ev = shown[HOME.liveIdx % shown.length]; out.cards.push({type: 'game', ev, kind: ev._hbKind || sel.kind}); }
   /* Sports Hub always stays Sports Hub -- it never borrows the hero slot to tease a movie/series
      resume. That has its own home now: the "Continue" tile in the carousel (homeTiles()). */
   return out;
@@ -7464,12 +7471,16 @@ function sportChips() {
   if (Q.sportGroup) {
     const g = SPORT_GROUPS.find(s => s[0] === Q.sportGroup);
     if (g) {
-      /* "All <sport>" first (the real landing chip now, see homeOpenSportGroupAll), then every
-         competition alphabetically (owner-reported: "its not even alphabetical") -- skipped entirely
-         for a single-competition sport (Boxing, Baseball...), where an "All Boxing" chip next to a
-         "Boxing" chip would just be the same list twice. */
-      const comps = g[3].length > 1 ? [{id: 'group:' + g[0], l: 'All ' + g[1]}]
-        .concat(g[3].slice().sort((a, b) => compLabel(a).localeCompare(compLabel(b))).map(id => ({id, l: compLabel(id)}))) : [];
+      /* "All <sport>" first (the real landing chip, see homeOpenSportGroupAll), then every
+         competition alphabetically (owner-reported: "its not even alphabetical").
+         A single-competition sport (Boxing, NFL, AFL, Cycling...) gets ONE chip, carrying the group
+         id but labelled with the sport's own name: "All Boxing" next to "Boxing" would be the same
+         list twice, but emitting nothing at all -- as this did briefly -- left those sports with a row
+         containing only "← All sports" and no tab of their own to highlight. */
+      const comps = g[3].length > 1
+        ? [{id: 'group:' + g[0], l: 'All ' + g[1]}]
+          .concat(g[3].slice().sort((a, b) => compLabel(a).localeCompare(compLabel(b))).map(id => ({id, l: compLabel(id)})))
+        : [{id: 'group:' + g[0], l: g[1]}];
       return comps.concat([{id: 'allsports', l: '← All sports'}]);
     }
   }
@@ -7642,7 +7653,7 @@ function renderSearch() {
     (lifted && Q.chip === i ? '<span class="lf" data-lf="-1">◀</span>' : '') +
     (LG_OK.has(c.id) ? '<img class="tabi" src="' + LG_SLUG(c.id) + '" alt="">' : '') + esc(c.l) + (c.n != null ? '<span class="c">' + c.n.toLocaleString() + '</span>' : '') +
     (lifted && Q.chip === i ? '<span class="lf" data-lf="1">▶</span>' : '') +
-    (S.zone === 'chips' && Q.chip === i && !Q.text && c.id !== 'add' ? '<span class="cx" title="Remove">✕</span>' : '') + '</button>').join('');
+    (S.zone === 'chips' && Q.chip === i && !Q.text && !Q.sportGroup && c.id !== 'add' ? '<span class="cx" title="Remove">✕</span>' : '') + '</button>').join('');
   const list = resultList();
   Q.item = Math.min(Q.item, Math.max(0, list.length - 1));
   if (list.length && !selectable(list[Q.item])) { const j = stepRes(list, Q.item, 1); Q.item = j >= 0 ? j : Math.max(0, stepRes(list, Q.item, -1)); }
@@ -7818,8 +7829,14 @@ function homeOpenSportsHub() {
      were, with the first chip merely *focused*, not actually selected, so it looked highlighted while
      showing unrelated events. Land on the first chip for real instead, same as picking it by hand
      (pickChip's 'allsports' case uses this same first-chip fallback). */
+  /* Q.sportGroup is cleared BEFORE sportChips() is read, not after. Read the other way round,
+     sportChips() still returns the PREVIOUS sport group's competition row, so entering the hub with a
+     stale group set Q.sport to 'group:<old sport>' while Q.sportGroup was then blanked -- leaving the
+     pinned chip row on screen with nothing highlighted and the old sport's events listed under it.
+     pickChip's own 'allsports' branch already does it in this order. */
+  Q.sportGroup = '';
   const first = sportChips()[0];
-  Q.sportGroup = ''; Q.chip = 0; Q.sport = (first && first.id !== 'add') ? first.id : 'all'; Q.skey = ''; resView.reset();
+  Q.chip = 0; Q.sport = (first && first.id !== 'add') ? first.id : 'all'; Q.skey = ''; resView.reset();
   show('main'); S.zone = 'chips'; showPage('sportshub'); S.zone = 'chips'; renderMain();
 }
 
@@ -7874,23 +7891,37 @@ function searchKey(k, e) {
     }
     if (k === KEY.LEFT) { if (Q.chip > 0) { Q.chip--; pickChip(chips[Q.chip]); return; } S.zone = Q.kb ? 'kb' : 'rail'; }
     else if (k === KEY.RIGHT && Q.chip < chips.length - 1) { Q.chip++; pickChip(chips[Q.chip]); return; }
+    /* UP/DOWN move a row at a time within the wrapped chip grid (requested: "going through the sports
+       tabs I can only go left and right"), but they move FOCUS ONLY -- they deliberately do NOT
+       re-pick the competition the way LEFT/RIGHT do.
+       Why the difference: DOWN's older, primary meaning is "drop into the fixture list below", and on
+       a grid that wraps to 3 rows you must press it repeatedly to get there. When each of those
+       presses also re-picked, a press aimed at the tiles silently swapped the filter onto whatever
+       chip sat in the next row -- typically a seasonally dormant competition, which then rendered a
+       bare "Nothing on in this section right now". Confirmed as one of the two causes of the owner's
+       "all the golf fixtures just disappeared" (the other was isKnownEvent, see homeSportsList).
+       The chip row already renders focus and selection as separate states ('focus' vs 'on' in the
+       chip markup above), so focus-without-selection is a state this UI can already express. */
     else if (k === KEY.UP || k === KEY.BACK) {
-      /* UP/DOWN now move a row at a time within the chip grid itself (requested: "going through the
-         sports tabs I can only go left and right") when there's a real row above/below to land on,
-         falling through to the original exit-upward/BACK behaviour only at the very top row -- same
-         fallback either way, just no longer skipped when a row genuinely exists. */
       if (k === KEY.UP) {
         const rows = chipRowsDom(), r = rows.findIndex(row => row.includes(Q.chip));
-        if (r > 0) { const col = rows[r].indexOf(Q.chip); Q.chip = rows[r - 1][Math.min(col, rows[r - 1].length - 1)]; pickChip(chips[Q.chip]); return; }
+        if (r > 0) { const col = rows[r].indexOf(Q.chip); Q.chip = rows[r - 1][Math.min(col, rows[r - 1].length - 1)]; renderMain(); return; }
       }
       if (Q.sportGroup) pickChip({id: 'allsports'}); else S.zone = 'qbox';
     }
     else if (k === KEY.DOWN) {
       const rows = chipRowsDom(), r = rows.findIndex(row => row.includes(Q.chip));
-      if (r >= 0 && r < rows.length - 1) { const col = rows[r].indexOf(Q.chip); Q.chip = rows[r + 1][Math.min(col, rows[r + 1].length - 1)]; pickChip(chips[Q.chip]); return; }
+      if (r >= 0 && r < rows.length - 1) { const col = rows[r].indexOf(Q.chip); Q.chip = rows[r + 1][Math.min(col, rows[r + 1].length - 1)]; renderMain(); return; }
       const l = resultList(); if (l.length) { S.zone = 'results'; Q.item = Math.max(0, stepRes(l, -1, 1)); } else return;
     }
-    else if (k === KEY.ENTER) { if (chips[Q.chip] && (chips[Q.chip].id === 'add' || chips[Q.chip].id === 'allsports')) { pickChip(chips[Q.chip]); return; } if (!Q.text && !Q.sportGroup) { Q.lift = true; renderMain(); return; } if (resultList().length) S.zone = 'results'; }
+    /* OK applies a chip the arrows have only moved focus to. Without this the focus-only rule above
+       would leave no way at all to choose a competition from a lower row. */
+    else if (k === KEY.ENTER) {
+      if (chips[Q.chip] && (chips[Q.chip].id === 'add' || chips[Q.chip].id === 'allsports')) { pickChip(chips[Q.chip]); return; }
+      if (chips[Q.chip] && Q.sportGroup && chips[Q.chip].id !== (Q.text ? Q.filter : Q.sport)) { pickChip(chips[Q.chip]); return; }
+      if (!Q.text && !Q.sportGroup) { Q.lift = true; renderMain(); return; }
+      if (resultList().length) S.zone = 'results';
+    }
     else if ((k === 46 || k === KEY.BKSP) && !Q.text && !Q.sportGroup) { removeChip(chips[Q.chip]); return; }
     else return;
     renderMain(); return;
