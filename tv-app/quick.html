@@ -2317,6 +2317,14 @@ async function loadGuideV2(force) {
   if (S.screen === 'main' && isSearchPage(S.page)) { Q.skey = ''; Q.gkey = ''; renderMain(); }
 }
 setInterval(() => { if (S.screen !== 'player') loadGuideV2(false); }, 20 * 60000);
+/* Multi-day formats break the flat "kick + 2.25h" duration every other comp in this file assumes --
+   confirmed real 2026-11-10: a live Pakistan vs Sri Lanka Test (started 2026-11-09) would have shown as
+   "finished" about 2 hours after its Day 1 start, despite the match genuinely still being on for days.
+   TheSportsDB gives one event per Test with no per-day end time, so this is an estimate (5 playing days),
+   not exact -- a real FINISHED/AWARDED status (see fxState) still ends it early if TheSportsDB updates
+   that before the estimate runs out, same safety net every other comp already relies on. */
+const MULTIDAY_COMPS = new Set(['ICC World Test Championship', 'International Test Match Series']);
+const matchDurationMs = comp => MULTIDAY_COMPS.has(comp) ? 5 * 24 * 3600e3 : 2.25 * 3600e3;
 /* Shapes guide-v2's pre-resolved events exactly like fixtureEvents()'s output so both merge into
    EVENTS through the same path in buildEventsG, with no separate display/matching logic to drift out
    of sync with it. */
@@ -2325,7 +2333,7 @@ function v2Events() {
   const out = [];
   for (const e of GUIDE_V2.events) {
     const kick = Date.parse(e.kick); if (!kick) continue;
-    const stop = kick + 2.25 * 3600e3, chans = new Map(), reps = [], pres = [];
+    const stop = kick + matchDurationMs(e.comp), chans = new Map(), reps = [], pres = [];
     (e.channels || []).forEach(c => {
       const start = Date.parse(c.start) || kick;
       tsdbGroups(c.channel, c.country).forEach(g => {
@@ -3664,6 +3672,15 @@ const COMPS = [
   ['Indian Premier League', 'indian premier league,ipl'], ['Australian Big Bash League', 'big bash,bbl'],
   ['Caribbean Premier League', 'caribbean premier league,cpl'], ['The Hundred', 'the hundred'],
   ['One Day International Series', 'odi,one day international'], ['Twenty20 International Series', 't20i,twenty20 international'],
+  /* added 2026-11-10 alongside rcs-guide's resolve_v2.py LEAGUES -- the Pakistan vs Sri Lanka Test match
+     bug (see CLAUDE.md/memory): this app had ZERO Test-cricket coverage, found when a real live Test
+     didn't show up anywhere despite being on the owner's own guide. 'Test Championship'/'Champions
+     Trophy' must be checked before nothing else collides here -- no other COMPS entry uses these words. */
+  ['ICC World Test Championship', 'world test championship,test championship,wtc'],
+  ['International Test Match Series', 'test match,test series,test cricket'],
+  ['Cricket World Cup', 'cricket world cup,icc cricket world cup,odi world cup'],
+  ['ICC Mens T20 World Cup', 't20 world cup,icc t20 world cup,mens t20 world cup'],
+  ['ICC Champions Trophy', 'champions trophy,icc champions trophy'],
   /* resolved server-side (see guide-v2 above / rcs-guide's resolve_v2.py) -- these names must match
      that script's LEAGUES comp names exactly, or v2Comps there won't recognise them as covered. */
   /* WNBA/EuroLeague/FIBA World Cup must all be checked BEFORE NBA below -- NBA's own bare "basketball"
@@ -3767,7 +3784,7 @@ const SPORT_GROUPS = [
   ['rugby', 'Rugby', 'lg-rugby.png', ['Rugby World Cup', 'Six Nations Championship', 'Rugby Championship', 'Super Rugby', 'United Rugby Championship', 'French Top 14']],
   ['afl', 'AFL', 'lg-afl.png', ['AFL']],
   ['nrl', 'Rugby League / NRL', 'lg-rugby-league.png', ['NRL', 'Rugby League World Cup', 'Rugby League Super League', 'World Club Challenge', 'State of Origin']],
-  ['cricket', 'Cricket', 'lg-cricket.png', ['One Day International Series', 'Twenty20 International Series', 'Indian Premier League', 'Australian Big Bash League', 'Caribbean Premier League', 'The Hundred']],
+  ['cricket', 'Cricket', 'lg-cricket.png', ['One Day International Series', 'Twenty20 International Series', 'Indian Premier League', 'Australian Big Bash League', 'Caribbean Premier League', 'The Hundred', 'ICC World Test Championship', 'International Test Match Series', 'Cricket World Cup', 'ICC Mens T20 World Cup', 'ICC Champions Trophy']],
   /* Added 2026-11-09. lg-cycling.png does not exist yet -- none of the existing lg-*.png icons (same
      gold/burgundy line-art style as lg-open-wheel-racing.png) are a bicycle, and reusing an unrelated
      one (e.g. the open-wheel racing car icon, otherwise unused) would show the wrong pictogram, not a
@@ -5295,8 +5312,16 @@ function homeLives() {
        don't work, plus real false positives like a movie titled "Freddy vs Jason" (confirmed live in
        the banner -- it matches the same regex a real fixture does). isKnownEvent() above is the actual
        bar now: a pinned/default competition, or wide enough channel coverage to prove it's genuinely
-       major on its own. */
-    return (EVENTS || []).filter(ev => (ev.fixture || ev.teams || ev.liveEvent) && evState(ev, now) === 0 && ev.chans && ev.chans.length && isKnownEvent(ev)).sort((a, b) => rk(a) - rk(b) || significance(b, now) - significance(a, now) || a.kick - b.kick);
+       major on its own.
+       Fourth correction, 2026-11-10: a nameOnly event with no parsed kickoff (!timed) sets
+       start=now/stop=now+24h at the moment addNameEvents() builds it (see there) -- and since EVENTS is
+       rebuilt from scratch on every refresh, THAT SAME channel re-qualifies as "just started, live"
+       fresh on every single rebuild, forever, because its window keeps sliding forward with "now" each
+       time rather than ever actually aging out. Confirmed live: the owner reported "Nottingham Forest"
+       stuck live "for hours" -- exactly this. filteredEvents()'s own 'now' filter, evRank(), and the
+       game-page badge all already special-case ev.nameOnly && !ev.timed (an honest "time not known"
+       state, never claimed live) -- this was simply missed here. Same exclusion, ported in. */
+    return (EVENTS || []).filter(ev => !(ev.nameOnly && !ev.timed) && (ev.fixture || ev.teams || ev.liveEvent) && evState(ev, now) === 0 && ev.chans && ev.chans.length && isKnownEvent(ev)).sort((a, b) => rk(a) - rk(b) || significance(b, now) - significance(a, now) || a.kick - b.kick);
   } catch (e) { return []; }
 }
 /* games being replayed on a channel right now (shown when nothing is live) */
