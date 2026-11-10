@@ -1775,6 +1775,15 @@ const GENRE_RULES = [
   ['Entertainment', 'entertainment,general,variety,drama,comedy,series,reality,local,regional,fta,freeview,tv shows,shows']
 ].map(([g, w]) => [g, w.split(',').map(x => ' ' + x + ' ')]);
 function genreOf(padded) { for (const [g, ws] of GENRE_RULES) for (const w of ws) if (padded.indexOf(w) >= 0) return g; return ''; }
+/* Event Hub plan item 2: which channels are worth spending EPG-confirmation effort on. Was Sports-only
+   everywhere this gets checked; widened to also cover general/FTA broadcast channels (BBC/ITV/Nine/
+   Seven/ABC/NBC/CBS/FOX-type channels usually classify as 'Entertainment' or fall through to 'General'
+   -- see GENRE_RULES' own 'fta'/'local'/'regional' keywords -- since those also carry real sports
+   programming, just not exclusively). Deliberately still excludes Kids/News/Movies/Documentary/Music/
+   Religious (and Adult, which never reaches DATA.live.items at all -- splitAdultG already removes it
+   into its own array) -- a genre-bounded scan, not the full 49k-channel catalog, per the owner's own
+   explicit concern about wasting CPU/RAM on a Fire Stick scanning Movies/Kids/News/etc for EPG matches. */
+const EPG_WORTHY_GENRES = new Set(['Sports', 'Entertainment', 'General']);
 function countryFromText(n) { const s = ' ' + n + ' '; for (const [w, c] of CWORDS) if (s.indexOf(' ' + w + ' ') >= 0) return c; return ''; }
 
 /* Works out each channel's country and genre, and pre-sorts every group A–Z.
@@ -1889,7 +1898,15 @@ async function applyData(d, show) {
        refs, confirmed at its definition), so it's safe to persist across restarts the same way GUIDE/
        FD/F1/TSDB already are below. A channel that's gone next boot just never gets looked up again
        (dead weight, not a correctness risk); a new channel is a normal cache miss, same as today. */
-    try { const saved = await idb.get(acctKey('peCache')); if (Array.isArray(saved)) d.live.parseEventCache = new Map(saved); } catch (e) {}
+    /* 'peCache2' (was 'peCache'): bumped 2026-11-10 after confirming a real stale-cache bug live on
+       device -- this persisted cache only invalidates a single entry when that CHANNEL's own raw text
+       changes, so when parseEvent()'s own matching LOGIC changed (the junk-side false-positive guard,
+       same session), every channel's already-cached pre-fix result kept being served unchanged, and a
+       known-fixed false positive ("Se V Sport Extra") was still showing after the fix was installed.
+       A plain key-name bump forces one full, harmless rebuild (same ~9s one-time cost already measured)
+       instead of silently trusting stale results forever -- do this again any time parseEvent()'s own
+       matching rules change, not just when channel data does. */
+    try { const saved = await idb.get(acctKey('peCache2')); if (Array.isArray(saved)) d.live.parseEventCache = new Map(saved); } catch (e) {}
     /* tsdbCache's rehydration: stored as {gsIds, tier}, turned back into {gs: [channel objs], tier} via
        byId (built just above, in the per-type loop). A channel id that's gone from this catalog is
        silently dropped from gs (.filter(Boolean)) rather than left as undefined -- the group is simply
@@ -2263,9 +2280,13 @@ let serverInfo = {};
    below just maps those channel names onto the owner's own provider channels the same way a free
    guide's listings already do (tsdbGroups -- same kind of input, so no new matching logic needed) and
    shapes the result exactly like fixtureEvents()'s output so it slots into the one place both get
-   merged (buildEventsG). Every guide-v2 channel is "likely" confidence, never "confirmed" -- server-
-   side resolution is still one source per claim; the app's own tap-time check (claimDoubt/EPGCHK)
-   is what actually confirms it, same as everything else.
+   merged (buildEventsG). Most guide-v2 channels are "likely" confidence -- one source's claim, same as
+   everything else, confirmed for real only by the app's own tap-time check (claimDoubt/EPGCHK) -- but
+   as of 2026-11-10 a channel CAN arrive pre-tagged "confirmed" if two of guide-v2's own independent
+   sources (TheSportsDB/ESPN/XMLTV) separately landed on the same channel for the same fixture
+   server-side (see resolve_v2.py's resolve_league(), the confidence-tiers pass after all three sources
+   are merged) -- real corroborating evidence, not a guess, so it's trusted here the same way the
+   client's own tap-time confirmation is.
    Store-safe by default: this address is never built in for a Free-tier install -- a fresh install
    makes zero requests anywhere until the user pastes an address of their own in Settings ("guidev2"
    row, ui.guideV2Url). A Red Carpet Pro unlock is itself a deliberate, consentful action (unlike a
@@ -2312,7 +2333,11 @@ function v2Events() {
            numbered feeds sharing the broadcaster's brand (see tsdbGroups' own comment). buildEventsG's
            prune step removes these again for any event where a different signal confirms one specific
            feed from the same brand family, so this flag only matters transiently, between here and there. */
-        const row = {g, epg: '', start, kick, stop: Math.max(stop, start + 2 * 3600e3), lang: chLang(g), region: regionOf(g), source: 'v2', confidence: c.confidence, tier: TSDB_GROUPS_TIER};
+        /* confirmed: true reuses the exact same "sure"/checkmark treatment chanTile() already gives the
+           app's own tap-time EPG confirmation (see claimDoubt/EPGCHK there) -- two independent sources
+           agreeing server-side (resolve_v2.py's confidence-tiers pass) is real corroborating evidence,
+           same standard, so it earns the same trust in the UI rather than a brand-new visual tier. */
+        const row = {g, epg: '', start, kick, stop: Math.max(stop, start + 2 * 3600e3), lang: chLang(g), region: regionOf(g), source: 'v2', confidence: c.confidence, confirmed: c.confidence === 'confirmed', tier: TSDB_GROUPS_TIER};
         if (c.kind === 'LIVE') { const old = chans.get(g.id); if (!old || start < old.start) chans.set(g.id, Object.assign(row, {kind: 'live'})); }
         else if (c.kind === 'REPLAY') reps.push(Object.assign(row, {kind: 'replay', hl: 0}));
         else pres.push(Object.assign(row, {kind: 'preview'}));
@@ -3874,11 +3899,11 @@ function sportsEpgMap(all) {
   if (c && c.items === DATA.live.items && c.xmap === (GUIDE && GUIDE.xmap)) return c.map;
   const m = new Map();
   for (const g of DATA.live.items) {
-    if (!all && g.g !== 'Sports') continue;
+    if (!all && !EPG_WORTHY_GENRES.has(g.g)) continue;
     for (const v of g.vers || [g]) if (v.epg) { const k = v.epg.toLowerCase(); (m.get(k) || m.set(k, new Set()).get(k)).add(g); }
   }
   if (GUIDE && GUIDE.xmap) Object.keys(GUIDE.xmap).forEach(k => {
-    const set = new Set(GUIDE.xmap[k].map(id => DATA.live.byId.get(String(id))).filter(g => g && (all || g.g === 'Sports')));
+    const set = new Set(GUIDE.xmap[k].map(id => DATA.live.byId.get(String(id))).filter(g => g && (all || EPG_WORTHY_GENRES.has(g.g))));
     if (set.size) m.set(k, set);
   });
   EPGMAP_CACHE[slot] = {items: DATA.live.items, xmap: GUIDE && GUIDE.xmap, map: m};
@@ -3917,7 +3942,14 @@ const XCC = {uk: 'UK', us: 'US', au: 'AU', ca: 'CA', ie: 'IE', de: 'DE', ch: 'CH
 function pickFreeGuides(covered) {
   if (ui.xgOff) return [];
   const need = {};
-  for (const g of DATA.live.items) if (g.g === 'Sports' && !covered.has(g.id) && XG_BY_CC[g.cc]) need[g.cc] = (need[g.cc] || 0) + 1;
+  /* EPG_WORTHY_GENRES here (not Sports-only): this decides which per-COUNTRY general XMLTV guide to
+     fetch, and that file's programme data can confirm FTA/general channels too (see sportsEpgMap),
+     not just sports ones -- so the trigger for "we need this country's guide" should match. rcsUrl()
+     and XG_BRAND just below stay Sports-only on purpose: both are inherently sports-only sources (the
+     app's own published sports guide; beIN/Eurosport/Optus are sports broadcasters specifically), so
+     widening their OWN trigger would just mean fetching a sports guide for accounts with no sports
+     channels at all. */
+  for (const g of DATA.live.items) if (EPG_WORTHY_GENRES.has(g.g) && !covered.has(g.id) && XG_BY_CC[g.cc]) need[g.cc] = (need[g.cc] || 0) + 1;
   const out = new Map();
   /* first in line, and loaded whenever any sports channel still lacks a guide of its own */
   if (rcsUrl() && DATA.live.items.some(g => g.g === 'Sports')) out.set(rcsUrl(), RCS_LABEL);
@@ -4302,10 +4334,21 @@ function parseEvent(title, sub, chName) {
   const live = LIVE_RE.test(raw), replay = REPLAY_RE.test(raw + ' ' + sub);
   let t = raw.replace(/^(live|en vivo|direct|replay)\b\s*[:\-–|]?\s*/i, '');
   let teams = null;
+  /* "Team A v Team B" (a single bare "v") is the NORMAL real format across most of this app's
+     non-football sports -- UK/AU broadcasters (Sky Sports, TNT, Fox League, Fox Footy) write NRL,
+     Super League, AFL, Cricket and Rugby Union this way, and almost none of those club names are in
+     TEAM_ALIASES/EPL_GUESS (those two are football-specific). Requiring a known alias on a bare "v"
+     would silently break all of that -- confirmed wrong before this landed. The real false positive
+     ("No-V Sport +8" parsed as "No" v "Sport +8", live 2026-11-10) isn't about the team being unknown,
+     it's that neither side even LOOKS like a team name: a 1-2 letter/country-code token, pure digits/
+     symbols, or a broadcaster/channel word. Block on that shape instead, for both "v" and "vs". */
+  const JUNK_SIDE_RE = /^(?:[a-z]{1,2}|no|se|dk|fi|uk|us|de|fr|nl|pt|es|it|pl|tr|[0-9+.\s]+)$/i;
+  const BROADCAST_WORD_RE = /\b(sport|sports|tv|hd|fhd|uhd|4k|plus|channel|ch|ppv|live|network|extra|max)\b/i;
   const m = t.match(/(?:^|[:|–-]\s*)([^:|]{2,45}?)\s+(?:v|vs\.?|versus)\s+([^:|(]{2,45})/i);
   if (m) {
     const a = canonTeam(m[1].replace(/^.*:\s*/, '')), b = canonTeam(m[2].replace(/\s+[-–]\s+.*$/, '').replace(/\s*\((live|r|hd)\)\s*$/i, ''));
-    if (a && b && a.length < 40 && b.length < 40) teams = [a, b];
+    const junk = s => !s || JUNK_SIDE_RE.test(s.trim()) || BROADCAST_WORD_RE.test(s);
+    if (a && b && a.length < 40 && b.length < 40 && !junk(a) && !junk(b)) teams = [a, b];
   } else {
     /* "LASK - Liverpool" style: at least one side must be a club the app knows, and the other must look like a team name */
     const d = t.match(/(?:^|:\s*)([^:|]{2,40}?)\s+[-–]\s+([^:|(]{2,40})/);
@@ -4431,7 +4474,7 @@ function* addNameEvents(out) {
   /* Fire-and-forget: persists the now-current cache so the NEXT app launch can load it back in
      applyData() instead of rebuilding from zero. Never awaited -- this is a background disk write,
      not something the render path (or this generator's own caller) should ever wait on. */
-  idb.set(acctKey('peCache'), [...peCache.entries()]).catch(() => {});
+  idb.set(acctKey('peCache2'), [...peCache.entries()]).catch(() => {});
 }
 /* buildEvents() used to be one fully synchronous function. On a big enough guide (this was diagnosed
    against a 49,121-channel provider) it's a genuine multi-second block, and on constrained hardware
@@ -4897,9 +4940,13 @@ function filteredEvents(f, q) {
   const now = nowMs(), toks = norm(q || '').split(' ').filter(Boolean);
   let l = EVENTS.filter(ev => ev.stop > now - 12 * 3600e3 || (ev.reps && ev.reps.some(r => r.stop > now)));
   if (toks.length) {
-    const strict = l.filter(ev => toks.every(t => ev.text.indexOf(' ' + t) >= 0));
+    /* whole-word match only (' '+t+' ', not just ' '+t) -- a bare leading-space check let a short
+       token match as a mere PREFIX of a longer word (confirmed live: "tour" matched inside
+       "Tourcoing", surfacing an unrelated match for a "tour de france" search). ev.text is always
+       space-padded on both ends (see parseEvent's own `text` construction), so this is safe. */
+    const strict = l.filter(ev => toks.every(t => ev.text.indexOf(' ' + t + ' ') >= 0));
     /* nothing exact: allow one-letter slips in longer words ("arsnal", "liverpol") */
-    l = strict.length ? strict : l.filter(ev => toks.every(t => ev.text.indexOf(' ' + t) >= 0 || (t.length >= 4 && ev.text.split(' ').some(w => w && prefixLev(t, w, 1) <= 1))));
+    l = strict.length ? strict : l.filter(ev => toks.every(t => ev.text.indexOf(' ' + t + ' ') >= 0 || (t.length >= 4 && ev.text.split(' ').some(w => w && prefixLev(t, w, 1) <= 1))));
   }
   else if (f === 'now') l = l.filter(ev => !(ev.nameOnly && !ev.timed) && (ev.isEvent && (evState(ev, now) === 0 || (ev.start > now && ev.start - now < 3 * 3600e3))) || repOnNow(ev, now));
   else if (f === 'all') l = l.filter(ev => ev.isEvent);
@@ -5157,6 +5204,45 @@ const lgImg = (c, cls) => LG_OK.has(c) ? '<img class="' + (cls || 'lgi') + '" sr
    since nobody multi-casts a single film the way a real top-tier event gets carried everywhere at once. */
 const BIG_EVENT_CHANS = 4;
 const isKnownEvent = ev => chipsList().includes(ev.comp) || (ev.chans && ev.chans.length >= BIG_EVENT_CHANS);
+/* Event Hub plan item 3: a significance score, added as an EXTRA tiebreaker alongside the existing
+   rk()/chipsList() pinned-priority sort already in homeLives()/homeUpcoming() below -- deliberately not
+   replacing it. That sort (and isKnownEvent() just above) already has a long, specific bug history
+   (talk shows passing as live, "Freddy vs Jason" matching the vs-regex, a real Arsenal fixture getting
+   bumped off the list) fixed by trial against this exact device/account -- this only adds ranking
+   WITHIN whatever that logic already decided belongs on screen, never changes what qualifies. */
+/* 'round' (added server-side 2026-11-10, see resolve_v2.py) is NOT one consistent shape to compare as a
+   number across competitions -- TheSportsDB's intRound uses special non-linear codes for knockout
+   rounds on some comps (confirmed: the Rugby League World Cup final is intRound="200", nowhere near a
+   late-regular-season value you could compare numerically against e.g. NBA's round 30), and football-
+   data.org sends a text stage name instead ("FINAL", "SEMI_FINALS") on others. Checked as a keyword/
+   threshold signal only, never compared as a plain number between two different competitions. */
+const KNOCKOUT_RE = /\b(final|semi[- ]?final|quarter[- ]?final|play[- ]?off|grand final|main card|title)\b/i;
+const isKnockout = ev => { const r = String(ev.round || ''); return (/^\d+$/.test(r) && Number(r) >= 125) || KNOCKOUT_RE.test(r) || KNOCKOUT_RE.test(ev.label || '') || KNOCKOUT_RE.test(ev.text || ''); };
+/* A broader "this is a genuinely major competition" set than chipsList()/DEFAULT_CHIPS (which is the
+   owner's own personal priority list, already handled by rk() in the callers below) -- this is for
+   ranking among events NOT already pinned, so a World Cup match still outranks an obscure domestic
+   league fixture even when neither is personally pinned. A judgement call, not derived from any data
+   source -- reasonable globally-recognised competitions across the sports this app covers, not every
+   comp in LEAGUES (most of tonight's 40 additions are real but intentionally not "flagship"). */
+const TIER1_COMPS = new Set(['Premier League', 'Champions League', 'World Cup', 'European Championship', 'La Liga', 'Serie A',
+  'Bundesliga', 'Ligue 1', 'NBA', 'NFL', 'NHL', 'MLB', 'Formula 1', 'UFC', 'ATP Tour', 'WTA Tour', 'Rugby League World Cup',
+  'Rugby World Cup', 'Cricket World Cup', 'Indian Premier League']);
+/* best confidence tier among an event's own matched channels -- 'confirmed' (2+ independent sources,
+   see resolve_v2.py) outranks 'likely' (one source) outranks none at all. */
+function bestConfidence(ev) {
+  let best = 0;
+  for (const c of ev.chans || []) best = Math.max(best, c.confidence === 'confirmed' ? 2 : c.confidence === 'likely' ? 1 : 0);
+  return best;
+}
+function significance(ev, now) {
+  let s = 0;
+  if (isKnockout(ev)) s += 100;
+  if (TIER1_COMPS.has(ev.comp)) s += 20;
+  s += bestConfidence(ev) * 5;
+  if (ev.kick <= now && ev.kick > now - 3 * 3600e3) s += 2;        /* live and recently started outranks live-for-hours */
+  else if (ev.kick > now && ev.kick - now < 3600e3) s += 1;        /* starting within the hour */
+  return s;
+}
 /* the games being played right now, from the fixture lists */
 function homeLives() {
   try {
@@ -5210,7 +5296,7 @@ function homeLives() {
        the banner -- it matches the same regex a real fixture does). isKnownEvent() above is the actual
        bar now: a pinned/default competition, or wide enough channel coverage to prove it's genuinely
        major on its own. */
-    return (EVENTS || []).filter(ev => (ev.fixture || ev.teams || ev.liveEvent) && evState(ev, now) === 0 && ev.chans && ev.chans.length && isKnownEvent(ev)).sort((a, b) => rk(a) - rk(b) || a.kick - b.kick);
+    return (EVENTS || []).filter(ev => (ev.fixture || ev.teams || ev.liveEvent) && evState(ev, now) === 0 && ev.chans && ev.chans.length && isKnownEvent(ev)).sort((a, b) => rk(a) - rk(b) || significance(b, now) - significance(a, now) || a.kick - b.kick);
   } catch (e) { return []; }
 }
 /* games being replayed on a channel right now (shown when nothing is live) */
@@ -5251,7 +5337,7 @@ function homeUpcoming() {
        upcoming match with no channels confirmed yet only still shows if its competition is pinned;
        otherwise there's nothing yet to prove it's a big one, same as how homeLives() already treats a
        channel-less live match as not actually watchable. */
-    return (EVENTS || []).filter(ev => (ev.fixture || ev.teams || ev.liveEvent) && evState(ev, now) === 1 && ev.kick - now < 48 * 3600e3 && isKnownEvent(ev)).sort((a, b) => rk(a) - rk(b) || a.kick - b.kick).slice(0, 8);
+    return (EVENTS || []).filter(ev => (ev.fixture || ev.teams || ev.liveEvent) && evState(ev, now) === 1 && ev.kick - now < 48 * 3600e3 && isKnownEvent(ev)).sort((a, b) => rk(a) - rk(b) || significance(b, now) - significance(a, now) || a.kick - b.kick).slice(0, 8);
   } catch (e) { return []; }
 }
 /* picks the first non-empty list in this order: a replay you can watch right now is more actionable
@@ -7731,7 +7817,8 @@ const GS = {ev: null, ch: 0, list: [], now: new Map(), q: ''};
 function searchChannels(q, ev) {
   const toks = norm(q).split(' ').filter(Boolean);
   if (!toks.length || !DATA || !DATA.live) return [];
-  const has = (text, t) => (' ' + text).indexOf(' ' + t) >= 0;
+  /* whole-word match (both ends padded+checked) -- same "tour" !== "Tourcoing" fix as filteredEvents' own token match above. */
+  const has = (text, t) => (' ' + text + ' ').indexOf(' ' + t + ' ') >= 0;
   guideListFor({id: '__build'}, 1);                       /* makes the per-channel guide index if there is a guide */
   const byG = GUIDE && GUIDE.byG, out = [];
   for (const g of DATA.live.items) {
@@ -8164,7 +8251,7 @@ const ABOUT_LEGAL_TEXT = 'Red Carpet Player — ABN: 16 217 031 405 (Melbourne, 
 function searchLiveByName(q) {
   const toks = norm(q).split(' ').filter(Boolean);
   if (!toks.length) return [];
-  return DATA.live.items.filter(g => { const t = ' ' + norm(g.raw + ' ' + g.name) + ' '; return toks.every(tk => t.indexOf(' ' + tk) >= 0); })
+  return DATA.live.items.filter(g => { const t = ' ' + norm(g.raw + ' ' + g.name) + ' '; return toks.every(tk => t.indexOf(' ' + tk + ' ') >= 0); })
     .sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true})).slice(0, 25);
 }
 function pickChannelFor(label, k) {
