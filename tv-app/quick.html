@@ -5225,7 +5225,18 @@ const lgImg = (c, cls) => LG_OK.has(c) ? '<img class="' + (cls || 'lgi') + '" sr
    can't tell a slasher-film crossover from a real fixture) never clears the channel-count bar either,
    since nobody multi-casts a single film the way a real top-tier event gets carried everywhere at once. */
 const BIG_EVENT_CHANS = 4;
-const isKnownEvent = ev => chipsList().includes(ev.comp) || (ev.chans && ev.chans.length >= BIG_EVENT_CHANS);
+/* Added 2026-11-10/11, picking back up this file's own flagged-but-unresolved question from earlier
+   tonight ("is BIG_EVENT_CHANS too strict, hiding real sparse-coverage games?"): a channel tagged
+   `confirmed` (resolve_v2.py's cross-source corroboration pass -- 2+ INDEPENDENT sources, e.g. ESPN and
+   an XMLTV feed, separately landing on the exact same channel) is already a stronger, more deliberate
+   signal of realness than a raw count ever was -- the count-of-4 only ever existed as a proxy for "this
+   is genuinely multi-source, not one lucky coincidence". A fake addNameEvents match ("Freddy vs Jason")
+   structurally can never earn a `confirmed` channel -- there's no real fixture for a second independent
+   source to ever agree against. So this never weakens the guard the comment above describes, only
+   loosens it for the case that guard was never actually trying to exclude: a genuinely real but
+   sparsely-covered match (exactly what tonight's whole cricket/boxing audit found plenty of) that has
+   one single, cross-confirmed channel instead of four merely-likely ones. */
+const isKnownEvent = ev => chipsList().includes(ev.comp) || (ev.chans && (ev.chans.length >= BIG_EVENT_CHANS || ev.chans.some(c => c.confirmed)));
 /* Event Hub plan item 3: a significance score, added as an EXTRA tiebreaker alongside the existing
    rk()/chipsList() pinned-priority sort already in homeLives()/homeUpcoming() below -- deliberately not
    replacing it. That sort (and isKnownEvent() just above) already has a long, specific bug history
