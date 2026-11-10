@@ -4087,6 +4087,19 @@ async function loadExtraGuides(chans, chIdx, items, from, to, every, force) {
         const sfx = ((id.match(/\.([a-z]{2,3})(?=@|$)/i) || [])[1] || '').toLowerCase();
         let cc = XCC[sfx] || '';
         if (!cc && /^[a-z]{2,3}$/.test(sfx)) { const up = sfx.toUpperCase(), code = CMAP[up] || up; if (COUNTRIES.has(up) || COUNTRIES.has(code)) cc = code; }
+        /* Added 2026-11-11, owner-flagged: "beIN is always a problem to match... beIN is in quite a few
+           countries." Root cause, confirmed by hand (downloaded and inspected the real file): epgshare01's
+           BEIN1.xml.gz is MENA-ONLY -- every one of its 80 channels is "..._AR.bein"/"..._EN.bein"
+           (Arabic/English dub of the SAME Qatar-based feed), nothing Australian/French/Spanish/Turkish/
+           American/Canadian at all, despite beIN operating entirely separate regional feeds with different
+           schedules in all of those. Its ids end in ".bein" (epgshare01's own per-SOURCE suffix), never a
+           real country code -- so the suffix match above always fell through to cc='', which silently
+           defeated the exact "a channel that names its country only goes to your channels from that
+           country" guarantee the comment above describes, for this one source only: nothing marked these
+           as Middle-East-only, so a user with (for example) beIN Sports Australia or beIN Sports France
+           could have this MENA-specific schedule offered as if it were theirs. 'QA' is a real recognised
+           country code already (COUNTRIES, REGION_OF -- maps to "Middle East"), just never reached here. */
+        if (!cc && /\bBEIN1\.xml\.gz\b/.test(url)) cc = 'QA';
         const names = [...block.matchAll(/<display-name[^>]*>([\s\S]*?)<\/display-name>/g)].map(m => xmlDec(m[1]));
         names.push(id.replace(/\.[a-z]{2}(?=@|$)/i, '').replace(/[._]/g, ' '), expandEpgId(id));
         const gs = new Set();
