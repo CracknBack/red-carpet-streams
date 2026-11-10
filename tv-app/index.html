@@ -7499,6 +7499,22 @@ function withHeads(evs) {
 }
 const selectable = x => x && !x.hdr;
 function stepRes(list, i, d) { let j = i + d; while (j >= 0 && j < list.length && !selectable(list[j])) j += d; return j >= 0 && j < list.length ? j : -1; }
+/* The sport chips wrap across several rows (CSS flex-wrap, variable-width chips -- "English Football
+   (League Cup)" is nowhere near as wide as "Add"), so there's no fixed column count the way the game-
+   tile grid's own fcols()/Q.frows has -- a row here can't be computed from the chip index alone, only
+   from where the browser actually put it. Measured live off the real DOM (offsetTop, grouped by actual
+   rendered row) rather than guessed, so it stays correct regardless of chip count, label length, or
+   screen width. */
+function chipRowsDom() {
+  const els = [...document.querySelectorAll('#chips .chip')], rows = [];
+  let lastTop = null;
+  els.forEach((el, i) => {
+    const top = el.offsetTop;
+    if (lastTop === null || Math.abs(top - lastTop) > 2) { rows.push([i]); lastTop = top; }
+    else rows[rows.length - 1].push(i);
+  });
+  return rows;
+}
 /* What the results list shows: sport shortcuts when nothing is typed, otherwise games first, then everything else. */
 function resultList() {
   const minute = Math.floor(nowMs() / 60000), gv = (GUIDE && GUIDE.ts) + '|' + (EVENTS ? 1 : 0) + '|' + minute + '|' + EPGVER;
@@ -7836,8 +7852,22 @@ function searchKey(k, e) {
     }
     if (k === KEY.LEFT) { if (Q.chip > 0) { Q.chip--; pickChip(chips[Q.chip]); return; } S.zone = Q.kb ? 'kb' : 'rail'; }
     else if (k === KEY.RIGHT && Q.chip < chips.length - 1) { Q.chip++; pickChip(chips[Q.chip]); return; }
-    else if (k === KEY.UP || k === KEY.BACK) { if (Q.sportGroup) pickChip({id: 'allsports'}); else S.zone = 'qbox'; }
-    else if (k === KEY.DOWN) { const l = resultList(); if (l.length) { S.zone = 'results'; Q.item = Math.max(0, stepRes(l, -1, 1)); } else return; }
+    else if (k === KEY.UP || k === KEY.BACK) {
+      /* UP/DOWN now move a row at a time within the chip grid itself (requested: "going through the
+         sports tabs I can only go left and right") when there's a real row above/below to land on,
+         falling through to the original exit-upward/BACK behaviour only at the very top row -- same
+         fallback either way, just no longer skipped when a row genuinely exists. */
+      if (k === KEY.UP) {
+        const rows = chipRowsDom(), r = rows.findIndex(row => row.includes(Q.chip));
+        if (r > 0) { const col = rows[r].indexOf(Q.chip); Q.chip = rows[r - 1][Math.min(col, rows[r - 1].length - 1)]; pickChip(chips[Q.chip]); return; }
+      }
+      if (Q.sportGroup) pickChip({id: 'allsports'}); else S.zone = 'qbox';
+    }
+    else if (k === KEY.DOWN) {
+      const rows = chipRowsDom(), r = rows.findIndex(row => row.includes(Q.chip));
+      if (r >= 0 && r < rows.length - 1) { const col = rows[r].indexOf(Q.chip); Q.chip = rows[r + 1][Math.min(col, rows[r + 1].length - 1)]; pickChip(chips[Q.chip]); return; }
+      const l = resultList(); if (l.length) { S.zone = 'results'; Q.item = Math.max(0, stepRes(l, -1, 1)); } else return;
+    }
     else if (k === KEY.ENTER) { if (chips[Q.chip] && (chips[Q.chip].id === 'add' || chips[Q.chip].id === 'allsports')) { pickChip(chips[Q.chip]); return; } if (!Q.text && !Q.sportGroup) { Q.lift = true; renderMain(); return; } if (resultList().length) S.zone = 'results'; }
     else if ((k === 46 || k === KEY.BKSP) && !Q.text && !Q.sportGroup) { removeChip(chips[Q.chip]); return; }
     else return;
