@@ -7341,6 +7341,19 @@ function renderHints() {
 }
 
 async function showPage(p) {
+  /* Q.kb (the on-screen remote keyboard panel) is its own flag, entirely independent of S.zone -- a
+     caller moving FOCUS elsewhere (S.zone = 'chips' etc.) was never the same as hiding the panel
+     itself. Confirmed live: activating the keyboard on Search, then switching to the Event Hub via the
+     rail (the most direct route -- UP/DOWN there calls showPage() straight away, bypassing
+     homeOpenSportGroupAll/homeOpenSportsHub/homeOpenSearch entirely, so fixing only those three missed
+     this exact path), left the full keyboard grid still rendered next to the sport chips on a fresh
+     landing -- focus correctly on the chips, but a giant unrequested keyboard still eating half the
+     screen. showPage() is the one real chokepoint every route into a page goes through (same reasoning
+     tsdbGroups' own comment gives for not duplicating a fix across every call site), so the reset
+     belongs here, not scattered across each entry point. Scoped to an actual PAGE change landing on
+     'sportshub' specifically -- pickChip() (switching sport chips while already there) never calls
+     showPage() again, so an in-progress keyboard session on the same page is untouched. */
+  if (p === 'sportshub') Q.kb = false;
   S.page = p;
   S.rail = PAGES.findIndex(x => x.id === p);
   $('main').classList.toggle('sport', isSearchPage(p) || p === 'favs');
