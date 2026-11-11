@@ -5055,15 +5055,36 @@ function* buildEventsG() {
      single class of event was 44.8% of the old file. */
   const __gdt0 = performance.now(), gd = guidesEvents();
   if (gd.length) {
+    const gLastWord = s => s.trim().split(' ').pop();
     const pairKey = ev => { const s = ev.teams ? ev.teams.map(norm).slice().sort() : null; return s && s[0] && s[1] ? s.join('|') : ''; };
-    const byPair = new Map();
-    EVENTS.forEach(ev => { const k = pairKey(ev); if (k) (byPair.get(k) || byPair.set(k, []).get(k)).push(ev); });
+    /* Exact key alone is not enough, and getting this wrong is visible and bad: the fixture feed says
+       "Borussia Dortmund" where the broadcaster's EPG says "Dortmund", so a strict key missed, this
+       event was added as a SECOND card carrying only the one or two channels the EPG knew about, and
+       opening that card showed "2 channels" for a match the app already had a full list for.
+       Confirmed on the owner's device with Arsenal v Borussia Dortmund showing only the two Stan
+       feeds. Falls back to the same containment test the v2/fixture merge above already uses -- both
+       sides present in the existing event's text, by full name or by last word -- indexed by last
+       word so this stays a lookup rather than a scan of every event for every event. */
+    const byPair = new Map(), byWord = new Map();
+    EVENTS.forEach(ev => {
+      const k = pairKey(ev); if (k) (byPair.get(k) || byPair.set(k, []).get(k)).push(ev);
+      if (!ev.teams) return;
+      ev.teams.forEach(t => { const w = gLastWord(norm(t)); if (w.length > 3) (byWord.get(w) || byWord.set(w, []).get(w)).push(ev); });
+    });
     const add = [], drop = new Set();
-    let merged = 0;
+    let merged = 0, fuzzy = 0;
     gd.forEach(g => {
       const k = pairKey(g);
       /* same two teams, same day: one game described twice */
-      const host = k ? (byPair.get(k) || []).find(ev => Math.abs(ev.kick - g.kick) < 12 * 3600e3) : null;
+      let host = k ? (byPair.get(k) || []).find(ev => Math.abs(ev.kick - g.kick) < 12 * 3600e3) : null;
+      const sides = g.teams ? g.teams.map(norm) : null;
+      if (!host && sides && sides[0] && sides[1]) {
+        const near = (byWord.get(gLastWord(sides[0])) || []).concat(byWord.get(gLastWord(sides[1])) || []);
+        host = near.find(ev => Math.abs(ev.kick - g.kick) < 12 * 3600e3 && ev.text &&
+          sides.every(s => ev.text.indexOf(' ' + s + ' ') >= 0 ||
+            (gLastWord(s).length > 3 && ev.text.indexOf(' ' + gLastWord(s) + ' ') >= 0)));
+        if (host) fuzzy++;
+      }
       if (host) {
         const have = new Map(host.chans.map((c, i) => [c.g.id, i]));
         g.chans.forEach(c => mergeChan(host.chans, have, c));
@@ -5075,7 +5096,7 @@ function* buildEventsG() {
     });
     if (add.length || drop.size) EVENTS = EVENTS.filter(ev => !drop.has(ev)).concat(add);
     add.forEach(ev => { ev.chans = pruneBrandSiblings(ev.chans); });
-    memLog('buildEvents: guides merge done, guides=' + gd.length + ' merged=' + merged + ' added=' + add.length +
+    memLog('buildEvents: guides merge done, guides=' + gd.length + ' merged=' + merged + ' (fuzzy ' + fuzzy + ') added=' + add.length +
       ' droppedEmpty=' + drop.size + ' EVENTS=' + EVENTS.length + ' totalMs=' + (performance.now() - __gdt0).toFixed(0));
   }
 }
