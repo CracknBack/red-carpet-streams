@@ -2316,14 +2316,17 @@ async function loadGuideV2(force) {
   if (S.screen === 'main' && isSearchPage(S.page)) { Q.skey = ''; Q.gkey = ''; renderMain(); }
 }
 setInterval(() => { if (S.screen !== 'player') loadGuideV2(false); }, 20 * 60000);
-/* Multi-day formats break the flat "kick + 2.25h" duration every other comp in this file assumes --
-   confirmed real 2026-11-10: a live Pakistan vs Sri Lanka Test (started 2026-11-09) would have shown as
-   "finished" about 2 hours after its Day 1 start, despite the match genuinely still being on for days.
-   TheSportsDB gives one event per Test with no per-day end time, so this is an estimate (5 playing days),
-   not exact -- a real FINISHED/AWARDED status (see fxState) still ends it early if TheSportsDB updates
-   that before the estimate runs out, same safety net every other comp already relies on. */
-const MULTIDAY_COMPS = new Set(['ICC World Test Championship', 'International Test Match Series']);
-const matchDurationMs = comp => MULTIDAY_COMPS.has(comp) ? 5 * 24 * 3600e3 : 2.25 * 3600e3;
+/* How long an event lasts is the SERVER's answer now, published per event as `end` (see
+   rcs-guide/resolve_v2.py's EVENT_HOURS_BY_SPORT and event_end_ts). This file used to guess -- a flat
+   2.25h for everything, with a hardcoded two-name MULTIDAY_COMPS set bolted on for Test cricket -- and
+   that guess is what made a four-day golf tournament read as "live" for two hours, "finished" while it
+   was still on day one, and then disappear from every list 12h after that. Deleted rather than
+   extended: a per-comp duration table maintained in the TV app is exactly the kind of blanket rule
+   that keeps breaking a different sport each time it changes.
+   `timed === false` means the source had no real start time (TheSportsDB sends 00:00:00 as a
+   placeholder for golf/tennis/boxing and more). Those events flow into the honest "time not known"
+   presentation this app already had for its own channel-name parsing -- see untimedEvent(). */
+const untimedEvent = ev => ev.timed === false;
 /* Shapes guide-v2's pre-resolved events exactly like fixtureEvents()'s output so both merge into
    EVENTS through the same path in buildEventsG, with no separate display/matching logic to drift out
    of sync with it. */
@@ -2332,7 +2335,9 @@ function v2Events() {
   const out = [];
   for (const e of GUIDE_V2.events) {
     const kick = Date.parse(e.kick); if (!kick) continue;
-    const stop = kick + matchDurationMs(e.comp), chans = new Map(), reps = [], pres = [];
+    /* Fall back to 2.5h only for a guide-v2 file published before `end` existed -- every current one
+       carries it, so this is a compatibility floor, not a duration model. */
+    const stop = Math.max(Date.parse(e.end) || 0, kick + 2.5 * 3600e3), chans = new Map(), reps = [], pres = [];
     (e.channels || []).forEach(c => {
       const start = Date.parse(c.start) || kick;
       tsdbGroups(c.channel, c.country).forEach(g => {
@@ -2352,6 +2357,9 @@ function v2Events() {
     });
     out.push({key: 'v2:' + e.id, fixture: true, status: e.status, label: e.label || ((e.home || '') + ' v ' + (e.away || '')),
       comp: e.comp, teams: e.home && e.away ? [e.home, e.away] : null, liveEvent: true, isEvent: true,
+      /* explicit false only when the server says so -- an older guide-v2 without the field must keep
+         reading as timed, not silently turn every event into "time not known" */
+      timed: e.timed !== false,
       text: ' ' + norm((e.label || '') + ' ' + e.comp) + ' ', kick, start: kick, stop, chans: [...chans.values()], reps, pres,
       /* guide-v2's own raw broadcaster strings, untouched by tsdbGroups -- kept only for display (the
          Event Guide card's "Official: X" label, see officialBroadcaster()), never consulted by any
@@ -4959,7 +4967,7 @@ function verifyReplayClaims(evs, refresh) {
 const repLiveNow = (ev, r, now) => r.start <= now && (!r.stop || r.stop > now) && !r.hl && !claimConflict(ev, r) && !LOW_TRUST.test(String((r.g && (r.g.raw || r.g.name)) || ''));
 const repOnNow = (ev, now) => evState(ev, now) === 2 && (ev.reps || []).some(r => repLiveNow(ev, r, now));
 /* order: live events, other programmes on now, replays on now, coming up, earlier */
-function evRank(ev, now) { if (ev.nameOnly && !ev.timed) return 3.5; const s = evState(ev, now); return s === 0 ? (ev.liveEvent ? 0 : 1) : s === 1 ? 3 : repOnNow(ev, now) ? 2 : 4; }
+function evRank(ev, now) { if (untimedEvent(ev)) return 3.5; const s = evState(ev, now); return s === 0 ? (ev.liveEvent ? 0 : 1) : s === 1 ? 3 : repOnNow(ev, now) ? 2 : 4; }
 function evState(ev, now) { if (ev.fixture) return fxState(ev, now); return ev.start <= now && (!ev.stop || ev.stop > now) ? 0 : ev.start > now ? 1 : 2; }
 function filteredEvents(f, q) {
   if (!GUIDE && !FD.list.length) return [];
@@ -4982,7 +4990,7 @@ function filteredEvents(f, q) {
     /* nothing exact: allow one-letter slips in longer words ("arsnal", "liverpol") */
     l = strict.length ? strict : l.filter(ev => toks.every(t => ev.text.indexOf(' ' + t + ' ') >= 0 || (t.length >= 4 && ev.text.split(' ').some(w => w && prefixLev(t, w, 1) <= 1))));
   }
-  else if (f === 'now') l = l.filter(ev => !(ev.nameOnly && !ev.timed) && (ev.isEvent && (evState(ev, now) === 0 || (ev.start > now && ev.start - now < 3 * 3600e3))) || repOnNow(ev, now));
+  else if (f === 'now') l = l.filter(ev => !untimedEvent(ev) && (ev.isEvent && (evState(ev, now) === 0 || (ev.start > now && ev.start - now < 3 * 3600e3))) || repOnNow(ev, now));
   else if (f === 'all') l = l.filter(ev => ev.isEvent);
   else if (f.startsWith('team:')) { const tn = f.slice(5), al = [norm(tn)].concat(TEAM_ALIASES.get(TEAM_OF.get(norm(tn)) || '') || []); l = l.filter(ev => al.some(a => ev.text.indexOf(' ' + a + ' ') >= 0)); }
   /* "All <sport>" (every SPORT_GROUPS entry except soccer routes straight here now, see
@@ -5358,7 +5366,7 @@ function homeLives() {
        stuck live "for hours" -- exactly this. filteredEvents()'s own 'now' filter, evRank(), and the
        game-page badge all already special-case ev.nameOnly && !ev.timed (an honest "time not known"
        state, never claimed live) -- this was simply missed here. Same exclusion, ported in. */
-    return (EVENTS || []).filter(ev => !(ev.nameOnly && !ev.timed) && (ev.fixture || ev.teams || ev.liveEvent) && evState(ev, now) === 0 && ev.chans && ev.chans.length && isKnownEvent(ev)).sort((a, b) => rk(a) - rk(b) || significance(b, now) - significance(a, now) || a.kick - b.kick);
+    return (EVENTS || []).filter(ev => !untimedEvent(ev) && (ev.fixture || ev.teams || ev.liveEvent) && evState(ev, now) === 0 && ev.chans && ev.chans.length && isKnownEvent(ev)).sort((a, b) => rk(a) - rk(b) || significance(b, now) - significance(a, now) || a.kick - b.kick);
   } catch (e) { return []; }
 }
 /* games being replayed on a channel right now (shown when nothing is live) */
@@ -7510,7 +7518,11 @@ function applyFilter() {
 }
 /* games are grouped under headings: On now, Later today, Tomorrow, Wednesday 15 Oct…, Earlier */
 function dayHeading(ev, now) {
-  if (ev.nameOnly && !ev.timed) return 'Event channels (time not known)';
+  /* Two different untimed shapes now land here: a channel named after an event with no parsed time
+     (nameOnly, the original case) and a real server fixture whose source published no start time
+     (golf/tennis/boxing -- TheSportsDB's 00:00:00 placeholder). Same honesty, different wording:
+     "Event channels" is meaningless for a golf tournament. */
+  if (untimedEvent(ev)) return ev.nameOnly ? 'Event channels (time not known)' : 'On today · start time not confirmed';
   const st = evState(ev, now);
   if (st === 0) return ev.liveEvent ? 'Live now' : 'On now';
   if (st === 2) return repOnNow(ev, now) ? 'Replays on now' : 'Earlier';
@@ -7602,7 +7614,7 @@ function resRow(x, i) {
   if (x.chans) {
     const now = nowMs(), s = evState(x, now), ko = (s === 2 ? dayWord(x.kick) : '') + clockStr(new Date(x.kick)), early = x.start < x.kick - 10 * 60e3;
     const reps = (x.reps || []).filter(r => !r.stop || r.stop > now), repNow = reps.some(r => repLiveNow(x, r, now)), repNext = reps.find(r => r.start > now && !r.hl);
-    const when = x.fixture && s === 2 && !repNow ? '<span class="gp">' + (x.status === 'POSTPONED' ? 'Postponed' : 'Full time') + '</span><span class="gs">' + (x.f1 ? 'Starts ' : 'KO ') + esc(ko) + '</span>' : x.nameOnly && !x.timed ? '<span class="gon">EVENT</span><span class="gs">channel</span>' : s === 0 ? (x.liveEvent ? '<span class="gl">LIVE</span><span class="gs">' + (x.f1 ? 'Starts ' : 'KO ') + esc(ko) + '</span>' : '<span class="gon">ON NOW</span><span class="gs">from ' + esc(clockStr(new Date(x.start))) + '</span>')
+    const when = x.fixture && s === 2 && !repNow ? '<span class="gp">' + (x.status === 'POSTPONED' ? 'Postponed' : 'Full time') + '</span><span class="gs">' + (x.f1 ? 'Starts ' : 'KO ') + esc(ko) + '</span>' : untimedEvent(x) ? '<span class="gon">EVENT</span><span class="gs">' + (x.nameOnly ? 'channel' : 'time TBC') + '</span>' : s === 0 ? (x.liveEvent ? '<span class="gl">LIVE</span><span class="gs">' + (x.f1 ? 'Starts ' : 'KO ') + esc(ko) + '</span>' : '<span class="gon">ON NOW</span><span class="gs">from ' + esc(clockStr(new Date(x.start))) + '</span>')
       : s === 2 && repNow ? '<span class="grp">REPLAY</span><span class="gs">' + (x.f1 ? 'Starts ' : 'KO ') + esc(ko) + '</span>'
       : s === 1 ? '<span class="gt">' + esc(ko) + '</span>' : '<span class="gp">Finished</span><span class="gs">' + (x.f1 ? 'Starts ' : 'KO ') + esc(ko) + '</span>';
     const sub = [x.comp, s === 0 && now < x.kick ? 'pre-match coverage on now' : '', s === 1 && early ? 'coverage from ' + clockStr(new Date(x.start)) : '',
