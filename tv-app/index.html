@@ -2327,7 +2327,7 @@ async function loadGuideV2(force) {
   if (S.screen === 'home') renderHome();
   if (S.screen === 'main' && isSearchPage(S.page)) { Q.skey = ''; Q.gkey = ''; renderMain(); }
 }
-setInterval(() => { if (S.screen !== 'player') loadGuideV2(false); }, 20 * 60000);
+setInterval(() => { if (S.screen !== 'player') { loadGuideV2(false); loadGuidesIndex(false); } }, 20 * 60000);
 /* How long an event lasts is the SERVER's answer now, published per event as `end` (see
    rcs-guide/resolve_v2.py's EVENT_HOURS_BY_SPORT and event_end_ts). This file used to guess -- a flat
    2.25h for everything, with a hardcoded two-name MULTIDAY_COMPS set bolted on for Test cricket -- and
@@ -2378,6 +2378,163 @@ function v2Events() {
          matching logic. Whether a local channel was actually found for any of these is irrelevant to
          what gets shown here: this is "who officially holds the rights", not "what's in your list". */
       rawChannels: e.channels || []});
+  }
+  return out;
+}
+
+/* ================= EPG/broadcaster-first guides (rcs-guide guides/*.json) =================
+   The other source in this file works fixture-first: take a list of matches, then try to work out who
+   is showing them. Everything downstream inherits that order's weakness -- 44.8% of guide-v2's events
+   had no channel at all, and the ones that did got a channel by inference.
+
+   These files invert it. The server reads the broadcasters' own published schedules, so channel, start
+   and stop are facts rather than guesses: every event in here has at least one real channel and a real
+   start/stop, which is why `confirmed` below is not wishful.
+
+   Two files, deliberately:
+     guides/index.json    -- every live event plus the next 24h across all sports, ~14 KB gzipped.
+                             Loaded on boot. This is what makes the Event Hub's default "All Sports"
+                             view populate instantly from ONE request instead of 16.
+     guides/<sport>.json  -- that sport's full 8-day list, fetched only when its chip is selected.
+   Raw sizes look alarming (index.json is 135 KB) and are irrelevant: Pages serves gzip, and fetching
+   even the four biggest sport files instead would be 261 KB. */
+const PRO_GUIDES_BASE = 'https://cracknback.github.io/rcs-guide/guides';
+const guidesBase = () => {
+  const v2 = guideV2Url();
+  /* sits next to whatever guide-v2.json the user actually points at, so a private build's own
+     published guides/ is found without a second setting to configure */
+  if (v2) return v2.replace(/\/guide-v2\.json.*$/, '') + '/guides';
+  return isProActive() ? PRO_GUIDES_BASE : '';
+};
+/* Server sport ids are not SPORT_GROUPS' ids -- the server splits what this app merges (boxing and mma
+   are one file) and spells two of them differently. Mapped explicitly rather than normalised by string
+   munging, because a silent miss here reads on screen as "that sport has nothing on". */
+const SPORT_SERVER = {soccer: ['soccer'], basketball: ['basketball'], icehockey: ['ice_hockey'],
+  baseball: ['baseball'], amfootball: ['am_football'], motorsport: ['motorsport'], tennis: ['tennis'],
+  golf: ['golf'], mma: ['boxing_mma'], boxing: ['boxing_mma'], rugby: ['rugby_union'], afl: ['afl'],
+  nrl: ['rugby_league'], cricket: ['cricket'], cycling: ['cycling']};
+const GUIDES = {index: null, sports: new Map(), busy: new Set(), bmap: null, bsig: '', bcache: null, err: ''};
+/* Cheap playlist fingerprint: the canonical broadcaster map below holds live channel references, so it
+   has to be rebuilt when the account's channel list changes, and reused when it hasn't. */
+const liveSig = () => { const it = (DATA.live && DATA.live.items) || []; return it.length ? it.length + ':' + it[0].id + ':' + it[it.length - 1].id : ''; };
+
+/* Requirement from the overhaul spec, and the whole reason this is cheap: resolve the ~131 canonical
+   broadcaster ids ONCE per playlist, not once per channel per event. v2Events() calls tsdbGroups() for
+   every channel row of every fixture -- measured at 20+ seconds of a ~30s pass on a real account before
+   it was given a cache. Here the entire question is answered by 131 lookups, because the server already
+   collapsed every regional and quality variant ("7mate Perth HD" -> au:7mate) into one id upstream.
+   Nothing is cloned into a Worker: structured-cloning 49,000 channel objects would cost far more than
+   the work it was meant to move off the main thread. */
+function canonBroadcasterMap() {
+  const sig = liveSig();
+  if (GUIDES.bmap && GUIDES.bsig === sig) return GUIDES.bmap;
+  const m = new Map();
+  const bs = (GUIDES.index && GUIDES.index.broadcasters) || [];
+  /* rehydrate from disk first -- stored as channel IDS, not objects, same round-trip tsdbCache needs
+     for the same reason (its values are live DATA.live references, not plain data) */
+  if (GUIDES.bcache && GUIDES.bcache.sig === sig && GUIDES.bcache.ids && bs.length) {
+    for (const [id, chIds, tier] of GUIDES.bcache.ids) {
+      const gs = chIds.map(i => DATA.live.byId.get(String(i))).filter(Boolean);
+      if (gs.length) m.set(id, {gs, tier});
+    }
+  }
+  if (!m.size && bs.length) {
+    for (const b of bs) {
+      const gs = tsdbGroups(b.name, b.country);
+      if (gs.length) m.set(b.id, {gs, tier: TSDB_GROUPS_TIER});
+    }
+    idb.set(acctKey('guidesBmap'), {sig, ids: [...m].map(([k, v]) => [k, v.gs.map(g => g.id), v.tier])}).catch(() => {});
+  }
+  GUIDES.bmap = m; GUIDES.bsig = sig;
+  memLog('guides: broadcaster map ' + m.size + '/' + bs.length + ' canonical ids resolved to local channels');
+  return m;
+}
+
+async function loadGuidesIndex(force) {
+  const base = guidesBase(); if (!base || GUIDES.busy.has('index')) return;
+  const key = 'guides:index:' + base;
+  if (!force && !GUIDES.index) { const c = await idb.get(key); if (c) GUIDES.index = c.data; }
+  if (!force && GUIDES.index && GUIDES.index._ts && Date.now() - GUIDES.index._ts < 20 * 60e3) return;
+  GUIDES.busy.add('index');
+  try {
+    const r = await fetch(base + '/index.json?t=' + Date.now());
+    if (!r.ok) throw new Error('error ' + r.status);
+    const j = await r.json();
+    const changed = !GUIDES.index || GUIDES.index.generated !== j.generated;
+    j._ts = Date.now();
+    GUIDES.index = j;
+    GUIDES.bmap = null;                      /* broadcaster list may have changed with it */
+    await idb.set(key, {data: j});
+    if (changed) EVENTS = null;
+    GUIDES.err = '';
+  } catch (e) { GUIDES.err = String((e && e.message) || e); }
+  GUIDES.busy.delete('index');
+  if (S.screen === 'home') renderHome();
+  else if (S.screen === 'main' && isSearchPage(S.page)) renderMain();
+}
+
+/* Lazy, per sport, cached in memory and on disk. Called when a sport chip is selected -- never on boot,
+   and never for all sports at once. */
+async function loadGuidesSport(sport, force) {
+  const base = guidesBase(); if (!base || !sport || GUIDES.busy.has(sport)) return;
+  const key = 'guides:sport:' + base + ':' + sport;
+  if (!force && !GUIDES.sports.has(sport)) { const c = await idb.get(key); if (c && c.data) GUIDES.sports.set(sport, c.data); }
+  const have = GUIDES.sports.get(sport);
+  if (!force && have && have._ts && Date.now() - have._ts < 20 * 60e3) return;
+  GUIDES.busy.add(sport);
+  try {
+    const r = await fetch(base + '/' + sport + '.json?t=' + Date.now());
+    if (!r.ok) throw new Error('error ' + r.status);
+    const j = await r.json();
+    const changed = !have || have.generated !== j.generated;
+    j._ts = Date.now();
+    GUIDES.sports.set(sport, j);
+    await idb.set(key, {data: j});
+    if (changed) EVENTS = null;
+  } catch (e) { /* additive: a sport file that won't load leaves index.json's 24h slice in place */ }
+  GUIDES.busy.delete(sport);
+  if (S.screen === 'main') renderMain();
+  else if (S.screen === 'home') renderHome();
+}
+/* Selecting a sport asks for its file; the 24h slice from index.json covers the view until it lands. */
+function guidesWant(groupId) { (SPORT_SERVER[groupId] || []).forEach(s => { loadGuidesSport(s, false); }); }
+
+/* Same output shape as v2Events()/fixtureEvents() so everything merges through one path in
+   buildEventsG with no parallel display logic to drift. */
+function guidesEvents() {
+  /* buildEventsG's caller catches and nulls EVENTS on any throw, which shows up as "nothing on" with
+     no error anywhere -- so the preconditions are checked rather than assumed. */
+  if (!GUIDES.index || !DATA || !DATA.live || !DATA.live.items || !DATA.live.byId) return [];
+  const bmap = canonBroadcasterMap(), byId = new Map();
+  /* A loaded sport file is the fuller copy of the same events (8 days vs 24 hours) and shares the
+     server's own id scheme, so it simply wins over index.json's slice. */
+  for (const f of GUIDES.sports.values()) for (const e of (f.events || [])) byId.set(e.id, e);
+  for (const e of (GUIDES.index.events || [])) if (!byId.has(e.id)) byId.set(e.id, e);
+  const out = [];
+  for (const e of byId.values()) {
+    const start = Date.parse(e.start), stop = Date.parse(e.end);
+    if (!start || !stop) continue;
+    const chans = [];
+    for (const bid of (e.broadcaster_ids || [])) {
+      const hit = bmap.get(bid); if (!hit) continue;
+      /* An exact or human-confirmed name match earns the same checkmark the app's own tap-time EPG
+         confirmation gets: the broadcaster's published schedule IS the evidence. A 'near'/'brand'
+         match is the uncertain step -- the event is still real, we are just less sure WHICH local feed
+         it is -- so those stay unconfirmed rather than borrowing trust they haven't earned. */
+      const sure = hit.tier === 'exact' || hit.tier === 'alias';
+      for (const g of hit.gs) {
+        if (chans.some(c => c.g.id === g.id)) continue;
+        chans.push({g, epg: '', start, kick: start, stop, lang: chLang(g), region: regionOf(g),
+          source: 'guides', confidence: sure ? 'confirmed' : 'likely', confirmed: sure, tier: hit.tier, kind: 'live'});
+      }
+    }
+    const label = e.home && e.away ? e.home + ' v ' + e.away : e.title;
+    out.push({key: 'g:' + e.id, fixture: true, status: '', label, comp: e.comp || '',
+      teams: e.home && e.away ? [e.home, e.away] : null, liveEvent: true, isEvent: true,
+      /* every one of these has a real published start and stop -- that is the point of the source */
+      timed: true, sportId: e.sport, shape: e.shape,
+      text: ' ' + norm(label + ' ' + (e.comp || '') + ' ' + e.title) + ' ',
+      kick: start, start, stop, chans, reps: [], pres: [], rawChannels: []});
   }
   return out;
 }
@@ -4525,6 +4682,22 @@ function* addNameEvents(out) {
     out.push(newEv); idxEv(newEv);
   }
   memLog('buildEvents: addNameEvents scanned=' + n + ' passedFilter=' + passedFilter + ' hadTeams=' + hadTeams + ' totalMs=' + (performance.now() - __t0).toFixed(0) + ' peCacheSize=' + peCache.size);
+  /* TEMPORARY (remove once addNameEvents is narrowed): which groups/categories actually survive the
+     filter above, and which of those ever yield a team pair. Narrowing this scan to a hardcoded list of
+     category names without first looking at the real ones is how a Boxing/UFC card goes missing, so the
+     list gets written from this output rather than from a guess about what the provider calls things. */
+  try {
+    const seen = new Map();
+    for (const g of DATA.live.items) {
+      if (g.g !== 'Sports' && !/\b(ppv|events?|match|epl|football|soccer|fight)\b/i.test(g.raw + ' ' + (DATA.live.catName.get(g.cat) || ''))) continue;
+      const k = (g.g || '?') + ' / ' + (DATA.live.catName.get(g.cat) || '?');
+      let r = seen.get(k); if (!r) { r = {n: 0, teams: 0}; seen.set(k, r); }
+      r.n++;
+      const inf = peCache.get(g.id); if (inf && inf.teams) r.teams++;
+    }
+    memLog('ANE-CATS total=' + seen.size + ' ' + [...seen.entries()].sort((a, b) => b[1].n - a[1].n).slice(0, 45)
+      .map(([k, v]) => k + '=' + v.n + '(' + v.teams + ')').join(' | '));
+  } catch (e) { memLog('ANE-CATS failed ' + e); }
   /* Fire-and-forget: persists the now-current cache so the NEXT app launch can load it back in
      applyData() instead of rebuilding from zero. Never awaited -- this is a background disk write,
      not something the render path (or this generator's own caller) should ever wait on. */
@@ -4874,6 +5047,37 @@ function* buildEventsG() {
     EVENTS = v2.concat(f1.filter(ev => !v2Comps.has(ev.comp)), out.filter(ev => !v2Comps.has(ev.comp) && !(f1.length && ev.comp === 'Formula 1')));
     memLog('buildEvents: v2-only merge done, EVENTS=' + EVENTS.length);
   }
+  /* The broadcaster-first events go in last, against whatever the two branches above produced, so this
+     one block serves both. Priority is deliberate and the opposite of how guide-v2 treats everything
+     else: where both sources describe the same match, the channels merge, but a fixture-first event
+     that found NO channel at all is dropped in favour of the broadcaster-first one, because "nobody is
+     showing this" was never true -- it was the fixture-first pipeline failing to find out who. That
+     single class of event was 44.8% of the old file. */
+  const __gdt0 = performance.now(), gd = guidesEvents();
+  if (gd.length) {
+    const pairKey = ev => { const s = ev.teams ? ev.teams.map(norm).slice().sort() : null; return s && s[0] && s[1] ? s.join('|') : ''; };
+    const byPair = new Map();
+    EVENTS.forEach(ev => { const k = pairKey(ev); if (k) (byPair.get(k) || byPair.set(k, []).get(k)).push(ev); });
+    const add = [], drop = new Set();
+    let merged = 0;
+    gd.forEach(g => {
+      const k = pairKey(g);
+      /* same two teams, same day: one game described twice */
+      const host = k ? (byPair.get(k) || []).find(ev => Math.abs(ev.kick - g.kick) < 12 * 3600e3) : null;
+      if (host) {
+        const have = new Map(host.chans.map((c, i) => [c.g.id, i]));
+        g.chans.forEach(c => mergeChan(host.chans, have, c));
+        merged++;
+        return;
+      }
+      add.push(g);
+      if (k) (byPair.get(k) || []).forEach(ev => { if (!ev.chans.length) drop.add(ev); });
+    });
+    if (add.length || drop.size) EVENTS = EVENTS.filter(ev => !drop.has(ev)).concat(add);
+    add.forEach(ev => { ev.chans = pruneBrandSiblings(ev.chans); });
+    memLog('buildEvents: guides merge done, guides=' + gd.length + ' merged=' + merged + ' added=' + add.length +
+      ' droppedEmpty=' + drop.size + ' EVENTS=' + EVENTS.length + ' totalMs=' + (performance.now() - __gdt0).toFixed(0));
+  }
 }
 const buildEvents = () => runSync(buildEventsG());
 let EVENTS_BUILDING = false;
@@ -4982,7 +5186,11 @@ const repOnNow = (ev, now) => evState(ev, now) === 2 && (ev.reps || []).some(r =
 function evRank(ev, now) { if (untimedEvent(ev)) return 3.5; const s = evState(ev, now); return s === 0 ? (ev.liveEvent ? 0 : 1) : s === 1 ? 3 : repOnNow(ev, now) ? 2 : 4; }
 function evState(ev, now) { if (ev.fixture) return fxState(ev, now); return ev.start <= now && (!ev.stop || ev.stop > now) ? 0 : ev.start > now ? 1 : 2; }
 function filteredEvents(f, q) {
-  if (!GUIDE && !FD.list.length) return [];
+  /* Used to be `if (!GUIDE && !FD.list.length) return []`, which made the provider EPG or
+     football-data a precondition for showing ANY event -- so a setup whose events come entirely from
+     the server (guide-v2.json, or guides/*.json now) displayed nothing anywhere while holding a
+     complete, fully-channelled event list. Each source stands on its own. */
+  if (!GUIDE && !FD.list.length && !GUIDE_V2 && !GUIDES.index) return [];
   /* Sports Hub / Search are the only hot render-path callers (resultList()) -- same non-blocking
      pattern as homeLives()/homeUpcoming(): don't drain buildEventsG() synchronously on the render path,
      builds in the background without blocking; ensureEventsAsync() re-renders when ready. This is what
@@ -5013,7 +5221,17 @@ function filteredEvents(f, q) {
      Owner-reported: "click on cricket...all cricket events should come under cricket." Matches the
      whole group's comp list instead of one exact name, same isEvent/fixture-only guard as the single-
      comp branch below. */
-  else if (f.startsWith('group:')) { const g = SPORT_GROUPS.find(s => s[0] === f.slice(6)), comps = g ? g[3] : []; l = l.filter(ev => comps.includes(ev.comp) && ev.isEvent && (ev.fixture || ev.teams || !FOOTBALL_COMPS.has(ev.comp))); }
+  /* "All <sport>" matched on the competition name alone, which the broadcaster-first events cannot
+     satisfy: only about half carry a comp at all, and a tournament session legitimately has none
+     ("DP World Tour", "Live Tennis: ATP Stockholm Open"). They do carry the server's own sport id, so
+     that counts as belonging to the sport too -- otherwise clicking Golf would show an empty list
+     while golf.json sat loaded in memory. Also asks for this sport's full 8-day file on the way past. */
+  else if (f.startsWith('group:')) {
+    const gid = f.slice(6), g = SPORT_GROUPS.find(s => s[0] === gid), comps = g ? g[3] : [];
+    const srv = new Set(SPORT_SERVER[gid] || []);
+    guidesWant(gid);
+    l = l.filter(ev => (comps.includes(ev.comp) || (ev.sportId && srv.has(ev.sportId))) && ev.isEvent && (ev.fixture || ev.teams || !FOOTBALL_COMPS.has(ev.comp)));
+  }
   else l = l.filter(ev => ev.comp === f && ev.isEvent && (ev.fixture || ev.teams || !FOOTBALL_COMPS.has(f)) && (!FD_NAMES.has(f) || !FD.list.length || ev.fixture));   /* a football tab shows games: a listing with two teams, never a magazine or highlights show */
   return l.sort((a, b) => { const sa = evRank(a, now), sb = evRank(b, now); return sa - sb || (sa === 4 ? b.kick - a.kick : a.kick - b.kick); }).slice(0, 400);
 }
@@ -5221,6 +5439,10 @@ function homeCards() {
 function openHome() {
   if (!LG_PROBED) probeIcons();
   loadGuideV2(false);   /* no key needed -- it's a small published file, unlike the others below */
+  /* ~14 KB gzipped, and it is what makes the Home banner and the default "All Sports" view populate
+     from one request. The per-sport files are NOT fetched here -- only when a sport is selected. */
+  loadGuidesIndex(false);
+  if (!GUIDES.bcache) idb.get(acctKey('guidesBmap')).then(c => { if (c) GUIDES.bcache = c; });
   if (ui.fdKey) loadFixtures(false);
   loadF1(false);
   if (ui.tsdbKey) loadTsdb(false);
@@ -5320,7 +5542,10 @@ function significance(ev, now) {
 /* the games being played right now, from the fixture lists */
 function homeLives() {
   try {
-    if (!DATA || !(FD.list.length || F1.list.length)) return [];
+    /* Same correction as filteredEvents': football-data or F1 was a precondition for the Home
+       banner showing anything at all, so a server-sourced event list -- including the
+       broadcaster-first one, which always has real channels -- left Home blank. */
+    if (!DATA || !(FD.list.length || F1.list.length || GUIDE_V2 || GUIDES.index)) return [];
     if (!EVENTS) { ensureEventsAsync(); return []; }   /* builds in the background without blocking; renderHome() re-runs when ready */
     const now = nowMs(), order = chipsList(), rk = ev => { const k = order.indexOf(ev.comp); return k < 0 ? 99 : k; };
     /* A fixture can be genuinely live (status correct) with zero channels actually matched to it --
@@ -5400,7 +5625,10 @@ function homeReplays() {
 /* games starting in the next couple of days (shown when nothing is live) */
 function homeUpcoming() {
   try {
-    if (!DATA || !(FD.list.length || F1.list.length)) return [];
+    /* Same correction as filteredEvents': football-data or F1 was a precondition for the Home
+       banner showing anything at all, so a server-sourced event list -- including the
+       broadcaster-first one, which always has real channels -- left Home blank. */
+    if (!DATA || !(FD.list.length || F1.list.length || GUIDE_V2 || GUIDES.index)) return [];
     if (!EVENTS) { ensureEventsAsync(); return []; }   /* builds in the background without blocking; renderHome() re-runs when ready */
     const now = nowMs(), order = chipsList(), rk = ev => { const k = order.indexOf(ev.comp); return k < 0 ? 99 : k; };
     /* same widening as homeLives()/homeReplays() -- a guide-built event not yet airing is just an
@@ -7410,7 +7638,7 @@ async function showPage(p) {
   $('page-browse').classList.toggle('hidden', !browse);
   $('page-search').classList.toggle('hidden', !isSearchPage(p));
   $('page-settings').classList.toggle('hidden', p !== 'settings');
-  if (isSearchPage(p)) loadGuideV2(false);
+  if (isSearchPage(p)) { loadGuideV2(false); loadGuidesIndex(false); }
   if (isSearchPage(p) && ui.fdKey) loadFixtures(false);
   if (isSearchPage(p)) loadF1(false);
   if (isSearchPage(p) && ui.tsdbKey) loadTsdb(false);
