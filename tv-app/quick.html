@@ -4019,7 +4019,7 @@ function askRemoveChip(c) {
   openMenu([{l: 'Remove the “' + c.l + '” tab', a: () => removeChip(c)}, {l: 'Keep it', a: () => renderMain()}]);
 }
 function removeChip(c) {
-  if (!c || c.id === 'add') return;
+  if (!c || c.id === 'add' || c.id.indexOf('group:') === 0) return;   /* sport chips (top-level or "All <Sport>") aren't pinned shortcuts -- nothing to remove */
   ui.chips = chipsList().filter(x => x !== c.id);
   save('sp_ui', ui);
   Q.chip = Math.max(0, Math.min(Q.chip, ui.chips.length - 1));
@@ -5429,10 +5429,11 @@ const HOME = {zone: 'tiles', tile: 2, cards: [], cardKind: '', liveIdx: 0, fade:
    hand. The hlive box already sits one DOWN-press below this carousel, so it's not meaningfully harder
    to reach; a real dedicated page is worth doing later, with time to test it properly, not bolted on
    in a hurry. */
-const HOME_TILES = [['settings', 'Settings'], ['search', 'Search'], ['live', 'Live TV'], ['vod', 'Movies'], ['series', 'TV Series'], ['favs', 'Favourites']];
-/* "Continue" only shows up once there's something to resume -- appended at the end so it never
-   shifts the indices of the six tiles above (HOME.tile's default stays pointing at Live TV). */
-function homeTiles() { return continueWatchingList().length ? HOME_TILES.concat([['cont', 'Continue']]) : HOME_TILES; }
+/* "Continue" is always the 7th tile now (owner-requested 2026-11-12: a fixed seven-card carousel,
+   not one that grows/shrinks whether there's anything to resume) -- kept last so it never shifts the
+   indices of the six tiles before it (HOME.tile's default stays pointing at Live TV). */
+const HOME_TILES = [['settings', 'Settings'], ['search', 'Search'], ['live', 'Live TV'], ['vod', 'Movies'], ['series', 'TV Series'], ['favs', 'Favourites'], ['cont', 'Continue']];
+function homeTiles() { return HOME_TILES; }
 function homeDetail(id) {
   if (!DATA) return '';
   const n = x => x.toLocaleString();
@@ -5441,7 +5442,7 @@ function homeDetail(id) {
   if (id === 'search') return 'Channels, movies, series';
   if (id === 'vod') { const c = specialList('vod', '__cont').length; return c ? c + ' to continue' : DATA.vod.fetched ? n(DATA.vod.items.length) + ' movies' : 'Movies'; }
   if (id === 'series') { const c = specialList('series', '__cont').length; return c ? c + ' to continue' : DATA.series.fetched ? n(DATA.series.items.length) + ' series' : 'Series'; }
-  if (id === 'cont') { const c = continueWatchingList().length; return c + (c === 1 ? ' title' : ' titles') + ' to resume'; }
+  if (id === 'cont') { const c = continueWatchingList().length; return c ? c + (c === 1 ? ' title' : ' titles') + ' to resume' : 'Nothing yet'; }
   return 'Account and display';
 }
 /* the strip: live games from your sports (shortcuts and teams); otherwise things to continue watching */
@@ -5486,12 +5487,15 @@ const LG_OWN = {
   'Formula 1': 'lg-open-wheel-racing.png', 'F1': 'lg-open-wheel-racing.png', 'IndyCar': 'lg-open-wheel-racing.png', 'MotoGP': 'lg-motor-racing.png', 'NASCAR': 'lg-motor-racing.png',
   'ATP Tour': 'lg-tennis.png', 'WTA Tour': 'lg-tennis.png', 'PGA Tour': 'lg-golf.png', 'European Tour': 'lg-golf.png', 'UFC': 'lg-mma.png', 'Boxing': 'lg-boxing.png'
 };
-const LG_SLUG = c => LG_OWN[c] || 'lg-' + String(c).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.png';   /* a league shows an icon only if its own file exists */
+/* a 'group:' id's icon is the sport's own SPORT_GROUPS art (same file the Home carousel's Sport
+   Selector already shows for it) -- not the generic comp-name slug guess below, which would mangle
+   "group:motorsport" into a nonexistent "group-motorsport.png". */
+const LG_SLUG = c => { if (String(c).indexOf('group:') === 0) { const g = SPORT_GROUPS.find(s => s[0] === c.slice(6)); return g ? g[2] : ''; } return LG_OWN[c] || 'lg-' + String(c).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.png'; };   /* a league shows an icon only if its own file exists */
 const LG_OK = new Set();
 let LG_PROBED = false;
 function probeIcons() {
   LG_PROBED = true;
-  Object.keys(LG_OWN).concat(DEFAULT_CHIPS, chipsList()).forEach(c => {
+  Object.keys(LG_OWN).concat(DEFAULT_CHIPS, chipsList(), SPORT_GROUPS.map(g => 'group:' + g[0])).forEach(c => {
     if (String(c).startsWith('team:') || LG_OK.has(c)) return;
     const im = new Image();
     im.onload = () => { LG_OK.add(c); Q.fsig = ''; if (S.screen === 'home') renderHome(); };
@@ -5871,7 +5875,12 @@ function homeOpenTile(i) {
   showPage(id);
 }
 function homeOpenSearch(id) {
-  Q.sportGroup = '';
+  /* id is always a single competition here (the Sport Selector popup's per-league item, picked over
+     "All <Sport>" -- that one goes through homeOpenSportGroupAll instead). Land inside that
+     competition's own sport group, not at the top-level sport list, so the sub-chip row (and the
+     "← All sports" way back) is there to switch to a sibling competition or back out. */
+  const g = id ? SPORT_GROUPS.find(s => s[3].includes(id)) : null;
+  Q.sportGroup = g ? g[0] : '';
   if (id) { Q.sport = id; const k = sportChips().findIndex(c => c.id === id); if (k >= 0) Q.chip = k; Q.skey = ''; }
   show('main'); S.zone = id ? 'chips' : 'qbox'; showPage('sportshub'); if (id) { S.zone = 'chips'; renderMain(); }
 }
@@ -7619,7 +7628,7 @@ function renderHints() {
   else if (z === 'qbox') h = [['OK', 'Type'], ['▶', 'Clear'], ['▼', 'Shortcuts']];
   else if (z === 'qclear') h = [['OK', 'Clear the search'], ['◀', 'Back to the box']];
   else if (z === 'kb') h = [['OK', 'Type'], ['0–9', 'Numbers'], ['▶', 'Results'], ['Back', 'Menu']];
-  else if (z === 'chips') h = Q.lift && !Q.text ? [['◀ ▶', 'Move tab'], ['▲', 'Remove tab'], ['OK', 'Put it down']] : [['◀ ▶', 'Choose'], ['OK', Q.text ? 'Results' : 'Move or remove'], ['▼', 'Results']];
+  else if (z === 'chips') h = [['◀ ▶', 'Choose'], ['OK', 'Results'], ['▼', 'Results']];
   else if (z === 'results') h = [['OK', 'Open'], ['red', 'Favourite'], ['Back', 'Shortcuts']];
   else h = [['OK', 'Select'], ['Back', 'Menu']];
   $('hints').innerHTML = hintsHtml(h);
@@ -7732,7 +7741,7 @@ KB.push([{l: 'Type on your phone', a: 'phone', s: 3}, {l: 'TV keyboard or voice'
 const CHIPS = [['all', 'All'], ['games', 'Games'], ['live', 'Live TV'], ['vod', 'Movies'], ['series', 'Series']];
 const TORD = {live: 0, vod: 1, series: 2};
 const Q = {text: '', filter: 'all', all: [], res: [], counts: {}, item: 0, chip: 0, kbR: 0, kbC: 0, token: 0, last: null, busy: false, deb: 0, ver: 0, toks: [],
-  kb: false, sport: (ui.chips && ui.chips[0]) || 'Premier League', games: [], gkey: '', slist: [], skey: '', sportGroup: ''};
+  kb: false, sport: 'group:soccer', games: [], gkey: '', slist: [], skey: '', sportGroup: ''};
 
 function keyAt(row, col) { let c = 0; for (let i = 0; i < row.length; i++) { if (col < c + row[i].s) return i; c += row[i].s; } return row.length - 1; }
 function startOf(row, ki) { let c = 0; for (let i = 0; i < ki; i++) c += row[i].s; return c; }
@@ -7753,9 +7762,15 @@ function sportChips() {
       return comps.concat([{id: 'allsports', l: '← All sports'}]);
     }
   }
-  const c = chipsList().map(id => ({id, l: chipLabel(id)}));
-  c.push({id: 'add', l: '＋ Add'});
-  return c;
+  /* Owner-requested 2026-11-12: the top-level row was one chip per COMPETITION (37 of them via
+     +Add/chipsList -- "English Football", "English Football (Cup)", "English Football (League Cup)"...
+     "the list now is endless"). Top level is now one chip per SPORT (SPORT_GROUPS, ~15 of them --
+     "tennis, cycling, golf, rugby, etc"), same list the Home carousel's Sport Selector already uses.
+     Picking one drills straight into that sport (see pickChip's 'group:' handling below) -- no more
+     +Add/pin management needed here since every sport is already on the row; chipsList()/ui.chips still
+     exists for Home banner priority ordering (Settings > Edit search shortcuts), just no longer drives
+     this tab row. */
+  return SPORT_GROUPS.map(g => ({id: 'group:' + g[0], l: g[1]}));
 }
 function searchChips() {
   /* Sports Hub keeps the sport-shortcut chips when nothing's typed; generic Search starts blank -- no
@@ -7922,11 +7937,11 @@ function renderSearch() {
   Q.chip = Math.min(Q.chip, chips.length - 1);
   const lifted = !!Q.lift && S.zone === 'chips' && !Q.text && !!chips[Q.chip] && chips[Q.chip].id !== 'add';
   if (!lifted) Q.lift = false;
-  $('chips').innerHTML = chips.map((c, i) => '<button class="chip' + (c.id === active ? ' on' : '') + (S.zone === 'chips' && Q.chip === i ? ' focus' : '') + (lifted && Q.chip === i ? ' lift' : '') + '" data-i="' + i + '"' + (!Q.text && c.id !== 'add' ? ' draggable="true"' : '') + '>' +
+  $('chips').innerHTML = chips.map((c, i) => '<button class="chip' + (c.id === active ? ' on' : '') + (S.zone === 'chips' && Q.chip === i ? ' focus' : '') + (lifted && Q.chip === i ? ' lift' : '') + '" data-i="' + i + '"' + (!Q.text && c.id !== 'add' && c.id.indexOf('group:') !== 0 ? ' draggable="true"' : '') + '>' +
     (lifted && Q.chip === i ? '<span class="lf" data-lf="-1">◀</span>' : '') +
     (LG_OK.has(c.id) ? '<img class="tabi" src="' + LG_SLUG(c.id) + '" alt="">' : '') + esc(c.l) + (c.n != null ? '<span class="c">' + c.n.toLocaleString() + '</span>' : '') +
     (lifted && Q.chip === i ? '<span class="lf" data-lf="1">▶</span>' : '') +
-    (S.zone === 'chips' && Q.chip === i && !Q.text && !Q.sportGroup && c.id !== 'add' ? '<span class="cx" title="Remove">✕</span>' : '') + '</button>').join('');
+    (S.zone === 'chips' && Q.chip === i && !Q.text && !Q.sportGroup && c.id !== 'add' && c.id.indexOf('group:') !== 0 ? '<span class="cx" title="Remove">✕</span>' : '') + '</button>').join('');
   const list = resultList();
   Q.item = Math.min(Q.item, Math.max(0, list.length - 1));
   if (list.length && !selectable(list[Q.item])) { const j = stepRes(list, Q.item, 1); Q.item = j >= 0 ? j : Math.max(0, stepRes(list, Q.item, -1)); }
@@ -8063,6 +8078,20 @@ function pickChip(c) {
   if (Q.text) { Q.filter = c.id; applyFilter(); }
   else { Q.sport = c.id; Q.item = 0; resView.reset(); renderMain(); }
 }
+/* Drilling into a top-level sport chip's own sub-row -- "All <Sport>" first (already merged, see
+   filteredEvents' 'group:' branch) plus its individual competitions and a "← All sports" way back --
+   is a deliberate second step, never a side effect of merely passing over the chip while arrowing
+   across the row (owner-reported: arrowing from Soccer toward Motorsport kept getting diverted into
+   every sport's sub-menu along the way, because LEFT/RIGHT call pickChip on every single step, and
+   drilling-in used to happen there too). Only reachable by activating a chip that's already the
+   selected one -- same place homeOpenSportGroupAll's popup used to be the only door to this reveal. */
+function tryDrillIn(c) {
+  if (!c || Q.sportGroup || c.id.indexOf('group:') !== 0) return false;
+  const g = SPORT_GROUPS.find(s => s[0] === c.id.slice(6));
+  if (!g || g[3].length <= 1) return false;
+  Q.sportGroup = g[0]; Q.chip = 0; resView.reset(); renderMain();
+  return true;
+}
 /* A sport icon with just one competition (Basketball -> NBA, Boxing -> Boxing...) goes straight there --
    nothing to choose. One with several (Soccer's 18 leagues, Motorsport's 4...) offers each league by
    name first, "All <sport>" last for everything in that sport together -- picking a specific league is
@@ -8188,14 +8217,16 @@ function searchKey(k, e) {
       const l = resultList(); if (l.length) { S.zone = 'results'; Q.item = Math.max(0, stepRes(l, -1, 1)); } else return;
     }
     /* OK applies a chip the arrows have only moved focus to. Without this the focus-only rule above
-       would leave no way at all to choose a competition from a lower row. */
+       would leave no way at all to choose a competition from a lower row. The top-level row is now a
+       fixed sport list (see sportChips()), nothing left to reorder there, so OK always just picks --
+       no more "lift to reorder" detour at top level. */
     else if (k === KEY.ENTER) {
       if (chips[Q.chip] && (chips[Q.chip].id === 'add' || chips[Q.chip].id === 'allsports')) { pickChip(chips[Q.chip]); return; }
-      if (chips[Q.chip] && Q.sportGroup && chips[Q.chip].id !== (Q.text ? Q.filter : Q.sport)) { pickChip(chips[Q.chip]); return; }
-      if (!Q.text && !Q.sportGroup) { Q.lift = true; renderMain(); return; }
+      if (chips[Q.chip] && chips[Q.chip].id !== (Q.text ? Q.filter : Q.sport)) { pickChip(chips[Q.chip]); return; }
+      if (chips[Q.chip] && tryDrillIn(chips[Q.chip])) return;
       if (resultList().length) S.zone = 'results';
     }
-    else if ((k === 46 || k === KEY.BKSP) && !Q.text && !Q.sportGroup) { removeChip(chips[Q.chip]); return; }
+    else if ((k === 46 || k === KEY.BKSP) && !Q.text && !Q.sportGroup && chips[Q.chip] && chips[Q.chip].id.indexOf('group:') !== 0) { removeChip(chips[Q.chip]); return; }
     else return;
     renderMain(); return;
   }
@@ -9792,7 +9823,7 @@ function optItems() {
   if (sc === 'player' && HAS_MPV && cur() && !MPV.on) it.push({l: 'Open in the mpv player (if there’s no sound or picture)', a: () => { const c = cur(); main.stop(); playMpv(c, c.t === 'live' ? 0 : NV._t || video.currentTime || 0); }});
   if (sc === 'main' && S.page === 'sportshub' && S.zone === 'chips' && !Q.text) {
     const c = searchChips()[Q.chip];
-    if (c && c.id !== 'add') it.push({l: 'Remove the “' + c.l + '” shortcut', a: () => removeChip(c)});
+    if (c && c.id !== 'add' && c.id.indexOf('group:') !== 0) it.push({l: 'Remove the “' + c.l + '” shortcut', a: () => removeChip(c)});
   }
   if (sc === 'login') {
     /* the phone page shows this back as "Typing into: <label>" -- the one way you can tell, on the
@@ -10384,9 +10415,9 @@ $('hero-versions').addEventListener('click', () => { if (HERO_IT) openItem(HERO_
    pages (open the sidebar) -- see #page-browse.rowsfocus, which is what collapses it out of the way. */
 $('b-catbtn').addEventListener('click', () => { S.zone = 'cats'; renderMain(); });
 $('rlist').addEventListener('click', e => { const i = idxOf(e); if (i < 0 || !selectable(resultList()[i])) return; Q.item = i; S.zone = 'results'; openResult(resultList()[i]); });
-$('chips').addEventListener('click', e => { const i = idxOf(e); if (i < 0) return; const c = searchChips()[i]; if (e.target.classList && e.target.classList.contains('cx')) { removeChip(c); return; } if (e.target.classList && e.target.classList.contains('lf')) { Q.chip = i; moveChip(Number(e.target.getAttribute('data-lf'))); return; } Q.chip = i; S.zone = 'chips'; Q.lift = false; pickChip(c); });
+$('chips').addEventListener('click', e => { const i = idxOf(e); if (i < 0) return; const c = searchChips()[i]; if (e.target.classList && e.target.classList.contains('cx')) { removeChip(c); return; } if (e.target.classList && e.target.classList.contains('lf')) { Q.chip = i; moveChip(Number(e.target.getAttribute('data-lf'))); return; } Q.chip = i; S.zone = 'chips'; Q.lift = false; if (c && c.id === (Q.text ? Q.filter : Q.sport) && tryDrillIn(c)) return; pickChip(c); });
 /* drag a tab to a new place with the mouse: drop it on the tab whose spot you want */
-$('chips').addEventListener('dragstart', e => { const i = idxOf(e), c = i >= 0 ? searchChips()[i] : null; if (!c || c.id === 'add' || Q.text) { e.preventDefault(); return; } Q.drag = c.id; e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', c.id); } catch (x) { } setTimeout(() => { const b = $('chips').querySelector('.chip[data-i="' + i + '"]'); if (b) b.classList.add('dragging'); }, 0); });
+$('chips').addEventListener('dragstart', e => { const i = idxOf(e), c = i >= 0 ? searchChips()[i] : null; if (!c || c.id === 'add' || c.id.indexOf('group:') === 0 || Q.text) { e.preventDefault(); return; } Q.drag = c.id; e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', c.id); } catch (x) { } setTimeout(() => { const b = $('chips').querySelector('.chip[data-i="' + i + '"]'); if (b) b.classList.add('dragging'); }, 0); });
 $('chips').addEventListener('dragover', e => { if (!Q.drag) return; e.preventDefault(); const el = e.target.closest('.chip'); $('chips').querySelectorAll('.chip.dragover').forEach(x => { if (x !== el) x.classList.remove('dragover'); }); if (el && !el.classList.contains('dragging')) el.classList.add('dragover'); });
 $('chips').addEventListener('drop', e => {
   e.preventDefault();
@@ -10410,7 +10441,7 @@ $('chips').addEventListener('pointerdown', e => {
   if (e.pointerType !== 'touch') return;
   const i = idxOf(e), c = i >= 0 ? searchChips()[i] : null;
   clearTimeout(chipTouchT);
-  if (!c || c.id === 'add' || Q.text) return;
+  if (!c || c.id === 'add' || c.id.indexOf('group:') === 0 || Q.text) return;
   chipTouchT = setTimeout(() => {
     chipTouchId = c.id; Q.drag = c.id;
     const b = $('chips').querySelector('.chip[data-i="' + i + '"]'); if (b) b.classList.add('dragging');
