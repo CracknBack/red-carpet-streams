@@ -568,8 +568,6 @@ html.phone .hwrap{bottom:0;padding:2rem 3rem 0}
 .chip{padding:.7rem 1.4rem;border:0;border-radius:.6rem;background:none;font-size:2rem;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;box-shadow:inset 0 -.3rem 0 transparent}
 .chip .c{margin-left:.6rem;font-size:1.5rem;font-weight:500;opacity:.75}
 .chip.on{color:#fff;box-shadow:inset 0 -.3rem 0 var(--amber)}
-.chip .cx{margin-left:1rem;font-size:1.5rem;opacity:.85;padding:0 .3rem;border-radius:.3rem}
-.chip .cx:hover{color:#FFB4A8;opacity:1}
 .chip.focus{background:rgba(160,28,42,.55);color:#fff}
 #chips{border-bottom:.15rem solid var(--line)}
 .row.r{height:8.4rem}
@@ -1107,7 +1105,6 @@ html.light .row-head{color:#3A1D18}
 html.light .srchrow.focus{color:#3A1D18}
 html.light .k.focus{color:#3A1D18}
 html.light .chip.on{color:#3A1D18}
-html.light .chip .cx:hover{color:#8A5A1C}
 html.light .gmsearch{background:rgba(252,248,238,0.85)}
 html.light .srow.danger{color:#8A5A1C}
 html.light .srow .v.gold{color:#8A5A1C}
@@ -4038,14 +4035,36 @@ function addSportEntry(id) {
   Q.sport = g ? 'group:' + id : id;
   Q.chip = sportChips().findIndex(c => c.id === Q.sport); Q.skey = ''; resView.reset(); renderMain();
 }
+/* "every sport, a tick or no tick next to each" (owner-requested 2026-11-13) -- a sport counts as
+   ticked if its whole-sport chip OR any one of its specific pinned leagues is present, and unticking
+   removes whichever of those this sport actually has. Replaces the inline ✕ on the chip row itself
+   (removed below) as the one place to add or remove, several at a time without reopening the menu --
+   see runOpt's `toggle` handling. */
+function sportEntryIds(g) { return [g[0]].concat(g[3]); }
+function sportHasEntry(g) { return sportEntryIds(g).some(id => sportChipIds().includes(id)); }
+function untickSport(g) {
+  const ids = sportChipIds(), present = sportEntryIds(g).filter(id => ids.includes(id));
+  if (!present.length) return;
+  if (ids.length <= present.length) { toast('Keep at least one sport or league on the tab row.'); return; }
+  ui.sportChips = ids.filter(id => !present.includes(id));
+  save('sp_ui', ui);
+  Q.chip = Math.max(0, Math.min(Q.chip, sportChips().length - 1));
+  Q.sport = sportChips()[Q.chip] ? sportChips()[Q.chip].id : '';
+  Q.skey = ''; resView.reset(); renderMain();
+}
 function askAddSportChip() {
-  const items = SPORT_GROUPS.map(g => ({l: g[1], a: () => {
+  /* owner-requested 2026-11-13: "an obvious symbol that there is a secondary list" -- a sport with more
+     than one competition doesn't just toggle on/off, picking it (while unticked) opens a second list to
+     choose which league; the trailing "›" marks that distinction up front rather than people finding out
+     only after pressing OK. */
+  const items = SPORT_GROUPS.map(g => ({l: g[1] + (g[3].length > 1 ? '  ›' : ''), checked: () => sportHasEntry(g), toggle: true, a: () => {
+    if (sportHasEntry(g)) { untickSport(g); return; }
     if (g[3].length <= 1) { addSportEntry(g[0]); return; }
-    const subItems = [{l: 'All ' + g[1], a: () => addSportEntry(g[0])}]
-      .concat(g[3].slice().sort((a, b) => compLabel(a).localeCompare(compLabel(b))).map(c => ({l: compLabel(c), a: () => addSportEntry(c)})));
+    const subItems = [{l: 'All ' + g[1], a: () => { addSportEntry(g[0]); askAddSportChip(); }}]
+      .concat(g[3].slice().sort((a, b) => compLabel(a).localeCompare(compLabel(b))).map(c => ({l: compLabel(c), a: () => { addSportEntry(c); askAddSportChip(); }})));
     openMenu(subItems, {title: g[1]});
   }}));
-  openMenu(items, {title: 'Add a sport or league'});
+  openMenu(items, {title: 'Sports & leagues shown'});
 }
 function askRemoveChip(c) {
   Q.lift = false;
@@ -8089,7 +8108,10 @@ function renderSearch() {
     (lifted && Q.chip === i ? '<span class="lf" data-lf="-1">◀</span>' : '') +
     (LG_OK.has(c.id) ? '<img class="tabi" src="' + LG_SLUG(c.id) + '" alt="">' : '') + esc(c.l) + (c.n != null ? '<span class="c">' + c.n.toLocaleString() + '</span>' : '') +
     (lifted && Q.chip === i ? '<span class="lf" data-lf="1">▶</span>' : '') +
-    (S.zone === 'chips' && Q.chip === i && !Q.text && !Q.sportGroup && c.id !== 'add' ? '<span class="cx" title="Remove">✕</span>' : '') + '</button>').join('');
+    /* no inline ✕ here any more (owner-requested 2026-11-13: confusing on a bare D-pad remote, which
+       has no cursor to click it with) -- add/remove now lives entirely in the "+ Add" tick-list
+       (askAddSportChip), reachable the same way regardless of input device. */
+    '</button>').join('');
   const list = resultList();
   Q.item = Math.min(Q.item, Math.max(0, list.length - 1));
   if (list.length && !selectable(list[Q.item])) { const j = stepRes(list, Q.item, 1); Q.item = j >= 0 ? j : Math.max(0, stepRes(list, Q.item, -1)); }
@@ -10048,7 +10070,12 @@ function openOpts() {
 function closeOpts() { OPT.open = false; $('opts').classList.add('hidden'); }
 function renderOpts() {
   $('opts').classList.remove('hidden');
-  $('opts-list').innerHTML = OPT.items.map((o, i) => '<div class="row' + (i === OPT.i ? ' focus' : '') + '" data-i="' + i + '"><span class="name">' + esc(o.l) + '</span></div>').join('');
+  /* o.checked, when present, marks this a tick-list row -- the ✓/empty box shows current membership,
+     and (see runOpt) picking one toggles it and re-renders this SAME list instead of closing, so
+     several can be ticked in one visit instead of reopening the menu per pick. */
+  $('opts-list').innerHTML = OPT.items.map((o, i) => '<div class="row' + (i === OPT.i ? ' focus' : '') + '" data-i="' + i + '">' +
+    (o.checked ? '<span class="tick">' + (o.checked() ? '☑' : '☐') + '</span>' : '') +
+    '<span class="name">' + esc(o.l) + '</span></div>').join('');
   /* a long menu (e.g. every competition not already a chip, or a sport's full league list) can run well
      past .obox's own 80vh cap -- on a remote, with no mouse to scroll, the focused row has to be
      carried into view itself or moving past the first screenful is just invisible. */
@@ -10056,8 +10083,10 @@ function renderOpts() {
   if (el) el.scrollIntoView({block: 'nearest'});
 }
 function runOpt(i) {
-  const o = OPT.items[i]; closeOpts();
-  if (!o) return;
+  const o = OPT.items[i];
+  if (!o) { closeOpts(); return; }
+  if (o.toggle) { o.a(); renderOpts(); return; }
+  closeOpts();
   if (o.a) o.a(); else handleKey(o.k, fakeEv());
 }
 function optsKey(k) {
@@ -10579,7 +10608,7 @@ $('hero-versions').addEventListener('click', () => { if (HERO_IT) openItem(HERO_
    pages (open the sidebar) -- see #page-browse.rowsfocus, which is what collapses it out of the way. */
 $('b-catbtn').addEventListener('click', () => { S.zone = 'cats'; renderMain(); });
 $('rlist').addEventListener('click', e => { const i = idxOf(e); if (i < 0 || !selectable(resultList()[i])) return; Q.item = i; S.zone = 'results'; openResult(resultList()[i]); });
-$('chips').addEventListener('click', e => { const i = idxOf(e); if (i < 0) return; const c = searchChips()[i]; if (e.target.classList && e.target.classList.contains('cx')) { removeChip(c); return; } if (e.target.classList && e.target.classList.contains('lf')) { Q.chip = i; moveChip(Number(e.target.getAttribute('data-lf'))); return; } Q.chip = i; S.zone = 'chips'; Q.lift = false; if (c && c.id === (Q.text ? Q.filter : Q.sport) && tryDrillIn(c)) return; pickChip(c); });
+$('chips').addEventListener('click', e => { const i = idxOf(e); if (i < 0) return; const c = searchChips()[i]; if (e.target.classList && e.target.classList.contains('lf')) { Q.chip = i; moveChip(Number(e.target.getAttribute('data-lf'))); return; } Q.chip = i; S.zone = 'chips'; Q.lift = false; if (c && c.id === (Q.text ? Q.filter : Q.sport) && tryDrillIn(c)) return; pickChip(c); });
 /* drag a tab to a new place with the mouse: drop it on the tab whose spot you want */
 $('chips').addEventListener('dragstart', e => { const i = idxOf(e), c = i >= 0 ? searchChips()[i] : null; if (!c || c.id === 'add' || c.id.indexOf('group:') === 0 || Q.text) { e.preventDefault(); return; } Q.drag = c.id; e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', c.id); } catch (x) { } setTimeout(() => { const b = $('chips').querySelector('.chip[data-i="' + i + '"]'); if (b) b.classList.add('dragging'); }, 0); });
 $('chips').addEventListener('dragover', e => { if (!Q.drag) return; e.preventDefault(); const el = e.target.closest('.chip'); $('chips').querySelectorAll('.chip.dragover').forEach(x => { if (x !== el) x.classList.remove('dragover'); }); if (el && !el.classList.contains('dragging')) el.classList.add('dragover'); });
