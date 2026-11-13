@@ -2530,8 +2530,14 @@ function guidesEvents() {
       }
     }
     const label = e.home && e.away ? e.home + ' v ' + e.away : e.title;
+    /* Most of this feed never gets structured home/away from the server (confirmed live: 94% of the
+       soccer file), so without this fallback those events can never be found as a merge target or
+       merge into one -- every country's broadcaster-first listing for the same real match stays its own
+       separate card forever (confirmed live: searching "Croatia" surfaced 9 separate England-v-Croatia
+       cards, one per broadcaster/language, that could never fold into each other). */
+    const teams = e.home && e.away ? [e.home, e.away] : guideTeamsFromTitle(e.title);
     out.push({key: 'g:' + e.id, fixture: true, status: '', label, comp: e.comp || '',
-      teams: e.home && e.away ? [e.home, e.away] : null, liveEvent: true, isEvent: true,
+      teams, liveEvent: true, isEvent: true,
       /* every one of these has a real published start and stop -- that is the point of the source */
       timed: true, sportId: e.sport, shape: e.shape,
       text: ' ' + norm(label + ' ' + (e.comp || '') + ' ' + e.title) + ' ',
@@ -3969,6 +3975,12 @@ const SPORT_GROUPS = [
      added -- matching art needs to come from the owner the same way the rest of this set did. */
   ['cycling', 'Cycling', 'lg-cycling.png', ['Cycling']]
 ];
+/* Owner-requested 2026-11-13: showing all ~15 sports at once on first open was "too many" -- a curated
+   starting six, with the rest reachable via the same +Add/remove pattern COMPS already uses for Home
+   banner shortcuts (addChip/removeChip below), just on this separate list (ui.sportChips) so picking a
+   sport to show/hide here can never collide with that unrelated, still-in-use one. */
+const DEFAULT_SPORT_CHIPS = ['soccer', 'basketball', 'amfootball', 'baseball', 'tennis', 'golf'];
+const sportChipIds = () => ui.sportChips || DEFAULT_SPORT_CHIPS;
 function parseShortcut(x) {
   const n = norm(x);
   if (!n) return '';
@@ -4014,16 +4026,42 @@ function moveChip(dir) {
   [list[at], list[to]] = [list[to], list[at]];
   ui.chips = list; save('sp_ui', ui); Q.chip = to; renderMain();
 }
+/* the sport row's own +Add/remove, separate from addChip/removeChip above (competition shortcuts for
+   the Home banner) so picking a sport to show/hide here can never touch that unrelated list.
+   Owner-requested 2026-11-13: "no one will ever have all those leagues, but many people will want one
+   or two or three" -- an entry here is either a whole sport (SPORT_GROUPS id, "All Soccer") or one
+   specific competition pinned on its own ("Premier League" as its own tab, no detour through Soccer's
+   dropdown every time). Same two-step choice homeOpenSportGroup's own popup already offers, just
+   landing in ui.sportChips instead of switching straight there. */
+function addSportEntry(id) {
+  if (sportChipIds().indexOf(id) < 0) { ui.sportChips = sportChipIds().concat([id]); save('sp_ui', ui); }
+  const g = SPORT_GROUPS.find(s => s[0] === id);
+  Q.sport = g ? 'group:' + id : id;
+  Q.chip = sportChips().findIndex(c => c.id === Q.sport); Q.skey = ''; resView.reset(); renderMain();
+}
+function askAddSportChip() {
+  const items = SPORT_GROUPS.map(g => ({l: g[1], a: () => {
+    if (g[3].length <= 1) { addSportEntry(g[0]); return; }
+    const subItems = [{l: 'All ' + g[1], a: () => addSportEntry(g[0])}]
+      .concat(g[3].slice().sort((a, b) => compLabel(a).localeCompare(compLabel(b))).map(c => ({l: compLabel(c), a: () => addSportEntry(c)})));
+    openMenu(subItems, {title: g[1]});
+  }}));
+  openMenu(items, {title: 'Add a sport or league'});
+}
 function askRemoveChip(c) {
   Q.lift = false;
   openMenu([{l: 'Remove the “' + c.l + '” tab', a: () => removeChip(c)}, {l: 'Keep it', a: () => renderMain()}]);
 }
 function removeChip(c) {
-  if (!c || c.id === 'add' || c.id.indexOf('group:') === 0) return;   /* sport chips (top-level or "All <Sport>") aren't pinned shortcuts -- nothing to remove */
-  ui.chips = chipsList().filter(x => x !== c.id);
+  if (!c || c.id === 'add') return;
+  const ids = sportChipIds();
+  if (ids.length <= 1) { toast('Keep at least one sport or league on the tab row.'); renderMain(); return; }
+  const entryId = c.id.indexOf('group:') === 0 ? c.id.slice(6) : c.id;
+  ui.sportChips = ids.filter(x => x !== entryId);
   save('sp_ui', ui);
-  Q.chip = Math.max(0, Math.min(Q.chip, ui.chips.length - 1));
-  Q.sport = ui.chips[Q.chip] || ''; Q.skey = ''; resView.reset();
+  Q.chip = Math.max(0, Math.min(Q.chip, ui.sportChips.length - 1));
+  Q.sport = sportChips()[Q.chip] ? sportChips()[Q.chip].id : '';
+  Q.skey = ''; resView.reset();
   toast('Removed “' + c.l + '”. Use ＋ Add (or Settings) to bring it back.');
   renderMain();
 }
@@ -4035,6 +4073,85 @@ function canonTeam(side) {
   if (known) return TEAM_OF.get(known);
   return side.replace(/\s+/g, ' ').trim();
 }
+
+/* ---------- national teams, for guide-sourced international fixtures (Nations League etc.) ----------
+   Kept deliberately separate from TEAM_OF/TEAM_ALIASES above (clubs only): merging country names into
+   that one shared map would widen the matching surface for every competition that calls canonTeam(),
+   not just international ones, for no benefit (a club name and a country name have never collided in
+   practice, but there's no reason to risk it). Only consulted by guideTeamsFromTitle() below.
+   Portuguese is the only language covered -- it's the dominant non-English source in the broadcaster
+   guide feed (br+pt broadcaster ids are its largest non-English share) and every real case seen so far
+   needed it. Not guessing at Greek/German/French spellings with no real titles to check them against --
+   those providers write "Team - Team" or "Team / Team" with no textual marker at all, which is a
+   separate, higher false-positive-risk problem (an unmarked dash/slash also separates a competition
+   name from its own subtitle, e.g. "UEFA Nations League - Informação") that this change does not touch. */
+const NATIONS = [
+  ['England', 'inglaterra'], ['Scotland', 'escocia'], ['Wales', 'pais de gales,país de gales'],
+  ['Northern Ireland', 'irlanda do norte'], ['Republic of Ireland', 'irlanda'],
+  ['Germany', 'alemanha'], ['France', 'franca,frança'], ['Spain', 'espanha'], ['Italy', 'italia,itália'],
+  ['Netherlands', 'paises baixos,países baixos,holanda'], ['Portugal', 'portugal'],
+  ['Belgium', 'belgica,bélgica'], ['Switzerland', 'suica,suíça'], ['Austria', 'austria,áustria'],
+  ['Denmark', 'dinamarca'], ['Norway', 'noruega'], ['Sweden', 'suecia,suécia'], ['Finland', 'finlandia,finlândia'],
+  ['Iceland', 'islandia,islândia'], ['Poland', 'polonia,polónia,polônia'],
+  ['Czech Republic', 'republica checa,república checa,republica tcheca,república tcheca'],
+  ['Slovakia', 'eslovaquia,eslováquia'], ['Hungary', 'hungria'], ['Romania', 'romenia,roménia,romênia'],
+  ['Bulgaria', 'bulgaria,bulgária'], ['Greece', 'grecia,grécia'], ['Turkey', 'turquia'],
+  ['Croatia', 'croacia,croácia'], ['Serbia', 'servia,sérvia'], ['Slovenia', 'eslovenia,eslovénia,eslovênia'],
+  ['Bosnia and Herzegovina', 'bosnia,bósnia,bosnia e herzegovina,bósnia e herzegovina,bosnia herzegovina'],
+  ['Montenegro', 'montenegro'], ['North Macedonia', 'macedonia do norte,macedónia do norte,macedônia do norte'],
+  ['Albania', 'albania,albânia'], ['Kosovo', 'kosovo'], ['Ukraine', 'ucrania,ucrânia'],
+  ['Belarus', 'bielorrussia,bielorrússia'], ['Moldova', 'moldavia,moldávia'], ['Russia', 'russia,rússia'],
+  ['Georgia', 'georgia,geórgia'], ['Armenia', 'armenia,arménia,armênia'], ['Azerbaijan', 'azerbaijao,azerbaijão'],
+  ['Kazakhstan', 'cazaquistao,cazaquistão'], ['Israel', 'israel'], ['Cyprus', 'chipre'], ['Malta', 'malta'],
+  ['Luxembourg', 'luxemburgo'], ['Liechtenstein', 'liechtenstein'], ['San Marino', 'san marino'],
+  ['Andorra', 'andorra'], ['Gibraltar', 'gibraltar'], ['Faroe Islands', 'ilhas faroe,ilhas faroé'],
+  ['Estonia', 'estonia,estônia,estónia'], ['Latvia', 'letonia,letônia,letónia'], ['Lithuania', 'lituania,lituânia'],
+  ['Eswatini', 'essuatini,essuatíni'], ['Ethiopia', 'etiopia,etiópia'], ['Liberia', 'liberia,libéria'],
+  ['Morocco', 'marrocos'], ['Niger', 'niger'], ['Mozambique', 'mocambique,moçambique'], ['Cape Verde', 'cabo verde'],
+  ['Burkina Faso', 'burkina faso'], ['Argentina', 'argentina']
+];
+const NATION_OF = new Map();
+NATIONS.forEach(([name, al]) => { NATION_OF.set(norm(name), name); al.split(',').forEach(a => NATION_OF.set(norm(a), name)); });
+const nationOf = s => NATION_OF.get(norm(s)) || null;
+/* Pulls two sides out of a guide-feed title that never got structured home/away from the server, e.g.
+   "UEFA Nations League - Inglaterra x Croácia (Direto)". Scoped to exactly the "A x B" convention
+   confirmed live in the pt/br portion of the guide feed (also seen, harmlessly, in e.g. an NBA listing --
+   "NBA: Cleveland Cavaliers x New York Knicks" -- same broadcaster naming habit, not soccer-specific).
+   Deliberately does NOT extend nameTeams() itself or add a bare "-"/"/" rule: nameTeams() is called from
+   six other places including hot per-channel matching paths, and an ungated dash/slash split is exactly
+   how a competition name and its own subtitle would misparse as two teams -- see the comment above. */
+function guideSidesFromTitle(raw) {
+  let s = String(raw || '').trim();
+  s = s.replace(/^\s*vt\s*-\s*/i, '');                                   /* Brazilian replay marker */
+  s = s.replace(/\s*\((?:direto|recorded|ao vivo)\)\s*$/i, '');
+  s = s.replace(/\s*-\s*(?:ao vivo|recorded|em direto)\s*$/i, '');
+  const m = s.match(/\sx\s/i);
+  if (!m) return null;
+  let left = s.slice(0, m.index);
+  const right = s.slice(m.index + m[0].length).trim();
+  /* strip a leading "<competition> - " -- only a SPACED dash (" - "), never a bare hyphen, so a
+     Brazilian club with one in its own name ("Atlético-MG", "Athletico-PR") survives intact */
+  const sep = left.search(/\s-\s(?!.*\s-\s)/);
+  if (sep >= 0) left = left.slice(sep + 3);
+  left = left.replace(/^[A-Za-z0-9][\w .&']{1,24}:\s*/, '');              /* a "Label:" tag, e.g. "NBA:" */
+  left = left.trim();
+  if (left.length < 2 || left.length > 45 || right.length < 2 || right.length > 70) return null;
+  return [left, right];
+}
+/* Tries the existing, already-proven nameTeams() first (handles "England v Croatia" / "vs" / "versus" --
+   needed even for the ENGLISH listing: it never gets structured home/away from the server either, so
+   without this it could never become a merge target, and nothing could ever merge into it), then the
+   new "x" pattern above. Either way, resolves both sides through the nation table so a foreign-language
+   fixture canonicalises to the same English name the host card uses, letting buildEventsG's merge
+   actually find it; a side that isn't a recognised nation is kept as its raw trimmed text, which still
+   lets two identical-language duplicates dedupe even though cross-language CLUB names aren't covered. */
+function guideTeamsFromTitle(raw) {
+  const sides = nameTeams(raw) || guideSidesFromTitle(raw);
+  if (!sides) return null;
+  const [a, b] = sides;
+  return [nationOf(a) || a, nationOf(b) || b];
+}
+
 /* Some providers structure their whole sports offering as one channel per match ("STAN 13 - Chelsea v
    Manchester United ... 2026-10-31 22:30"), not a persistent named channel -- so its raw name always
    trips the eventish-guide-junk filters in compCategoryChannels/genericCompChannels below. Used to
@@ -5066,14 +5183,14 @@ function* buildEventsG() {
        feeds. Falls back to the same containment test the v2/fixture merge above already uses -- both
        sides present in the existing event's text, by full name or by last word -- indexed by last
        word so this stays a lookup rather than a scan of every event for every event. */
-    const byPair = new Map(), byWord = new Map();
+    const byPair = new Map(), byWord = new Map(), byComp = new Map();
     EVENTS.forEach(ev => {
       const k = pairKey(ev); if (k) (byPair.get(k) || byPair.set(k, []).get(k)).push(ev);
-      if (!ev.teams) return;
+      if (!ev.teams) { const ck = ev.comp || ''; (byComp.get(ck) || byComp.set(ck, []).get(ck)).push(ev); return; }
       ev.teams.forEach(t => { const w = gLastWord(norm(t)); if (w.length > 3) (byWord.get(w) || byWord.set(w, []).get(w)).push(ev); });
     });
     const add = [], drop = new Set();
-    let merged = 0, fuzzy = 0;
+    let merged = 0, fuzzy = 0, compMerged = 0, compVetoed = 0;
     gd.forEach(g => {
       const k = pairKey(g);
       /* same two teams, same day: one game described twice */
@@ -5086,19 +5203,50 @@ function* buildEventsG() {
             (gLastWord(s).length > 3 && ev.text.indexOf(' ' + gLastWord(s) + ' ') >= 0)));
         if (host) fuzzy++;
       }
+      /* Comp-only events (no two named sides at all -- Formula 1, MotoGP, golf, any single-entity
+         race/tournament) never reach either lookup above, so they never got the same protection a
+         team-sport guide entry already has: NOTHING cross-checked a broadcaster's own claimed air
+         time against whether a real session is actually scheduled anywhere near it. Confirmed live:
+         a "Formula 1" EPG slot showed a red LIVE tag for a rebroadcast of the previous week's race --
+         the real, correctly-timed race already exists in EVENTS (from v2Events()/guide-v2.json, which
+         IS schedule-validated), this guide entry just never checked for it, matching the exact same
+         comp+closest-kickoff pattern already proven above for f1Events()-into-v2 (see that merge). */
+      if (!host && !sides && g.comp) {
+        const cands = byComp.get(g.comp) || [];
+        let best = null, bestDiff = Infinity;
+        cands.forEach(ev => { const d = Math.abs(ev.kick - g.kick); if (d < bestDiff) { bestDiff = d; best = ev; } });
+        if (best && bestDiff <= 30 * 60e3) { host = best; compMerged++; }
+        else if (v2Comps.has(g.comp)) {
+          /* We DO have real schedule coverage for this competition (guide-v2/resolve_v2.py tracks it),
+             and nothing in it is happening anywhere near this claimed time -- that's a real, independent
+             reason to doubt a bare broadcaster EPG slot, not a coverage gap to fall back on. Dropped
+             rather than kept-but-relabelled: with no actual race/session behind it, there is no genuine
+             game info to show (no result, no real kickoff) -- just the clutter this whole feature exists
+             to avoid, the same call already made for an unwatchable foreign-only listing above. */
+          compVetoed++;
+          return;
+        }
+      }
       if (host) {
         const have = new Map(host.chans.map((c, i) => [c.g.id, i]));
         g.chans.forEach(c => mergeChan(host.chans, have, c));
         merged++;
         return;
       }
+      /* A broadcaster-first event with no channel in THIS playlist either is clutter, not information --
+         confirmed live: once the gates above stopped blocking guide-sourced events from showing at all,
+         every foreign listing for a match this provider doesn't carry (Greek, German, ...) became its
+         own standalone card, flooding the Event Guide with games the owner has no way to watch. Only
+         worth adding as a new card -- or worth evicting an existing empty-channel card in its favour --
+         when it actually brings a channel. */
+      if (!g.chans.length) return;
       add.push(g);
       if (k) (byPair.get(k) || []).forEach(ev => { if (!ev.chans.length) drop.add(ev); });
     });
     if (add.length || drop.size) EVENTS = EVENTS.filter(ev => !drop.has(ev)).concat(add);
     add.forEach(ev => { ev.chans = pruneBrandSiblings(ev.chans); });
-    memLog('buildEvents: guides merge done, guides=' + gd.length + ' merged=' + merged + ' (fuzzy ' + fuzzy + ') added=' + add.length +
-      ' droppedEmpty=' + drop.size + ' EVENTS=' + EVENTS.length + ' totalMs=' + (performance.now() - __gdt0).toFixed(0));
+    memLog('buildEvents: guides merge done, guides=' + gd.length + ' merged=' + merged + ' (fuzzy ' + fuzzy + ', comp ' + compMerged + ') added=' + add.length +
+      ' droppedEmpty=' + drop.size + ' compVetoed=' + compVetoed + ' EVENTS=' + EVENTS.length + ' totalMs=' + (performance.now() - __gdt0).toFixed(0));
   }
 }
 const buildEvents = () => runSync(buildEventsG());
@@ -5876,12 +6024,11 @@ function homeOpenTile(i) {
 }
 function homeOpenSearch(id) {
   /* id is always a single competition here (the Sport Selector popup's per-league item, picked over
-     "All <Sport>" -- that one goes through homeOpenSportGroupAll instead). Land inside that
-     competition's own sport group, not at the top-level sport list, so the sub-chip row (and the
-     "← All sports" way back) is there to switch to a sibling competition or back out. */
-  const g = id ? SPORT_GROUPS.find(s => s[3].includes(id)) : null;
-  Q.sportGroup = g ? g[0] : '';
-  if (id) { Q.sport = id; const k = sportChips().findIndex(c => c.id === id); if (k >= 0) Q.chip = k; Q.skey = ''; }
+     "All <Sport>" -- that one goes through homeOpenSportGroupAll instead). The chip row stays the
+     fixed top-level sport list (see sportChips()) -- picking a competition no longer swaps it out for
+     a second row of league tabs, it just points Q.sport at that competition and highlights the sport
+     it belongs to (see renderMain's active-chip check). */
+  if (id) { Q.sport = id; const g = SPORT_GROUPS.find(s => s[3].includes(id)), k = g ? SPORT_GROUPS.indexOf(g) : -1; if (k >= 0) Q.chip = k; Q.skey = ''; }
   show('main'); S.zone = id ? 'chips' : 'qbox'; showPage('sportshub'); if (id) { S.zone = 'chips'; renderMain(); }
 }
 function homeOpenContinue() {
@@ -7746,31 +7893,29 @@ const Q = {text: '', filter: 'all', all: [], res: [], counts: {}, item: 0, chip:
 function keyAt(row, col) { let c = 0; for (let i = 0; i < row.length; i++) { if (col < c + row[i].s) return i; c += row[i].s; } return row.length - 1; }
 function startOf(row, ki) { let c = 0; for (let i = 0; i < ki; i++) c += row[i].s; return c; }
 function sportChips() {
-  if (Q.sportGroup) {
-    const g = SPORT_GROUPS.find(s => s[0] === Q.sportGroup);
-    if (g) {
-      /* "All <sport>" first (the real landing chip, see homeOpenSportGroupAll), then every
-         competition alphabetically (owner-reported: "its not even alphabetical").
-         A single-competition sport (Boxing, NFL, AFL, Cycling...) gets ONE chip, carrying the group
-         id but labelled with the sport's own name: "All Boxing" next to "Boxing" would be the same
-         list twice, but emitting nothing at all -- as this did briefly -- left those sports with a row
-         containing only "← All sports" and no tab of their own to highlight. */
-      const comps = g[3].length > 1
-        ? [{id: 'group:' + g[0], l: 'All ' + g[1]}]
-          .concat(g[3].slice().sort((a, b) => compLabel(a).localeCompare(compLabel(b))).map(id => ({id, l: compLabel(id)})))
-        : [{id: 'group:' + g[0], l: g[1]}];
-      return comps.concat([{id: 'allsports', l: '← All sports'}]);
-    }
-  }
   /* Owner-requested 2026-11-12: the top-level row was one chip per COMPETITION (37 of them via
      +Add/chipsList -- "English Football", "English Football (Cup)", "English Football (League Cup)"...
      "the list now is endless"). Top level is now one chip per SPORT (SPORT_GROUPS, ~15 of them --
      "tennis, cycling, golf, rugby, etc"), same list the Home carousel's Sport Selector already uses.
-     Picking one drills straight into that sport (see pickChip's 'group:' handling below) -- no more
-     +Add/pin management needed here since every sport is already on the row; chipsList()/ui.chips still
-     exists for Home banner priority ordering (Settings > Edit search shortcuts), just no longer drives
-     this tab row. */
-  return SPORT_GROUPS.map(g => ({id: 'group:' + g[0], l: g[1]}));
+     chipsList()/ui.chips still exists for Home banner priority ordering (Settings > Edit search
+     shortcuts), just no longer drives this tab row.
+     This row never swaps for a second row of league tabs -- that used to happen on picking any
+     multi-competition sport (Soccer's 18+ leagues filled the whole screen) and was reported as
+     "unusable": no way to see or reach a sport that sorted past the league list, and no clear way back
+     out. Picking a sport with more than one competition opens a dropdown instead (tryDrillIn ->
+     homeOpenSportGroup, same popup Home's own Sport Selector already uses for this) -- this row itself
+     never changes shape.
+     Owner-requested 2026-11-13: showing all ~15 at once was "too many" -- defaults to a curated six
+     (DEFAULT_SPORT_CHIPS above), with "+ Add" to bring in any other one (askAddSportChip) and the same
+     remove affordance (✕ / BKSP, see removeChip) competition shortcuts already had.
+     Owner-requested 2026-11-13: an entry can also be one SPECIFIC competition pinned on its own ("no
+     one will ever have all those leagues, but many people will want one or two or three") -- not a
+     SPORT_GROUPS id, so it's rendered as a plain competition chip (no "group:" prefix, no dropdown to
+     drill into -- it's already the single thing it names). */
+  return sportChipIds().map(id => {
+    const g = SPORT_GROUPS.find(s => s[0] === id);
+    return g ? {id: 'group:' + g[0], l: g[1]} : {id, l: compLabel(id)};
+  }).concat([{id: 'add', l: '＋ Add'}]);
 }
 function searchChips() {
   /* Sports Hub keeps the sport-shortcut chips when nothing's typed; generic Search starts blank -- no
@@ -7934,14 +8079,18 @@ function renderSearch() {
     $('kb').innerHTML = h;
   } else $('kb').innerHTML = '';
   const chips = searchChips(), active = Q.text ? Q.filter : Q.sport;
+  /* the chip row is always the top-level sport list now (see sportChips()), so the active sport's own
+     "group:" chip has to be matched by which sport Q.sport BELONGS to (a specific competition, e.g.
+     "Premier League", or "group:soccer" for "All Soccer"), not by an exact id match against it. */
+  const activeGroup = SPORT_GROUPS.find(g => 'group:' + g[0] === active || g[3].includes(active));
   Q.chip = Math.min(Q.chip, chips.length - 1);
   const lifted = !!Q.lift && S.zone === 'chips' && !Q.text && !!chips[Q.chip] && chips[Q.chip].id !== 'add';
   if (!lifted) Q.lift = false;
-  $('chips').innerHTML = chips.map((c, i) => '<button class="chip' + (c.id === active ? ' on' : '') + (S.zone === 'chips' && Q.chip === i ? ' focus' : '') + (lifted && Q.chip === i ? ' lift' : '') + '" data-i="' + i + '"' + (!Q.text && c.id !== 'add' && c.id.indexOf('group:') !== 0 ? ' draggable="true"' : '') + '>' +
+  $('chips').innerHTML = chips.map((c, i) => '<button class="chip' + ((c.id.indexOf('group:') === 0 ? !!activeGroup && c.id === 'group:' + activeGroup[0] : c.id === active) ? ' on' : '') + (S.zone === 'chips' && Q.chip === i ? ' focus' : '') + (lifted && Q.chip === i ? ' lift' : '') + '" data-i="' + i + '"' + (!Q.text && c.id !== 'add' && c.id.indexOf('group:') !== 0 ? ' draggable="true"' : '') + '>' +
     (lifted && Q.chip === i ? '<span class="lf" data-lf="-1">◀</span>' : '') +
     (LG_OK.has(c.id) ? '<img class="tabi" src="' + LG_SLUG(c.id) + '" alt="">' : '') + esc(c.l) + (c.n != null ? '<span class="c">' + c.n.toLocaleString() + '</span>' : '') +
     (lifted && Q.chip === i ? '<span class="lf" data-lf="1">▶</span>' : '') +
-    (S.zone === 'chips' && Q.chip === i && !Q.text && !Q.sportGroup && c.id !== 'add' && c.id.indexOf('group:') !== 0 ? '<span class="cx" title="Remove">✕</span>' : '') + '</button>').join('');
+    (S.zone === 'chips' && Q.chip === i && !Q.text && !Q.sportGroup && c.id !== 'add' ? '<span class="cx" title="Remove">✕</span>' : '') + '</button>').join('');
   const list = resultList();
   Q.item = Math.min(Q.item, Math.max(0, list.length - 1));
   if (list.length && !selectable(list[Q.item])) { const j = stepRes(list, Q.item, 1); Q.item = j >= 0 ? j : Math.max(0, stepRes(list, Q.item, -1)); }
@@ -7950,6 +8099,12 @@ function renderSearch() {
   else if (!Q.text && !list.length && S.page === 'sportshub') {
     if (ui.fdKey && FD.err && !FD.list.length) empty = FD.err + ' Check Settings → Fixtures key.';
     else if ((!GUIDE || GUIDE_BUSY) && !FD.list.length) empty = GUIDE_MSG || 'Getting the TV guide ready…';
+    /* Owner-reported 2026-11-13: picking a sport showed a bare "Nothing on" for a few seconds before its
+       fixtures popped in, indistinguishable from the list genuinely being empty -- no way to tell the
+       app hadn't just frozen. The cause: a sport's full guide file (loadGuidesSport, via guidesWant())
+       loads lazily on picking its chip, same as GUIDE_BUSY already covers for the main EPG, but nothing
+       checked GUIDES.busy the same way. */
+    else if (activeGroup && (SPORT_SERVER[activeGroup[0]] || []).some(s => GUIDES.busy.has(s))) empty = 'Gathering guide matches for ' + activeGroup[1] + '…';
     else if (GUIDE && GUIDE.none) empty = 'There’s no TV guide for this playlist, so games can’t be listed. Type above to search channels, movies and series.';
     else if (GUIDE && !GUIDE.items.length) empty = 'Your provider’s TV guide has no entries for its sports channels, so games can’t be listed. Type above to search channels, movies and series.';
     else empty = FOOTBALL_COMPS.has(Q.sport) && !FD.list.some(f => f.comp === Q.sport) ? 'No ' + Q.sport + ' games found yet. They appear here once a fixture list or a TV guide lists them.' : 'Nothing on in this section right now. Type above to search everything.';
@@ -8073,23 +8228,26 @@ async function openItem(x, list) {
 }
 function pickChip(c) {
   if (!c) { renderMain(); return; }
-  if (c.id === 'add') { askAddChip(); return; }
+  if (c.id === 'add') { askAddSportChip(); return; }
   if (c.id === 'allsports') { Q.sportGroup = ''; Q.chip = 0; const first = sportChips()[0]; Q.sport = (first && first.id !== 'add') ? first.id : ''; Q.item = 0; resView.reset(); renderMain(); return; }
   if (Q.text) { Q.filter = c.id; applyFilter(); }
   else { Q.sport = c.id; Q.item = 0; resView.reset(); renderMain(); }
 }
-/* Drilling into a top-level sport chip's own sub-row -- "All <Sport>" first (already merged, see
-   filteredEvents' 'group:' branch) plus its individual competitions and a "← All sports" way back --
+/* Drilling into a top-level sport chip -- offering its individual competitions plus "All <Sport>" --
    is a deliberate second step, never a side effect of merely passing over the chip while arrowing
-   across the row (owner-reported: arrowing from Soccer toward Motorsport kept getting diverted into
-   every sport's sub-menu along the way, because LEFT/RIGHT call pickChip on every single step, and
-   drilling-in used to happen there too). Only reachable by activating a chip that's already the
-   selected one -- same place homeOpenSportGroupAll's popup used to be the only door to this reveal. */
+   across the row (owner-reported, twice now: first as arrowing from Soccer toward Motorsport getting
+   diverted into every sport's sub-menu along the way, because LEFT/RIGHT used to call pickChip on
+   every single step and drilling-in happened there too; then, even after that was fixed, as "I click
+   right, all the soccer tabs open up, covers the screen... I can't get out" -- drilling in used to
+   mean swapping this whole row for a second one listing every competition, which for an 18-league
+   sport filled the screen with no obvious way back. Opens the same popup Home's own Sport Selector
+   already uses for exactly this (homeOpenSportGroup) instead -- the chip row itself never changes
+   shape; see sportChips(). Only reachable by activating a chip that's already the selected one. */
 function tryDrillIn(c) {
-  if (!c || Q.sportGroup || c.id.indexOf('group:') !== 0) return false;
+  if (!c || c.id.indexOf('group:') !== 0) return false;
   const g = SPORT_GROUPS.find(s => s[0] === c.id.slice(6));
   if (!g || g[3].length <= 1) return false;
-  Q.sportGroup = g[0]; Q.chip = 0; resView.reset(); renderMain();
+  homeOpenSportGroup(g[0]);
   return true;
 }
 /* A sport icon with just one competition (Basketball -> NBA, Boxing -> Boxing...) goes straight there --
@@ -8118,7 +8276,7 @@ function homeOpenSportGroupAll(id) {
   /* 'group:' + id (not g[3][0], the sport's first competition) -- see filteredEvents' own comment on
      this exact branch: the old value only ever showed that ONE competition, despite the "All <sport>"
      label and this function's own name both promising every competition in the sport merged together. */
-  Q.sportGroup = id; Q.chip = 0; Q.sport = g ? 'group:' + id : ''; Q.skey = ''; resView.reset();
+  Q.chip = g ? SPORT_GROUPS.indexOf(g) : 0; Q.sport = g ? 'group:' + id : ''; Q.skey = ''; resView.reset();
   show('main'); S.zone = 'chips'; showPage('sportshub'); S.zone = 'chips'; renderMain();
 }
 /* same destination as homeOpenSportGroupAll above, just with nothing pre-picked -- the neutral "every
@@ -8191,8 +8349,15 @@ function searchKey(k, e) {
       else Q.lift = false;
       renderMain(); return;
     }
-    if (k === KEY.LEFT) { if (Q.chip > 0) { Q.chip--; pickChip(chips[Q.chip]); return; } S.zone = Q.kb ? 'kb' : 'rail'; }
-    else if (k === KEY.RIGHT && Q.chip < chips.length - 1) { Q.chip++; pickChip(chips[Q.chip]); return; }
+    /* Owner-reported 2026-11-13: "moving left right up and down through the sport tabs [should] just
+       move the red highlight bar until a button to select is pressed" -- LEFT/RIGHT called pickChip on
+       every single step (committing the selection, rebuilding the fixture list below) while UP/DOWN
+       already correctly moved focus only, same inconsistency arrowing-into-a-submenu used to be (see
+       tryDrillIn above). Scoped to !Q.text: the Search page's own filter chips (All/Live/Movies/...)
+       keep their existing instant-switch feel, which was never the complaint -- only the sport row's
+       selection, which rebuilds potentially thousands of events, needs this. */
+    if (k === KEY.LEFT) { if (Q.chip > 0) { Q.chip--; if (Q.text) pickChip(chips[Q.chip]); else renderMain(); return; } S.zone = Q.kb ? 'kb' : 'rail'; }
+    else if (k === KEY.RIGHT && Q.chip < chips.length - 1) { Q.chip++; if (Q.text) pickChip(chips[Q.chip]); else renderMain(); return; }
     /* UP/DOWN move a row at a time within the wrapped chip grid (requested: "going through the sports
        tabs I can only go left and right"), but they move FOCUS ONLY -- they deliberately do NOT
        re-pick the competition the way LEFT/RIGHT do.
@@ -8226,7 +8391,7 @@ function searchKey(k, e) {
       if (chips[Q.chip] && tryDrillIn(chips[Q.chip])) return;
       if (resultList().length) S.zone = 'results';
     }
-    else if ((k === 46 || k === KEY.BKSP) && !Q.text && !Q.sportGroup && chips[Q.chip] && chips[Q.chip].id.indexOf('group:') !== 0) { removeChip(chips[Q.chip]); return; }
+    else if ((k === 46 || k === KEY.BKSP) && !Q.text && !Q.sportGroup && chips[Q.chip] && chips[Q.chip].id !== 'add') { removeChip(chips[Q.chip]); return; }
     else return;
     renderMain(); return;
   }
@@ -9823,7 +9988,7 @@ function optItems() {
   if (sc === 'player' && HAS_MPV && cur() && !MPV.on) it.push({l: 'Open in the mpv player (if there’s no sound or picture)', a: () => { const c = cur(); main.stop(); playMpv(c, c.t === 'live' ? 0 : NV._t || video.currentTime || 0); }});
   if (sc === 'main' && S.page === 'sportshub' && S.zone === 'chips' && !Q.text) {
     const c = searchChips()[Q.chip];
-    if (c && c.id !== 'add' && c.id.indexOf('group:') !== 0) it.push({l: 'Remove the “' + c.l + '” shortcut', a: () => removeChip(c)});
+    if (c && c.id !== 'add') it.push({l: 'Remove the “' + c.l + '” shortcut', a: () => removeChip(c)});
   }
   if (sc === 'login') {
     /* the phone page shows this back as "Typing into: <label>" -- the one way you can tell, on the
