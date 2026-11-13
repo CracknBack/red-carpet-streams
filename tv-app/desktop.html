@@ -3180,20 +3180,31 @@ function proUpsell(feature) {
   /* The checkout hop only makes sense where a real system browser exists one tap away -- a phone/
      tablet running this same APK, or Windows. On a TV remote (FIRE, not PHONE) the QR code is the
      only realistic path to a browser, so this item is left out there rather than offered and failing. */
+  /* Owner-requested 2026-11-13, after a real tester's report: reaching this screen at all means a
+     trial that WAS running (TRIAL_START is set from the very first launch, see its own comment) has
+     already ended -- proUpsell only ever fires when isProActive() is false, which by definition means
+     neither a real key nor an active trial. Silence about that fact read as "this app just demands
+     money with no warning", not as "your free period finished" -- say so plainly instead of leaving it
+     to be inferred. inTrial()/trialDaysLeft() aren't checked here: if this function is running at all,
+     the trial is necessarily over, not just low. */
   const items = [
+    {l: 'Your 7-day free trial has ended.', a: () => {}},
     {l: feature + ' is a Red Carpet Pro feature.', a: () => {}}
   ];
-  /* No price baked into this label on purpose -- it's compiled into every APK already out in the
-     world, so a price change on Lemon Squeezy/the website later would otherwise leave old installs
-     showing a stale number forever. The checkout page itself (opened fresh each time) is the one
-     place that's always showing the real, current price. */
+  /* Price now shown directly (owner-requested, same report: a real tester found a paywall with no
+     price on it "sketchy", not careful) -- was deliberately left out before so a price change later
+     wouldn't leave old already-distributed APKs showing a stale number forever. Kept in sync with the
+     website's own current price by hand (both "$4.99 one-time" today) rather than fetched live, same
+     tradeoff as PRO_GUIDE_V2_URL/RCS_GUIDE elsewhere in this file being baked in, not queried -- a
+     wrong price for a while until the next build is still far better than showing none at all. */
+  items.push({l: 'Red Carpet Pro: $4.99 one-time (lifetime, not a subscription).', a: () => {}});
   if (PHONE || PC) items.push({l: 'Open Checkout on This Device', a: () => openInSystemBrowser(proCheckoutUrl())});
   items.push({l: 'Enter a Red Carpet Pro license key…', a: proActivateMenu});
   items.push({l: 'Not now', a: () => {}});
   openMenu(items, {
     title: 'Red Carpet Pro — Checkout',
     img: qr,
-    msg: 'Scan with your phone’s camera, or use the button below, to open checkout and get your Pro Key at today’s price, then enter it below.' +
+    msg: 'Scan with your phone’s camera, or use the button below, to open checkout, then enter your Pro Key below.' +
       ' Pro unlocks software utilities only — local guide matching, categories, multi-EPG merging and pinned channels. It does not provide access to any media content.'
   });
 }
@@ -10436,6 +10447,17 @@ function enterMain() {
   show('main'); S.zone = 'cats'; showPage(anyFavs() ? 'favs' : 'live'); openHome(); startLogoDb();
   if (isM3u() && !EPGX) loadXmltv().catch(() => {});
   if (CRASHGUARD_FORCE) toast('Running in a lighter mode after a crash, to save memory. Channel logos look plainer this session; Settings is unaffected.');
+  /* Owner-requested 2026-11-13: the trial used to run entirely silently -- the only place it was ever
+     mentioned was a small Home-screen corner badge, visible only WHILE it's still running. Someone who
+     didn't happen to notice that badge got no announcement that a trial existed at all, and then no
+     announcement when it ended either -- just a paywall days later with no context (see proUpsell's
+     own "trial has ended" line, added the same report). Said once, here, so it's at least announced
+     when it STARTS too. sp_trial_announced is its own flag, separate from TRIAL_START, so it can never
+     re-fire on every login the way an unguarded check would. */
+  if (inTrial() && !isProUnlocked() && !load('sp_trial_announced', false)) {
+    save('sp_trial_announced', true);
+    toast('You have 7 days of free Red Carpet Pro — automated Event Guide matching, channel pinning and more. Look for the countdown on Home.');
+  }
   setTimeout(crashGuardMarkStable, 150000);
 }
 
