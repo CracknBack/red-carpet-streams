@@ -2288,6 +2288,16 @@ const tileView = new VView($('tiles'), {rowH: 27, render: tileHtml, cols: tileCo
    spots matches and shows, groups the same match across channels, and ranks those channels:
    English commentary first, then picture quality. */
 let GUIDE = null, EVENTS = null, GUIDE_BUSY = false, GUIDE_MSG = '', GUIDE_AC = null, GUIDE_RETRY = false;
+/* Set instead of nulling EVENTS outright whenever guide-v2/guides data changes underneath it (see the
+   three "changed" sites below) -- a background refresh used to wipe EVENTS to null the instant anything
+   in the source JSON differed, which every render-path reader (filteredEvents/homeLives/homeUpcoming)
+   treats as "not built yet" and shows as a flat, unexplained blank until the next full rebuild finishes.
+   Reported live: return from watching a game via Back, Sports Hub shows no fixtures for several seconds
+   while that rebuild runs, even though the fixtures it's about to show again were already sitting right
+   there a moment before. Marking stale instead keeps the last-good EVENTS on screen while a rebuild
+   happens quietly underneath -- same idea as any stale-while-revalidate cache, just applied to this one
+   in-memory array instead of the network layer. */
+let EVENTS_STALE = false;
 let serverInfo = {};
 
 /* ================= guide-v2 (resolved server-side, see Plan-New-Guide.md) =================
@@ -2328,7 +2338,7 @@ async function loadGuideV2(force) {
     j._ts = Date.now();
     GUIDE_V2 = j;
     await idb.set(key, {data: j});
-    if (changed) EVENTS = null;
+    if (changed) EVENTS_STALE = true;
   } catch (e) { /* guide-v2 is additive -- a failed fetch just leaves whatever was cached (or nothing) in place, never breaks the rest of the guide */ }
   GUIDE_V2_BUSY = false;
   if (S.screen === 'home') renderHome();
@@ -2472,7 +2482,7 @@ async function loadGuidesIndex(force) {
     GUIDES.index = j;
     GUIDES.bmap = null;                      /* broadcaster list may have changed with it */
     await idb.set(key, {data: j});
-    if (changed) EVENTS = null;
+    if (changed) EVENTS_STALE = true;
     GUIDES.err = '';
   } catch (e) { GUIDES.err = String((e && e.message) || e); }
   GUIDES.busy.delete('index');
@@ -2497,7 +2507,7 @@ async function loadGuidesSport(sport, force) {
     j._ts = Date.now();
     GUIDES.sports.set(sport, j);
     await idb.set(key, {data: j});
-    if (changed) EVENTS = null;
+    if (changed) EVENTS_STALE = true;
   } catch (e) { /* additive: a sport file that won't load leaves index.json's 24h slice in place */ }
   GUIDES.busy.delete(sport);
   if (S.screen === 'main') renderMain();
@@ -2619,7 +2629,7 @@ async function loadFixtures(force) {
     const changed = sig !== FD.sig; FD.sig = sig;
     Object.assign(FD, {list: all, ts: Date.now(), err: ''});
     await idb.set(key, {list: all, ts: FD.ts});
-    if (changed) EVENTS = null;
+    if (changed) EVENTS_STALE = true;
   } catch (e) { FD.err = 'Fixtures couldn’t be updated: ' + e.message; }
   FD.busy = false; if (S.screen === 'home') renderHome();
   if (S.screen === 'main' && isSearchPage(S.page)) { Q.skey = ''; Q.gkey = ''; renderMain(); }
@@ -2649,7 +2659,7 @@ async function loadF1(force) {
     const changed = sig !== F1.sig; F1.sig = sig;
     Object.assign(F1, {list, ts: Date.now(), err: ''});
     await idb.set(key, {list, ts: F1.ts});
-    if (changed) EVENTS = null;
+    if (changed) EVENTS_STALE = true;
   } catch (e) { F1.err = 'The F1 schedule couldn’t be updated: ' + e.message; }
   F1.busy = false; if (S.screen === 'home') renderHome();
   if (S.screen === 'main' && isSearchPage(S.page)) { Q.skey = ''; Q.gkey = ''; renderMain(); }
@@ -5309,14 +5319,21 @@ let EVENTS_BUILDING = false;
    rush. GUIDE/DATA are snapshotted so a result computed against data that got replaced mid-build (an
    account switch, a fresh refresh) is discarded instead of silently applied. */
 async function ensureEventsAsync() {
-  if (EVENTS || EVENTS_BUILDING) return;
+  /* (EVENTS && !EVENTS_STALE), not just EVENTS -- a source marking EVENTS_STALE (see the "changed"
+     sites above) deliberately leaves the last-good EVENTS in place for the render path to keep using
+     while this runs, so a bare `if (EVENTS) return` would never rebuild it again. prevEvents is
+     snapshotted before the build starts so a discarded/failed build (below) can restore exactly what
+     was on screen a moment ago instead of leaving whatever buildEventsG() partially wrote to EVENTS,
+     or nulling it outright -- either of which would blank a screen that had something fine on it. */
+  if ((EVENTS && !EVENTS_STALE) || EVENTS_BUILDING) return;
   EVENTS_BUILDING = true;
+  EVENTS_STALE = false;
   memLog('buildEvents start');
-  const myGuide = GUIDE, myData = DATA;
+  const myGuide = GUIDE, myData = DATA, prevEvents = EVENTS;
   try {
     await runSliced(buildEventsG());
-    if (GUIDE !== myGuide || DATA !== myData) EVENTS = null;
-  } catch (e) { EVENTS = null; }   /* e.g. GUIDE/DATA replaced mid-build; next render retries cleanly */
+    if (GUIDE !== myGuide || DATA !== myData) { EVENTS = prevEvents; EVENTS_STALE = true; }
+  } catch (e) { EVENTS = prevEvents; EVENTS_STALE = true; }   /* keep showing the last-good build; next render retries cleanly */
   finally {
     EVENTS_BUILDING = false;
     memLog('buildEvents done');
@@ -5416,6 +5433,10 @@ function filteredEvents(f, q) {
      the one other caller (guideCheck(), an on-demand Settings diagnostic, not a render path) keeps the
      synchronous buildEvents() call, unchanged. */
   if (!EVENTS) { ensureEventsAsync(); return []; }
+  /* EVENTS_STALE means a source changed underneath this array (see the "changed" sites that set it),
+     not that it's unusable -- keep serving it below while a fresh build runs in the background; the
+     screen updates itself once that resolves (see ensureEventsAsync's own re-render). */
+  if (EVENTS_STALE) ensureEventsAsync();
   const now = nowMs(), toks = norm(q || '').split(' ').filter(Boolean);
   let l = EVENTS.filter(ev => ev.stop > now - 12 * 3600e3 || (ev.reps && ev.reps.some(r => r.stop > now)));
   if (toks.length) {
@@ -5768,6 +5789,7 @@ function homeLives() {
        broadcaster-first one, which always has real channels -- left Home blank. */
     if (!DATA || !(FD.list.length || F1.list.length || GUIDE_V2 || GUIDES.index)) return [];
     if (!EVENTS) { ensureEventsAsync(); return []; }   /* builds in the background without blocking; renderHome() re-runs when ready */
+    if (EVENTS_STALE) ensureEventsAsync();   /* keep serving the last-good EVENTS below while a fresh build runs quietly */
     const now = nowMs(), order = chipsList(), rk = ev => { const k = order.indexOf(ev.comp); return k < 0 ? 99 : k; };
     /* A fixture can be genuinely live (status correct) with zero channels actually matched to it --
        the guide/channel-matching found nothing, not the same failure as the status being wrong. Either
@@ -5851,6 +5873,7 @@ function homeUpcoming() {
        broadcaster-first one, which always has real channels -- left Home blank. */
     if (!DATA || !(FD.list.length || F1.list.length || GUIDE_V2 || GUIDES.index)) return [];
     if (!EVENTS) { ensureEventsAsync(); return []; }   /* builds in the background without blocking; renderHome() re-runs when ready */
+    if (EVENTS_STALE) ensureEventsAsync();   /* keep serving the last-good EVENTS below while a fresh build runs quietly */
     const now = nowMs(), order = chipsList(), rk = ev => { const k = order.indexOf(ev.comp); return k < 0 ? 99 : k; };
     /* same widening as homeLives()/homeReplays() -- a guide-built event not yet airing is just an
        upcoming kickoff time inferred from the channel's own listing. Same correction as both of those
@@ -5960,7 +5983,10 @@ function renderHome() {
   const showTrialBadge = !FREE_FOR_NOW && !isProUnlocked() && inTrial();   /* a countdown is misleading when FREE_FOR_NOW means nothing actually runs out */
   $('h-trial').classList.toggle('hidden', !showTrialBadge);
   if (showTrialBadge) $('h-trial').textContent = 'PRO TRIAL — ' + trialDaysLeft() + ' DAY' + (trialDaysLeft() === 1 ? '' : 'S') + ' LEFT';
-  $('h-ver').innerHTML = (GUIDE_BUSY ? '<span class="hbd"></span>Updating the TV guide…&nbsp;&nbsp;·&nbsp;&nbsp;' : '') + 'Version ' + esc(APP_VERSION);
+  /* guideBusyNow(), not GUIDE_BUSY alone -- GUIDE_BUSY only ever covers the legacy XMLTV-matched guide,
+     so this stayed permanently hidden on a modern guide-v2/guides setup even while that source (or the
+     EVENTS rebuild it feeds) was genuinely busy. See guideBusyNow()'s own comment. */
+  $('h-ver').innerHTML = (guideBusyNow() ? '<span class="hbd"></span>Updating the TV guide…&nbsp;&nbsp;·&nbsp;&nbsp;' : '') + 'Version ' + esc(APP_VERSION);
   /* persistent carousel: one real DOM node per tile, created once and never innerHTML-rebuilt --
      each render only updates its data-offset (shortest signed circular distance from the active
      tile, -3..+3) and lets CSS transform the card itself into position, so it physically glides/
@@ -6010,8 +6036,18 @@ function renderHome() {
   /* An empty banner used to just be a blank hero picture with no explanation — indistinguishable from
      "broken" while fixtures/F1 are still loading. Say so, but only while genuinely still loading
      (FD.busy/F1.busy, or neither has ever completed a load yet) — once both have finished at least
-     once, an empty banner correctly means "checked, nothing on right now", not "still working". */
-  const stillBuilding = !hb.n && (FD.busy || F1.busy || (!FD.ts && !F1.ts)), bg = heroBgStyle();
+     once, an empty banner correctly means "checked, nothing on right now", not "still working".
+     Was FD.busy || F1.busy || (!FD.ts && !F1.ts) -- that last clause is permanently true for any
+     guide-v2/guides-only account (the modern default; see the fdkey/tsdbkey Settings comment), since
+     FD/F1 never get configured or fetched there at all. That made this read "still building" forever
+     on a quiet day for most setups, so the real "nothing on right now, not broken" message a few lines
+     below could never actually be reached for them. guideBusyNow() covers every source actually busy
+     right now; EVENTS_STALE covers "a source just changed, the rebuild hasn't caught up yet" (same
+     flag the stale-while-revalidate render path reads); the final clause is "nothing has EVER loaded
+     from any source", the only case where "still building" truly means first-ever load, not routine
+     quiet. */
+  const everLoaded = !!(FD.ts || F1.ts || (GUIDE_V2 && GUIDE_V2._ts) || (GUIDES.index && GUIDES.index._ts) || (GUIDE && GUIDE.ts));
+  const stillBuilding = !hb.n && (guideBusyNow() || EVENTS_STALE || !everLoaded), bg = heroBgStyle();
   /* The other genuinely-empty case, now that isKnownEvent() hard-filters the banner down to the
      priority list (or wide-enough channel coverage): your pinned sports can all legitimately be quiet
      at once -- different time zones, a seasonal gap (NFL alone is dark 7 months a year) -- without the
@@ -6606,6 +6642,36 @@ async function ensureSearchCatalog() {
   await ensureSearchIndex('vod');
   await ensureSearchIndex('series');
   ALL = DATA.live.items.concat(SRCHIDX.vod || [], SRCHIDX.series || []);
+}
+/* Sports Hub shares this screen's markup/search box with Search (see isSearchPage), but unlike Search
+   it never actually reads SRCHIDX unless the owner types something -- resultList()'s no-query branch
+   (Q.sport chips) only ever touches filteredEvents/EVENTS, never ALL/SRCHIDX. showPage() used to call
+   ensureSearchCatalog() on landing for EITHER page (isSearchPage(p) covers both), so just opening
+   Sports Hub to check today's fixtures silently kicked off a full provider-size movies+series index
+   fetch (procSearchIndexG, see ensureSearchIndex above) at the exact same moment as
+   loadGuideV2/loadGuidesIndex/loadFixtures/loadF1/loadTsdb -- several unrelated network+CPU passes all
+   competing for the one connection/CPU on a Fire TV Stick HD, reported live as "too many things
+   happening at once" and the Sports Hub page itself showing "Indexing movies & series…" despite the
+   owner never touching search. Now only called from where the catalog is actually about to be used:
+   real Search on page entry (still eager there -- it's core to that page), and the first keystroke
+   typed while on Sports Hub (runSearch, since Sports Hub's search box is the same shared input). The
+   in-flight guard (searchCatalogKick) makes repeated calls from fast typing a no-op instead of
+   overlapping fetches. */
+let searchCatalogKick = null;
+function kickSearchCatalog() {
+  if (!DATA || (SRCHIDX.vod && SRCHIDX.series) || (isM3u() && DATA.vod.grouped && DATA.series.grouped) || searchCatalogKick) return;
+  searchCatalogKick = ensureSearchCatalog().then(() => {
+    searchCatalogKick = null;
+    if (!isSearchPage(S.page)) return;
+    Q.last = null;
+    /* renderSearchHead() already correctly flips its "still indexing…" text off the instant
+       SRCHIDX is populated (it reads SRCHIDX fresh on every render) -- but the result LIST itself
+       is just whatever Q.all/Q.counts were left at, which is still whatever searching Live TV
+       alone produced if the owner typed a query before this resolved. A bare renderMain() never
+       recomputes that, so the query had to be retyped by hand to actually pick up vod/series --
+       that's what looked like "search failed". Re-running it here instead closes that gap. */
+    if (Q.text) runSearch(); else renderMain();
+  }).catch(err => { searchCatalogKick = null; toast(err && err.message ? err.message : 'Could not load movies/series.'); });
 }
 /* Fetches and groups ONE provider category's movies/series (a few hundred items, typically), instead
    of the whole catalog — the actual fix for this crash, not just a reordering of when the full-catalog
@@ -7863,11 +7929,20 @@ async function showPage(p) {
   $('page-browse').classList.toggle('hidden', !browse);
   $('page-search').classList.toggle('hidden', !isSearchPage(p));
   $('page-settings').classList.toggle('hidden', p !== 'settings');
+  /* guide-v2 + guides/index.json first and immediately -- the small (14KB gzipped), fast sources that
+     cover the default "All Sports" landing view and whichever specific sport guidesWant() asks for
+     below. loadF1 and the legacy loadGuide (XMLTV match, can be a real multi-MB download -- see its own
+     byte-progress GUIDE_MSG) used to fire in the exact same instant as those, all competing for one
+     connection on a Fire TV Stick HD the moment Sports Hub opens -- reported live as "too many things
+     happening at once". Neither is what's actually on screen on arrival (F1 only matters on its own tab;
+     the legacy guide is additive, not the primary source for most setups -- see the fdkey/tsdbkey
+     Settings comment), so they're deliberately given a half-second head start to the sources that are,
+     rather than racing them for bandwidth from the same tick. */
   if (isSearchPage(p)) { loadGuideV2(false); loadGuidesIndex(false); }
-  if (isSearchPage(p) && ui.fdKey) loadFixtures(false);
-  if (isSearchPage(p)) loadF1(false);
-  if (isSearchPage(p) && ui.tsdbKey) loadTsdb(false);
-  if (isSearchPage(p) && !GUIDE_BUSY && (!GUIDE || Date.now() - GUIDE.ts > 3 * 3600e3)) loadGuide(false);
+  if (isSearchPage(p) && ui.fdKey) setTimeout(() => { if (isSearchPage(S.page)) loadFixtures(false); }, 500);
+  if (isSearchPage(p)) setTimeout(() => { if (isSearchPage(S.page)) loadF1(false); }, 500);
+  if (isSearchPage(p) && ui.tsdbKey) setTimeout(() => { if (isSearchPage(S.page)) loadTsdb(false); }, 500);
+  if (isSearchPage(p) && !GUIDE_BUSY && (!GUIDE || Date.now() - GUIDE.ts > 3 * 3600e3)) setTimeout(() => { if (isSearchPage(S.page) && !GUIDE_BUSY) loadGuide(false); }, 500);
   /* Opening Movies/Series itself is cheap now — just the category list (ensureCats below), nothing
      fetched yet. Only Search still pulls in the whole catalog (it can need any item from any category,
      and is core to the app). The Home Favourites page's Movies/Series tabs used to as well — removed
@@ -7883,19 +7958,9 @@ async function showPage(p) {
      device. ensureSearchCatalog builds a lean {id,name,cat} index instead (procSearchIndexG) -- a small
      fraction of the memory -- which Search matches against; opening a result hydrates the full item on
      demand via ensureCategoryItems, same as Movies/Series browsing already does (see openItem). */
-  if (isSearchPage(p) && DATA && !(SRCHIDX.vod && SRCHIDX.series) && !(isM3u() && DATA.vod.grouped && DATA.series.grouped)) {
-    ensureSearchCatalog().then(() => {
-      if (!isSearchPage(S.page)) return;
-      Q.last = null;
-      /* renderSearchHead() already correctly flips its "still indexing…" text off the instant
-         SRCHIDX is populated (it reads SRCHIDX fresh on every render) -- but the result LIST itself
-         is just whatever Q.all/Q.counts were left at, which is still whatever searching Live TV
-         alone produced if the owner typed a query before this resolved. A bare renderMain() never
-         recomputes that, so the query had to be retyped by hand to actually pick up vod/series --
-         that's what looked like "search failed". Re-running it here instead closes that gap. */
-      if (Q.text) runSearch(); else renderMain();
-    }).catch(err => toast(err && err.message ? err.message : 'Could not load movies/series.'));
-  }
+  /* p === 'search' only, not isSearchPage(p) -- see kickSearchCatalog's own comment (next to
+     ensureSearchCatalog) for why Sports Hub must not eagerly trigger this just from being opened. */
+  if (p === 'search') kickSearchCatalog();
   if (S.page !== p) return;
   if (browse) {
     ensureCats(p); catView.reset(); listView.reset(); gridView.reset();
@@ -8100,6 +8165,25 @@ function resRow(x, i) {
     highlight(x.plc && x.label ? x.label : disp(x), Q.toks) + badges(x) + (x.plc && x.nGames ? '<span class="bd">' + x.nGames + (x.nGames === 1 ? ' game' : ' games') + '</span>' : '') + '</span><span class="sub' + (x.plc && !x.nGames ? ' dim' : '') + '">' + esc(sub) + '</span>' + (x.t === 'live' && !x.plc ? ' ' : '') + (x.t === 'live' ? '<span class="sub nowp">' + nowLine(x) + '</span>' : '') + '</div>' + (isFav(x) ? '<span class="star">★</span>' : '') + '</div>';
 }
 
+/* True while ANY sports-guide source is actively fetching/rebuilding -- GUIDE_BUSY only ever covered
+   the legacy XMLTV-matched guide (loadGuide), so on a modern guide-v2/guides setup (the default for
+   most accounts now -- see the fdkey/tsdbkey Settings comment) every "is it working?" indicator reading
+   just GUIDE_BUSY stayed permanently false even while loadGuideV2/loadGuidesSport/the EVENTS rebuild
+   were genuinely busy, making both the Sports Hub status line and Home's banner silently wrong for
+   that setup instead of just unpolished. One place both now read from, so they can't drift apart. */
+function guideBusyNow() { return GUIDE_BUSY || GUIDE_V2_BUSY || GUIDES.busy.size > 0 || EVENTS_BUILDING; }
+/* Same consolidation for the "last updated" text -- picks whichever of the three independent guide
+   sources (legacy GUIDE, guide-v2, the server guides/index.json) was actually refreshed most recently,
+   instead of only ever reading GUIDE.ts. */
+function guideFreshnessText() {
+  if (guideBusyNow()) return GUIDE_MSG || 'Updating the sports guide…';
+  const gTs = (GUIDE && GUIDE.ts) || 0, v2Ts = (GUIDE_V2 && GUIDE_V2._ts) || 0, gxTs = (GUIDES.index && GUIDES.index._ts) || 0;
+  const ts = Math.max(gTs, v2Ts, gxTs);
+  if (!ts) return '';
+  let s = 'TV guide updated ' + clockStr(new Date(ts));
+  if (ts === gTs) { if (GUIDE.until) s += ', runs to ' + new Date(GUIDE.until).toLocaleDateString([], {weekday: 'short'}); if (GUIDE.shift) s += ', times corrected'; }
+  return s;
+}
 function renderSearchHead() {
   const q = $('q');
   if (document.activeElement !== q) q.value = Q.text;
@@ -8110,11 +8194,17 @@ function renderSearchHead() {
   const idxLoading = !!DATA && (isM3u() ? !(DATA.vod.grouped && DATA.series.grouped) : !(SRCHIDX.vod && SRCHIDX.series));
   if (Q.busy) st = 'Checking for close spellings…';
   else if (Q.text) { const n = (Q.counts.all || 0) + Q.games.length; st = n ? n.toLocaleString() + (n === 1 ? ' result' : ' results') : 'No matches'; if (idxLoading) st += ' (movies & series still indexing…)'; }
-  else st = idxLoading ? 'Indexing movies & series…' : (GUIDE_MSG || (GUIDE && GUIDE.ts ? 'TV guide updated ' + clockStr(new Date(GUIDE.ts)) + (GUIDE.until ? ', runs to ' + new Date(GUIDE.until).toLocaleDateString([], {weekday: 'short'}) : '') + (GUIDE.shift ? ', times corrected' : '') : ''));
+  else st = idxLoading ? 'Indexing movies & series…' : guideFreshnessText();
   $('qstat').textContent = st;
 }
 function renderSearch() {
   $('page-search').classList.toggle('nokb', !Q.kb);
+  /* Kicked here, before renderSearchHead(), not left for filteredEvents() (called later, while
+     building the results list below) to discover on its own -- EVENTS_BUILDING is set synchronously
+     the instant ensureEventsAsync() starts (before its first await), so triggering it before the status
+     text is computed means the very first render after landing here already reads "Updating…" instead
+     of showing last render's stale text for one extra cycle until the next re-render catches up. */
+  if (EVENTS_STALE && !EVENTS_BUILDING) ensureEventsAsync();
   renderSearchHead();
   if (Q.kb) {
     const row = KB[Q.kbR], ki = keyAt(row, Q.kbC);
@@ -8877,6 +8967,10 @@ function runSearch() {
   const nq = norm(Q.text);
   Q.busy = false;
   if (!nq) { Q.all = []; Q.last = null; Q.toks = []; publish([]); return; }
+  /* Every actual-search input path (typed, pasted, phone QR, ENTER) funnels through here, so this is
+     the one place to kick the movies+series index off the moment a query is real -- see
+     kickSearchCatalog's own comment for why Sports Hub no longer does this just from being opened. */
+  kickSearchCatalog();
   const toks = nq.split(' '), qs = toks.join(''), whole = toks.join(' ');
   Q.toks = toks;
   const pool = Q.last && nq.startsWith(Q.last.nq) ? Q.last.pool : ALL;
