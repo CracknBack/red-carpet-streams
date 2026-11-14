@@ -94,6 +94,11 @@ jobs:
             fi
             cp "$SRC" "$GITHUB_WORKSPACE/out/$OUT"
             echo "Built $OUT"
+            # Fixed filename, release builds only -- lets the aftv.news Downloader code point at
+            # releases/latest/download/RedCarpetPlayer-latest.apk once and never need re-registering.
+            if [ "$F" = "player" ] && [ "$BT" != "debug" ]; then
+              cp "$SRC" "$GITHUB_WORKSPACE/out/RedCarpetPlayer-latest.apk"
+            fi
           done
 
       - uses: actions/upload-artifact@v4
