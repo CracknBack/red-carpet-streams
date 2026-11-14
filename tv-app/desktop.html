@@ -9874,6 +9874,27 @@ $('osd').addEventListener('pointerup', e => {
   lastScrubTime = Date.now();
   try { bar.releasePointerCapture(e.pointerId); } catch (x) {}
 });
+/* Phone: tapping the left/right half of the video seeks like YouTube's double-tap. The first tap
+   is a normal play/pause + show-controls tap, delayed briefly (280ms) so a following tap on the
+   same side can cancel it and seek instead -- each further rapid tap on that side jumps further
+   than the last (10s, 20s, 30s...), same "the more you tap, the faster it scrubs" feel as holding
+   LEFT/RIGHT on a remote (scanKey()), just driven by tap count instead of hold duration. */
+let phoneTap = {t: 0, side: 0, n: 0, timer: null};
+function onPhoneTap(e) {
+  const it = cur(); if (!it) return;
+  if (it.t === 'live') { toggleOsd(); return; }
+  const r = $('player').getBoundingClientRect(), side = (e.clientX - r.left) < r.width / 2 ? -1 : 1, now = Date.now();
+  if (now - phoneTap.t < 320 && side === phoneTap.side) {
+    clearTimeout(phoneTap.timer); phoneTap.n++; phoneTap.t = now;
+    if (isFinite(video.duration)) { const d = (phoneTap.n - 1) * 10; seek(side * d); pmsg((side < 0 ? '◀◀ ' : '▶▶ ') + d + 's'); }
+    return;
+  }
+  phoneTap = {t: now, side, n: 1, timer: null};
+  phoneTap.timer = setTimeout(() => {
+    if (video.paused) { safePlay(); P.userPaused = false; } else { video.pause(); P.userPaused = true; }
+    toggleOsd();
+  }, 280);
+}
 function closePlayer() {
   stopScan();
   if (GUIDE_RETRY) { GUIDE_RETRY = false; setTimeout(() => { if (S.screen !== 'player' && !GUIDE_BUSY) loadGuide(false); }, 60000); }
@@ -10717,8 +10738,9 @@ $('m-vers').addEventListener('click', e => { const i = idxOf(e); if (i < 0) retu
 $('s-vers').addEventListener('click', e => { const i = idxOf(e); if (i < 0) return; openSeries(SER.g, i, 'svers'); });
 $('seasons').addEventListener('click', e => { const i = idxOf(e); if (i < 0) return; SER.s = i; SER.e = 0; SER.zone = 'seasons'; epView.reset(); renderSeries(); });
 $('eps').addEventListener('click', e => { const i = idxOf(e); if (i < 0) return; SER.e = i; SER.zone = 'eps'; play(SER.eps[SER.seasons[SER.s]], i); });
-$('player').addEventListener('click', () => {
+$('player').addEventListener('click', e => {
   if (Date.now() - lastScrubTime < 350) return;
+  if (PHONE) { onPhoneTap(e); return; }
   const it = cur(); if (it && it.t !== 'live') { if (video.paused) { safePlay(); P.userPaused = false; } else { video.pause(); P.userPaused = true; } } toggleOsd();
 });
 if (PC) {
