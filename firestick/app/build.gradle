@@ -9,7 +9,15 @@ plugins {
    confirmed 2026-11-14 when a CI build's versionCode (73, CI's own run count) was lower than what was
    already installed from a prior local build (83), and Android refused to install it as a downgrade).
    GITHUB_RUN_NUMBER is kept only as a fallback for a checkout that's missing the file entirely. */
-def buildNumFile = file('BUILD_NUMBER')
+/* '../BUILD_NUMBER', not 'BUILD_NUMBER' -- file() resolves relative to this module's own directory
+   (firestick/app/), but the one tracked counter this comment above describes lives one level up at
+   firestick/BUILD_NUMBER. That mismatch meant buildNumFile.exists() was false for BOTH CI and a local
+   build, so both silently fell through to the GITHUB_RUN_NUMBER fallback below -- set by Actions in CI
+   (its own unrelated run-count, exactly the old bug this comment says was fixed) and unset locally
+   (defaulting to '1', which is lower than anything already installed and fails as a downgrade).
+   Confirmed live 2026-11-15: a local assemblePlayerRelease built versionCode=1 while the device already
+   had 84 installed. */
+def buildNumFile = file('../BUILD_NUMBER')
 def runNumber = (buildNumFile.exists() ? buildNumFile.text.trim() : System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
 /* the version shown is the TV app's own version (read from the files copied into the app at build time) */
 def infoFile = file('src/main/assets/www/appinfo.json')
