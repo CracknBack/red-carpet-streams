@@ -44,6 +44,11 @@ jobs:
       - name: Read the app version
         run: echo "VER=$(jq -r .version "$ROOT/tv-app/appinfo.json")" >> "$GITHUB_ENV"
 
+      - name: Read the build number
+        # The one tracked counter build.gradle itself also reads (see its own comment) -- CI and a
+        # local build share this file so "build N" always means the same versionCode either way.
+        run: echo "BUILD_NUM=$(cat "$ROOT/firestick/BUILD_NUMBER")" >> "$GITHUB_ENV"
+
       - name: Work out which flavors to build
         run: |
           case "${{ inputs.flavor }}" in
@@ -83,9 +88,9 @@ jobs:
             gradle -p "$ROOT/firestick" "assemble${FC}${TC}" --no-daemon
             SRC="$ROOT/firestick/app/build/outputs/apk/$F/$BT/app-$F-$BT.apk"
             if [ "$F" = "player" ]; then
-              OUT="RedCarpetPlayer-v${VER}-build${{ github.run_number }}${SUFFIX}.apk"
+              OUT="RedCarpetPlayer-v${VER}-build${BUILD_NUM}${SUFFIX}.apk"
             else
-              OUT="RedCarpetStreams-${VER}-build${{ github.run_number }}${SUFFIX}.apk"
+              OUT="RedCarpetStreams-${VER}-build${BUILD_NUM}${SUFFIX}.apk"
             fi
             cp "$SRC" "$GITHUB_WORKSPACE/out/$OUT"
             echo "Built $OUT"
@@ -93,12 +98,24 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: redcarpet-apks-build${{ github.run_number }}
+          name: redcarpet-apks-build${{ env.BUILD_NUM }}
           path: out/*.apk
 
       - name: Publish as a release (easy to download on your phone, or to generate a Downloader code from)
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: firestick-${{ github.run_number }}
-          name: Red Carpet ${{ env.VER }} (build ${{ github.run_number }})
+          tag_name: firestick-${{ env.BUILD_NUM }}
+          name: Red Carpet ${{ env.VER }} (build ${{ env.BUILD_NUM }})
           files: out/*.apk
+
+      - name: Advance the build number for next time
+        # Only for a real release build -- a debug test build shouldn't burn the next public number.
+        if: inputs.build_type != 'debug'
+        run: |
+          cd "$ROOT"
+          echo "$(( BUILD_NUM + 1 ))" > firestick/BUILD_NUMBER
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add firestick/BUILD_NUMBER
+          git commit -m "Advance build number to $(( BUILD_NUM + 1 )) after build $BUILD_NUM"
+          git push

@@ -2,7 +2,15 @@ plugins {
     id 'com.android.application'
 }
 
-def runNumber = (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
+/* The single source of truth for the public build number -- CI and a local `gradle assemblePlayerRelease`
+   now always produce the same versionCode for "build N", because both read the one tracked counter
+   instead of each keeping their own (CI used to use its own run number, which only counts CI's own
+   invocations; a local build used to need GITHUB_RUN_NUMBER set by hand, and the two drifted apart --
+   confirmed 2026-11-14 when a CI build's versionCode (73, CI's own run count) was lower than what was
+   already installed from a prior local build (83), and Android refused to install it as a downgrade).
+   GITHUB_RUN_NUMBER is kept only as a fallback for a checkout that's missing the file entirely. */
+def buildNumFile = file('BUILD_NUMBER')
+def runNumber = (buildNumFile.exists() ? buildNumFile.text.trim() : System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
 /* the version shown is the TV app's own version (read from the files copied into the app at build time) */
 def infoFile = file('src/main/assets/www/appinfo.json')
 def appVer = infoFile.exists() ? new groovy.json.JsonSlurper().parseText(infoFile.text).version : '0.0'
