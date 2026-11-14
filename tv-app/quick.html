@@ -3077,7 +3077,15 @@ const TRIAL_START = (() => {
 })();
 function trialDaysLeft() { return Math.max(0, Math.ceil(TRIAL_DAYS - (Date.now() - TRIAL_START) / 86400000)); }
 function inTrial() { return trialDaysLeft() > 0; }
-function isProActive() { return isProUnlocked() || inTrial(); }
+/* TEMPORARY, 2026-11-14: the real Lemon Squeezy store isn't activated yet, so there is currently no
+   way for anyone -- the owner included -- to actually buy a key. Showing a paywall nobody can get
+   past is worse than showing none at all while that's true, and current download volume is low
+   enough that giving Pro away free for this window is an acceptable, deliberate call, not an
+   oversight. Flip FREE_FOR_NOW back to false (or delete this line and its one use below) the moment
+   the store goes live -- this is NOT meant to be permanent, unlike OWNER_BYPASS further down, which
+   is scoped to one local build only and never ships. This one, if left on, ships to everyone. */
+const FREE_FOR_NOW = true;
+function isProActive() { return FREE_FOR_NOW || isProUnlocked() || inTrial(); }
 /* A stable-per-device label (not a hardcoded constant) so each of a license's up-to-5 activated
    instances shows up distinctly in the Lemon Squeezy dashboard instead of 5 identical "Red Carpet
    Player" rows nobody can tell apart -- generated once and persisted, so re-activating the same
@@ -5940,7 +5948,7 @@ function renderHome() {
   $('h-date').textContent = d.toLocaleDateString([], {weekday: 'long', day: 'numeric', month: 'long'});
   const u = userInfo || {}, exp = Number(u.exp_date) ? new Date(Number(u.exp_date) * 1000) : null;
   $('h-sub').textContent = isM3u() ? 'Playlist' : exp ? 'Subscription active until ' + exp.toLocaleDateString([], {day: 'numeric', month: 'short', year: 'numeric'}) : (u.status || '');
-  const showTrialBadge = !isProUnlocked() && inTrial();
+  const showTrialBadge = !FREE_FOR_NOW && !isProUnlocked() && inTrial();   /* a countdown is misleading when FREE_FOR_NOW means nothing actually runs out */
   $('h-trial').classList.toggle('hidden', !showTrialBadge);
   if (showTrialBadge) $('h-trial').textContent = 'PRO TRIAL — ' + trialDaysLeft() + ' DAY' + (trialDaysLeft() === 1 ? '' : 'S') + ' LEFT';
   $('h-ver').innerHTML = (GUIDE_BUSY ? '<span class="hbd"></span>Updating the TV guide…&nbsp;&nbsp;·&nbsp;&nbsp;' : '') + 'Version ' + esc(APP_VERSION);
@@ -8956,7 +8964,7 @@ function renderSettings() {
     ['App version', APP_VERSION]
   ].concat(CLOCK.skew ? [['Device clock', 'Off by ' + Math.round(Math.abs(CLOCK.skew) / 60000) + ' minutes; the app corrects for it']] : []);
   const V_ = {
-    pro: ['Red Carpet Pro', isProUnlocked() ? 'Activated' + (ui.pro.mode === 'test' ? ' (test key)' : '') : inTrial() ? 'Free Trial — ' + trialDaysLeft() + ' day' + (trialDaysLeft() === 1 ? '' : 's') + ' left' : 'Free Edition — tap to enter a license key'],
+    pro: ['Red Carpet Pro', isProUnlocked() ? 'Activated' + (ui.pro.mode === 'test' ? ' (test key)' : '') : inTrial() ? 'Free Trial — ' + trialDaysLeft() + ' day' + (trialDaysLeft() === 1 ? '' : 's') + ' left' : FREE_FOR_NOW ? 'Free for now — every Pro feature is unlocked while the store isn’t live yet' : 'Free Edition — tap to enter a license key'],
     refresh: ['Update lists now', 'Last updated ' + upd + (GUIDE && GUIDE.ts ? ' · guide ' + clockStr(new Date(GUIDE.ts)) : '')], guidecheck: ['Check the TV guide', 'See what the guide contains'],
     catlist: ['Copy category list', 'Movies/Series category names, for reorganising them'],
     fdkey: ['Fixtures key (football-data.org)', !ui.fdKey ? 'Not set' : FD.err ? 'Problem: ' + FD.err.replace('Fixtures couldn’t be updated: ', '') : FD.ts ? FD.list.length + ' games · updated ' + clockStr(new Date(FD.ts)) : 'Saved'],
@@ -10454,7 +10462,10 @@ function enterMain() {
      own "trial has ended" line, added the same report). Said once, here, so it's at least announced
      when it STARTS too. sp_trial_announced is its own flag, separate from TRIAL_START, so it can never
      re-fire on every login the way an unguarded check would. */
-  if (inTrial() && !isProUnlocked() && !load('sp_trial_announced', false)) {
+  /* FREE_FOR_NOW means there's no real 7-day limit in effect right now (see its own comment) --
+     announcing one anyway would be actively misleading, not just redundant, so this is skipped
+     entirely while it's on rather than reworded. */
+  if (!FREE_FOR_NOW && inTrial() && !isProUnlocked() && !load('sp_trial_announced', false)) {
     save('sp_trial_announced', true);
     toast('You have 7 days of free Red Carpet Pro — automated Event Guide matching, channel pinning and more. Look for the countdown on Home.');
   }
