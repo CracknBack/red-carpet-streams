@@ -401,6 +401,12 @@ html.phone .hb-find{font-size:3.4rem;padding:0 2rem}
 /* the fixtures: tiles, three across */
 #rlist.fgridwrap{overflow-y:auto;overflow-x:hidden;padding:1.4rem 2.6rem 4rem 2.6rem;scrollbar-width:none}
 #rlist.fgridwrap::-webkit-scrollbar,#g-chans.ctiles::-webkit-scrollbar{display:none}
+/* Every scrollable list here hides its native scrollbar (looks bad on TV/phone), which also throws
+   away the only hint that there's more below. scrollHintInit() (see JS) toggles .more-below on each
+   container once it's actually overflowing and not yet scrolled to the end; the ::after is a sticky
+   pseudo-footer so it rides along at the bottom of the scrollport without becoming a real list item
+   that would mess with the grid/flex layout of the real rows above it. */
+#rlist.more-below::after,#g-chans.more-below::after,.slist.more-below::after,#opts-list.more-below::after{content:'▾ more';position:sticky;bottom:.2rem;display:flex;justify-content:center;align-items:center;margin-top:-2.6rem;height:2.6rem;font-size:1.3rem;letter-spacing:.08em;color:var(--amber);text-shadow:0 .2rem .6rem rgba(0,0,0,.85);pointer-events:none;animation:hbpulse 1.8s ease-in-out infinite}
 .fhead,.chead{font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-weight:700;text-transform:uppercase;letter-spacing:.14em;font-size:1.8rem;color:var(--amber);margin:2.2rem 0 1rem;display:flex;align-items:baseline;gap:1.2rem}
 .fhead:first-child,.chead:first-child{margin-top:.6rem}
 .chead span{font-family:'Barlow',sans-serif;font-weight:400;letter-spacing:0;text-transform:none;color:var(--muted);font-size:1.6rem}
@@ -658,7 +664,11 @@ mark{background:none;color:var(--amber);font-weight:600}
 /* overflow:visible (not hidden) -- the thumb is a circle taller than the thin bar itself and needs to
    poke out past it. cursor:pointer plus a taller invisible hit area (padding via :before would change
    layout, so the pointerdown handler below just reads the bar's own rect directly instead). */
-.bar{position:relative;height:.7rem;background:rgba(255,255,255,.18);border-radius:.35rem;margin:1.8rem 0 .8rem;overflow:visible;cursor:pointer}
+.bar{position:relative;height:.7rem;background:rgba(255,255,255,.18);border-radius:.35rem;margin:1.8rem 0 .8rem;overflow:visible;cursor:pointer;touch-action:none}
+/* Without touch-action:none, a touch drag along the bar is ambiguous to the browser (pan vs. our own
+   drag) and it can hand the gesture to native scrolling mid-drag, which cancels the pointer* sequence
+   after the very first touch -- looks exactly like "the bar won't let me drag it", confirmed on phone. */
+.bar::before{content:'';position:absolute;top:-1.2rem;bottom:-1.2rem;left:0;right:0;touch-action:none}
 .bar i{display:block;height:100%;background:var(--amber);border-radius:.35rem;pointer-events:none}
 .bar .thumb{position:absolute;top:50%;width:1.7rem;height:1.7rem;border-radius:50%;background:var(--amber);box-shadow:0 0 .8rem rgba(231,185,111,.65);transform:translate(-50%,-50%);pointer-events:none}
 .times{display:flex;justify-content:space-between;color:var(--muted)}
@@ -9002,6 +9012,7 @@ function renderSettings() {
   $('page-settings').innerHTML = h + '</div></div>';
   const f = document.querySelector('#slist .srow.focus');
   if (f) f.scrollIntoView({block: 'nearest'});
+  scrollHintInit($('slist'));   /* #page-settings' own innerHTML replace rebuilds #slist as a new node every call, unlike #rlist/#g-chans/#opts-list which patch in place -- so this can't just run once at boot */
 }
 function settingsAction(i) {
   const a = SETS[i];
@@ -10777,6 +10788,20 @@ setInterval(tick0, 15000);
 const tick = () => { $('clock').textContent = clockStr(); if (PV.it && S.screen === 'main') renderPreviewInfo(); if (tilesShown()) fillTileCaps(); };
 setInterval(tick, 15000); tick();
 window.addEventListener('resize', () => { if (S.screen === 'main') { catView.reset(); listView.reset(); gridView.reset(); resView.reset(); renderMain(); } });
+
+/* Scrollable lists hide their native scrollbar (ugly on TV/phone) with no other hint that there's
+   more content below -- toggles .more-below (CSS renders a small pulsing "more" footer) once the
+   element is actually overflowing and hasn't been scrolled to the end. A ResizeObserver catches
+   content changes from any render path (fixtures loading in, a filter changing the list, etc.)
+   without needing a call sprinkled into every renderer that fills these containers. */
+function scrollHintInit(el) {
+  if (!el || el.__scrollHintInit) return; el.__scrollHintInit = true;
+  const update = () => el.classList.toggle('more-below', el.scrollHeight - el.clientHeight - el.scrollTop > 4);
+  el.addEventListener('scroll', update, {passive: true});
+  new ResizeObserver(update).observe(el);
+  update();
+}
+[$('rlist'), $('g-chans'), $('opts-list')].forEach(scrollHintInit);   /* #slist doesn't exist yet at boot -- renderSettings() calls this itself once it does */
 
 /* exposed only for testing on a computer */
 window.__sp = {clean};
