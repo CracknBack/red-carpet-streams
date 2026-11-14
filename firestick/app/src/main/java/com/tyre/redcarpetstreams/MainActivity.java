@@ -596,8 +596,19 @@ public class MainActivity extends Activity {
                     Log.i("RCS_PBLOG", "event=play url=" + redact(url) + " live=" + isLive);
                 }
                 player.setPlaybackSpeed(1f);
+                /* Not setTrackTypeDisabled(TEXT, true) here: disabling the whole track type makes
+                   DefaultTrackSelector mark every text track as unsupported for selection, and
+                   Tracks.Group.isTrackSupported() in tracksJson() can't tell that apart from "this
+                   stream genuinely has no subtitles" -- the JS side's Subtitles menu item
+                   (index.html's trackInfo()/optItems()) only appears when tr.text.length > 0, so a
+                   disabled type reads as "no subtitles were ever available," not "off by default."
+                   clearOverrides() alone already resets any previous video's track pick, and
+                   ExoPlayer/Media3 doesn't auto-select a text track without one unless the manifest
+                   itself flags a track DEFAULT/forced, so leaving the type enabled keeps subtitles
+                   off by default in the common case while still letting the page discover and offer
+                   whatever tracks the stream actually has. */
                 player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon()
-                        .clearOverrides().setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true).build());
+                        .clearOverrides().build());
                 pv.setVisibility(View.VISIBLE);
                 MediaItem.Builder mb = new MediaItem.Builder().setUri(url);
                 if (isLive) {
