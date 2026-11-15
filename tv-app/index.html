@@ -3996,20 +3996,22 @@ const SPORT_GROUPS = [
    basketball, Formula 1 for "grand prix", one tour per individual sport (PGA/ATP, not every variant --
    "tabs for absolutely everything is madness" too). */
 const DEFAULT_SPORT_CHIPS = ['Premier League', 'NBA', 'Formula 1', 'PGA Tour', 'ATP Tour'];
-/* Changing DEFAULT_SPORT_CHIPS above does nothing on its own for any device that already has
-   ui.sportChips saved -- sportChipIds() below always prefers the saved value over the default, so an
-   existing install stayed on the old whole-sport tabs no matter what the new default said. Confirmed
-   live 2026-11-15: rebuilt with the new default, installed, tabs were still Soccer/Basketball/.../Golf.
-   One-time migration: if the saved list is EXACTLY the old whole-sport default (meaning this install
-   never actually used Add/Remove to customise it -- just has whatever first boot saved), replace it with
-   the new one. A list that differs at all means a real customisation already happened and is left alone,
-   never overwritten. */
-const OLD_DEFAULT_SPORT_CHIPS = ['soccer', 'basketball', 'amfootball', 'baseball', 'tennis', 'golf'];
-if (ui.sportChips && ui.sportChips.length === OLD_DEFAULT_SPORT_CHIPS.length && ui.sportChips.every((id, i) => id === OLD_DEFAULT_SPORT_CHIPS[i])) {
-  delete ui.sportChips;
-  save('sp_ui', ui);
-}
-const sportChipIds = () => ui.sportChips || DEFAULT_SPORT_CHIPS;
+/* Changing DEFAULT_SPORT_CHIPS above does nothing on its own for a device that already has ui.sportChips
+   saved -- sportChipIds() always preferred the saved value over the default, so an existing install
+   stayed on the old whole-sport tabs no matter what the new default said (confirmed live 2026-11-15).
+   First fix attempt guessed at the exact old saved array and compared against that -- wrong approach,
+   the guess didn't match this device's actual saved value (confirmed live right after: tabs were still
+   unchanged post-"fix"). Never guess what an old value was. ui.sportChipsCustomized is a dedicated flag,
+   set ONLY by saveSportChips() below whenever the owner actually uses Add/Remove -- sportChipIds() trusts
+   the saved list ONLY when that flag is true, so any existing install with a saved-but-never-flagged list
+   (which is every install before this fix, with zero exceptions, regardless of what that list contains)
+   falls straight through to the new default, no comparison against a guessed-at old value needed at all. */
+const sportChipIds = () => (ui.sportChipsCustomized && ui.sportChips) ? ui.sportChips : DEFAULT_SPORT_CHIPS;
+/* The one place ui.sportChips is ever written -- guarantees sportChipsCustomized can never drift out of
+   sync with it (every call site below used to set ui.sportChips directly; if even one of them had been
+   missed when adding the flag, that path would silently keep saving to a list sportChipIds() never
+   actually reads once customised). */
+function saveSportChips(ids) { ui.sportChips = ids; ui.sportChipsCustomized = true; save('sp_ui', ui); }
 function parseShortcut(x) {
   const n = norm(x);
   if (!n) return '';
@@ -4063,7 +4065,7 @@ function moveChip(dir) {
    dropdown every time). Same two-step choice homeOpenSportGroup's own popup already offers, just
    landing in ui.sportChips instead of switching straight there. */
 function addSportEntry(id) {
-  if (sportChipIds().indexOf(id) < 0) { ui.sportChips = sportChipIds().concat([id]); save('sp_ui', ui); }
+  if (sportChipIds().indexOf(id) < 0) saveSportChips(sportChipIds().concat([id]));
   const g = SPORT_GROUPS.find(s => s[0] === id);
   Q.sport = g ? 'group:' + id : id;
   Q.chip = sportChips().findIndex(c => c.id === Q.sport); Q.skey = ''; resView.reset(); renderMain();
@@ -4079,8 +4081,7 @@ function untickSport(g) {
   const ids = sportChipIds(), present = sportEntryIds(g).filter(id => ids.includes(id));
   if (!present.length) return;
   if (ids.length <= present.length) { toast('Keep at least one sport or league on the tab row.'); return; }
-  ui.sportChips = ids.filter(id => !present.includes(id));
-  save('sp_ui', ui);
+  saveSportChips(ids.filter(id => !present.includes(id)));
   Q.chip = Math.max(0, Math.min(Q.chip, sportChips().length - 1));
   Q.sport = sportChips()[Q.chip] ? sportChips()[Q.chip].id : '';
   Q.skey = ''; resView.reset(); renderMain();
@@ -4096,9 +4097,8 @@ function toggleSportEntry(id) {
   const ids = sportChipIds();
   if (ids.includes(id)) {
     if (ids.length <= 1) { toast('Keep at least one sport or league on the tab row.'); return; }
-    ui.sportChips = ids.filter(x => x !== id);
-  } else ui.sportChips = ids.concat([id]);
-  save('sp_ui', ui);
+    saveSportChips(ids.filter(x => x !== id));
+  } else saveSportChips(ids.concat([id]));
   /* Re-filters the already-built EVENTS array in place (no network, no rebuild) -- cheap enough to run
      on every single tick so the tab row updates live while the picker's still open, rather than only
      catching up once it closes. */
@@ -4137,8 +4137,7 @@ function removeChip(c) {
   const ids = sportChipIds();
   if (ids.length <= 1) { toast('Keep at least one sport or league on the tab row.'); renderMain(); return; }
   const entryId = c.id.indexOf('group:') === 0 ? c.id.slice(6) : c.id;
-  ui.sportChips = ids.filter(x => x !== entryId);
-  save('sp_ui', ui);
+  saveSportChips(ids.filter(x => x !== entryId));
   Q.chip = Math.max(0, Math.min(Q.chip, ui.sportChips.length - 1));
   Q.sport = sportChips()[Q.chip] ? sportChips()[Q.chip].id : '';
   Q.skey = ''; resView.reset();
