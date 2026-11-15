@@ -3997,6 +3997,19 @@ const SPORT_GROUPS = [
    basketball, Formula 1 for "grand prix", one tour per individual sport (PGA/ATP, not every variant --
    "tabs for absolutely everything is madness" too). */
 const DEFAULT_SPORT_CHIPS = ['Premier League', 'NBA', 'Formula 1', 'PGA Tour', 'ATP Tour'];
+/* Changing DEFAULT_SPORT_CHIPS above does nothing on its own for any device that already has
+   ui.sportChips saved -- sportChipIds() below always prefers the saved value over the default, so an
+   existing install stayed on the old whole-sport tabs no matter what the new default said. Confirmed
+   live 2026-11-15: rebuilt with the new default, installed, tabs were still Soccer/Basketball/.../Golf.
+   One-time migration: if the saved list is EXACTLY the old whole-sport default (meaning this install
+   never actually used Add/Remove to customise it -- just has whatever first boot saved), replace it with
+   the new one. A list that differs at all means a real customisation already happened and is left alone,
+   never overwritten. */
+const OLD_DEFAULT_SPORT_CHIPS = ['soccer', 'basketball', 'amfootball', 'baseball', 'tennis', 'golf'];
+if (ui.sportChips && ui.sportChips.length === OLD_DEFAULT_SPORT_CHIPS.length && ui.sportChips.every((id, i) => id === OLD_DEFAULT_SPORT_CHIPS[i])) {
+  delete ui.sportChips;
+  save('sp_ui', ui);
+}
 const sportChipIds = () => ui.sportChips || DEFAULT_SPORT_CHIPS;
 function parseShortcut(x) {
   const n = norm(x);
