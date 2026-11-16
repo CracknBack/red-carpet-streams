@@ -18,8 +18,10 @@ The owner does not know what a repo or hosting setup is. **Never ask them how th
 things live — you already know, or can look it up.** The marketing website (`website/`) is the Vercel project
 `red-carpet-player` (team `cracknback's projects`, slug `tyre-trawler`, team id
 `team_geB51NIW3HEZC5GboYcyNCBD`), served at https://redcarpetplayer.store, git-connected to this repo's
-`main` branch: a push touching `website/` (or a future `api/` folder of serverless functions) deploys
-automatically. Verify with the Vercel MCP tools (`get_project`, `get_deployment`) instead of asking. Only ask
+`main` branch: a push touching `website/` deploys automatically. The Vercel project's root directory is
+`website/`, so the licence-server functions live in `website/api/` (`.mjs`, zero dependencies; Redis via the
+Upstash REST API). Pushes to any other branch get a private preview deployment (login-protected; fetch it with
+the Vercel MCP `web_fetch_vercel_url`). Offline tests: `node tools/test_license_api.mjs`. Verify with the Vercel MCP tools (`get_project`, `get_deployment`) instead of asking. Only ask
 the owner for decisions/secrets only they can supply (price, shop logins, business choices), in plain
 language, with a recommended default. Pro licensing is mid-migration from Lemon Squeezy (shutting down) to
 self-generated keys sold via Polar + Creem; see the memory note `redcarpet_licensing_migration.md`.
