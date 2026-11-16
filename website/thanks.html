@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Thank you — Red Carpet Pro</title>
+<link rel="icon" type="image/png" href="icons/logo-mark-square.png">
+<style>
+  :root{--crimson:#9E2A2B;--crimson-hover:#B83334;--gold:#D4AF37;--gold-light:#F3E5AB;--ink:#E2E8F0;--muted:#94A3B8;--bg:#0A0F1C;--card:#111726;--card-border:rgba(212,175,55,.18)}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,'Segoe UI',sans-serif;line-height:1.55}
+  .card{width:100%;max-width:520px;background:var(--card);border:1px solid var(--card-border);border-radius:14px;padding:28px 22px;text-align:center}
+  h1{margin:0 0 .4rem;font-size:1.5rem}
+  p{margin:.6rem 0;color:var(--muted);font-size:.92rem}
+  .key{margin:1.1rem 0 .6rem;padding:.9rem .5rem;border:1px dashed var(--gold);border-radius:10px;font:700 1.45rem/1.2 ui-monospace,Consolas,monospace;letter-spacing:.08em;color:var(--gold-light);word-break:break-all;user-select:all}
+  button{width:100%;padding:.8rem 1rem;border-radius:.65rem;border:1px solid var(--gold);background:var(--crimson);color:#fff;font-weight:800;letter-spacing:.02em;text-transform:uppercase;font-size:.85rem;cursor:pointer}
+  button:hover{background:var(--crimson-hover)}
+  a{color:var(--gold-light)}
+  .spin{width:30px;height:30px;margin:1rem auto;border:3px solid var(--card-border);border-top-color:var(--gold);border-radius:50%;animation:s 1s linear infinite}
+  @keyframes s{to{transform:rotate(360deg)}}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main class="card">
+  <div id="wait">
+    <h1>Thank you!</h1>
+    <p>Payment received. We’re creating your Pro license key — this usually takes a few seconds.</p>
+    <div class="spin" aria-hidden="true"></div>
+  </div>
+  <div id="ready" hidden>
+    <h1>You’re all set — thank you!</h1>
+    <p>Your Red Carpet Pro license key:</p>
+    <div class="key" id="key"></div>
+    <button type="button" id="copy">Copy key</button>
+    <p><b>Save this key.</b> We’ve also emailed it to you. It works on up to 5 of your devices.</p>
+    <p>To activate: open Red Carpet Player → <b>Settings</b> → <b>Enter a Red Carpet Pro license key</b>.</p>
+  </div>
+  <div id="slow" hidden>
+    <h1>Thank you!</h1>
+    <p>Your payment went through, but your key is taking longer than usual. Check your email (and spam folder) — it will be sent there shortly. If it hasn’t arrived within 15 minutes, write to <a href="mailto:redcarpetplayer@pm.me">redcarpetplayer@pm.me</a> and we’ll sort it out.</p>
+  </div>
+  <div id="bad" hidden>
+    <h1>Hmm, something’s missing</h1>
+    <p>This page needs the link you were sent to after paying. Your key will also arrive by email. Need help? <a href="mailto:redcarpetplayer@pm.me">redcarpetplayer@pm.me</a></p>
+  </div>
+</main>
+<script>
+(function () {
+  var q = new URLSearchParams(location.search);
+  var provider = q.get('provider');
+  var id = q.get('checkout_id');
+  function show(which) { ['wait', 'ready', 'slow', 'bad'].forEach(function (n) { document.getElementById(n).hidden = n !== which; }); }
+  if (['polar', 'creem'].indexOf(provider) < 0 || !/^[A-Za-z0-9_-]{8,100}$/.test(id || '')) { show('bad'); return; }
+  var tries = 0;
+  function poll() {
+    fetch('/api/license/lookup?provider=' + provider + '&checkout_id=' + encodeURIComponent(id), { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (j.status === 'ready' && typeof j.key === 'string') {
+          document.getElementById('key').textContent = j.key;
+          show('ready');
+        } else { next(); }
+      })
+      .catch(next);
+  }
+  function next() { if (++tries > 40) show('slow'); else setTimeout(poll, 3000); } // ~2 minutes of polling
+  document.getElementById('copy').onclick = function () {
+    var k = document.getElementById('key').textContent, b = this;
+    (navigator.clipboard ? navigator.clipboard.writeText(k) : Promise.reject()).then(function () { b.textContent = 'Copied!'; }, function () { b.textContent = 'Select the key above and copy it'; });
+  };
+  poll();
+})();
+</script>
+</body>
+</html>

@@ -12,6 +12,18 @@ no framework, ~7000 lines) wrapped for three platforms:
   changes to the shared `tv-app/index.html` do affect it.
 - **LG webOS** — same native `<video>` + hls.js path as Windows, no dedicated project folder.
 
+## Owner context: non-technical about hosting — read before asking questions
+
+The owner does not know what a repo or hosting setup is. **Never ask them how the site is hosted or where
+things live — you already know, or can look it up.** The marketing website (`website/`) is the Vercel project
+`red-carpet-player` (team `cracknback's projects`, slug `tyre-trawler`, team id
+`team_geB51NIW3HEZC5GboYcyNCBD`), served at https://redcarpetplayer.store, git-connected to this repo's
+`main` branch: a push touching `website/` (or a future `api/` folder of serverless functions) deploys
+automatically. Verify with the Vercel MCP tools (`get_project`, `get_deployment`) instead of asking. Only ask
+the owner for decisions/secrets only they can supply (price, shop logins, business choices), in plain
+language, with a recommended default. Pro licensing is mid-migration from Lemon Squeezy (shutting down) to
+self-generated keys sold via Polar + Creem; see the memory note `redcarpet_licensing_migration.md`.
+
 ## Build/deploy
 
 - `.github/workflows/firestick.yml` and `windows.yml` are **`workflow_dispatch`-only** (no `on: push`),

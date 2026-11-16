@@ -3042,9 +3042,11 @@ function fixtureList(ev) {
 
 
 /* ================= Red Carpet Pro license =================
-   One-time $9.99 purchase via a Merchant of Record (Lemon Squeezy). A real purchase hands the buyer a
-   Lemon Squeezy license key (their own UUID format, not any shape of our choosing -- this file never
-   assumes one), verified here against their /v1/licenses/activate endpoint. PRO_TEST_KEY_HASH is a
+   One-time purchase (launch price $4.99, later $9.99) via a Merchant of Record -- Polar or Creem, chosen
+   on https://redcarpetplayer.store/buy.html. Lemon Squeezy was dropped (it shut down before activating our
+   store). A purchase's webhook makes OUR server issue a key (website/api, deployed with the website on
+   Vercel); this file just sends what's typed to our own /api/license/activate and never assumes a key's
+   shape (the server normalises case/dashes). PRO_TEST_KEY_HASH is a
    SHA-256 hash, not the key itself, so the real dev/test value isn't sitting in plaintext in a public
    APK/repo -- compare by hashing what's typed, never by storing the secret itself here. */
 const PRO_TEST_KEY_HASH = '7fbdf56186f49b702a85e133836b6c6bf2c81676b41ecf37486771c1c871e45f';
@@ -3071,7 +3073,7 @@ const TRIAL_START = (() => {
 })();
 function trialDaysLeft() { return Math.max(0, Math.ceil(TRIAL_DAYS - (Date.now() - TRIAL_START) / 86400000)); }
 function inTrial() { return trialDaysLeft() > 0; }
-/* TEMPORARY, 2026-11-14: the real Lemon Squeezy store isn't activated yet, so there is currently no
+/* TEMPORARY, 2026-11-14: the real store (Lemon Squeezy then, Polar/Creem now) isn't live yet, so there is currently no
    way for anyone -- the owner included -- to actually buy a key. Showing a paywall nobody can get
    past is worse than showing none at all while that's true, and current download volume is low
    enough that giving Pro away free for this window is an acceptable, deliberate call, not an
@@ -3081,9 +3083,10 @@ function inTrial() { return trialDaysLeft() > 0; }
 const FREE_FOR_NOW = true;
 function isProActive() { return FREE_FOR_NOW || isProUnlocked() || inTrial(); }
 /* A stable-per-device label (not a hardcoded constant) so each of a license's up-to-5 activated
-   instances shows up distinctly in the Lemon Squeezy dashboard instead of 5 identical "Red Carpet
-   Player" rows nobody can tell apart -- generated once and persisted, so re-activating the same
-   device later reuses the same label instead of spawning a new-looking instance name each time. */
+   instances is distinct on our server instead of 5 identical "Red Carpet Player" rows nobody can tell
+   apart -- generated once and persisted, so re-activating the same device later reuses the same label
+   (and the server hands back the same slot) instead of using up another of the 5. */
+const LICENSE_API = 'https://redcarpetplayer.store/api/license';
 function proDeviceLabel() {
   let id = load('sp_devid', null);
   if (!id) { id = Math.random().toString(36).slice(2, 6).toUpperCase(); save('sp_devid', id); }
@@ -3091,7 +3094,7 @@ function proDeviceLabel() {
 }
 async function proActivateOnline(key) {
   try {
-    const res = await fetch('https://api.lemonsqueezy.com/v1/licenses/activate', {
+    const res = await fetch(LICENSE_API + '/activate', {
       method: 'POST',
       headers: {'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'},
       body: new URLSearchParams({license_key: key, instance_name: proDeviceLabel()})
@@ -3103,7 +3106,7 @@ async function proActivateOnline(key) {
 }
 async function proDeactivateOnline(key, instanceId) {
   try {
-    const res = await fetch('https://api.lemonsqueezy.com/v1/licenses/deactivate', {
+    const res = await fetch(LICENSE_API + '/deactivate', {
       method: 'POST',
       headers: {'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'},
       body: new URLSearchParams({license_key: key, instance_id: instanceId})
@@ -3128,8 +3131,8 @@ function proRefreshScreen() {
   else renderMain();
 }
 /* The one real deactivation path -- used by both "clear the key field" and the explicit Settings
-   menu option below, so a device's license-key instance is always actually released on Lemon
-   Squeezy's side (freeing one of the license's 5 device slots), not just unset locally. A test-key
+   menu option below, so a device's license-key instance is always actually released on our
+   server (freeing one of the license's 5 device slots), not just unset locally. A test-key
    activation has no online instance to release, so this only calls out when mode === 'online'. */
 async function proDeactivate() {
   const p = ui.pro;
@@ -3170,12 +3173,11 @@ function openInSystemBrowser(url) {
   if (window.RCSPC && window.RCSPC.openUrl) { try { window.RCSPC.openUrl(url); return; } catch (e) {} }
   window.open(url, '_blank');
 }
-/* Lemon Squeezy's checkout[custom][device_id] query param -- their own documented way to carry
-   custom data through checkout -- so a purchase from this screen already identifies which device
-   it came from, same as the label Lemon Squeezy's own dashboard shows for an activated instance
-   (see proDeviceLabel). */
+/* The website's buy page, not a shop link baked into the app: the actual Polar/Creem checkout links
+   live in ONE place there (website/buy.html), so changing shop or price never needs an app update
+   (old APKs/installs keep working). */
 function proCheckoutUrl() {
-  return 'https://redcarpetplayer.lemonsqueezy.com/checkout/buy/70a50843-75c3-4fd5-9a25-379bd2b058e0?checkout[custom][device_id]=' + encodeURIComponent(proDeviceLabel());
+  return 'https://redcarpetplayer.store/buy.html';
 }
 function proUpsell(feature) {
   const qr = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(proCheckoutUrl());
@@ -3199,7 +3201,7 @@ function proUpsell(feature) {
      website's own current price by hand (both "$4.99 one-time" today) rather than fetched live, same
      tradeoff as PRO_GUIDE_V2_URL/RCS_GUIDE elsewhere in this file being baked in, not queried -- a
      wrong price for a while until the next build is still far better than showing none at all. */
-  items.push({l: 'Red Carpet Pro: $4.99 one-time (lifetime, not a subscription).', a: () => {}});
+  items.push({l: 'Red Carpet Pro: $4.99 special launch price, one-time (lifetime, not a subscription).', a: () => {}});
   if (PHONE || PC) items.push({l: 'Open Checkout on This Device', a: () => openInSystemBrowser(proCheckoutUrl())});
   items.push({l: 'Enter a Red Carpet Pro license key…', a: proActivateMenu});
   items.push({l: 'Not now', a: () => {}});

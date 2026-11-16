@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Get Red Carpet Pro</title>
+<link rel="icon" type="image/png" href="icons/logo-mark-square.png">
+<style>
+  :root{--crimson:#9E2A2B;--crimson-hover:#B83334;--gold:#D4AF37;--gold-light:#F3E5AB;--ink:#E2E8F0;--muted:#94A3B8;--bg:#0A0F1C;--card:#111726;--card-border:rgba(212,175,55,.18)}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,'Segoe UI',sans-serif;line-height:1.55}
+  .card{width:100%;max-width:480px;background:var(--card);border:1px solid var(--card-border);border-radius:14px;padding:28px 22px;text-align:center}
+  h1{margin:0 0 .3rem;font-size:1.5rem}
+  .price{font-size:2rem;font-weight:800;margin:.6rem 0 0}
+  .price small{font-size:.9rem;color:var(--muted);font-weight:600}
+  p{margin:.5rem 0;color:var(--muted);font-size:.9rem}
+  .badge{display:inline-block;background:rgba(212,175,55,.14);border:1px solid var(--gold);color:var(--gold-light);font-size:.7rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:.3rem .7rem;border-radius:999px}
+  a.btn{display:block;margin-top:.7rem;padding:.85rem 1rem;border-radius:.65rem;border:1px solid var(--gold);background:var(--crimson);color:#fff;text-decoration:none;font-weight:800;letter-spacing:.02em;text-transform:uppercase;font-size:.85rem}
+  a.btn:hover{background:var(--crimson-hover)}
+  a{color:var(--gold-light)}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main class="card">
+  <span class="badge">Special Launch Price</span>
+  <h1>Red Carpet Pro</h1>
+  <div class="price">$4.99 <small>USD · one-time · lifetime</small></div>
+  <p>One payment unlocks Pro forever on up to 5 of your devices. No subscription.</p>
+  <div id="buttons"></div>
+  <p id="soon" hidden>Checkout is opening very soon. Please check back shortly, or email <a href="mailto:redcarpetplayer@pm.me">redcarpetplayer@pm.me</a>.</p>
+  <p style="font-size:.78rem">Pro unlocks software utilities only. It does not provide access to any media content. Payment is handled by a Merchant of Record — we never see your card details.</p>
+</main>
+<script>
+// ONE place to change checkout links (no app update needed). Paste each shop's checkout link here.
+// A link left empty is simply not shown. With exactly one link, visitors are sent straight to it.
+var CHECKOUTS = [
+  { name: 'Polar',  url: '' },
+  { name: 'Creem',  url: '' }
+];
+(function () {
+  var live = CHECKOUTS.filter(function (c) { return /^https:\/\//.test(c.url); });
+  if (live.length === 1) { location.replace(live[0].url); return; }
+  if (!live.length) { document.getElementById('soon').hidden = false; return; }
+  var box = document.getElementById('buttons');
+  live.forEach(function (c) {
+    var a = document.createElement('a');
+    a.className = 'btn'; a.href = c.url; a.textContent = 'Checkout with ' + c.name;
+    box.appendChild(a);
+  });
+})();
+</script>
+</body>
+</html>
