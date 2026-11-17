@@ -9,7 +9,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { cmd, hgetall } from './kv.mjs';
 
 export const MAX_DEVICES = 5;
-export const SUPPORT_EMAIL = 'redcarpetplayer@pm.me';
+export const SUPPORT_EMAIL = 'support@redcarpetplayer.store';
 
 // 31 symbols: no 0/O/1/I/L, so a key read off a screen and typed with a TV remote isn't ambiguous.
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
