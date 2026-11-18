@@ -24,7 +24,7 @@
   "name": "Red Carpet Player",
   "operatingSystem": "Android TV, Fire OS, Android 8.0+, Windows 10/11",
   "applicationCategory": "MultimediaApplication",
-  "description": "Red Carpet Player is a standalone 4K Live TV and Event Guide player for your own M3U/M3U8 or Xtream playlist, with instant local caching and automated fixture-to-channel matching.",
+  "description": "Red Carpet Player is a standalone 4K Live TV and Event Guide player for your own M3U/M3U8 or Xtream playlist, with instant local caching and automated matching of public event schedules to your own channels.",
   "url": "https://www.redcarpetplayer.store/",
   "image": "https://www.redcarpetplayer.store/img/hero-art.jpg",
   "softwareVersion": "4.0",
@@ -51,10 +51,26 @@
   "mainEntity": [
     {
       "@type": "Question",
-      "name": "How do I load a huge 50,000+ channel M3U or Xtream playlist on Fire TV without memory crashes or EPG freezes?",
+      "name": "How does the Event Guide work with my own playlist?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Red Carpet Player never loads your whole catalogue into memory at once. Live channels, movies and series are fetched and cached one provider category at a time into a lightweight on-device index, so even a playlist with tens of thousands of channels and titles opens instantly and stays responsive on a base Fire TV Stick. Search runs against that same lean index instead of a full grouped catalogue, so it can't balloon memory either. The TV guide (EPG) updates in the background and only patches the fixtures that actually changed, instead of rebuilding the whole guide and freezing the screen every time a match goes live."
+        "text": "The Event Guide reads public event guides and broadcast schedules (including sports, news and documentaries) and matches them against the channels and categories in your own playlist and XMLTV guide. You can browse it free; with Pro you can tune straight into a matched channel. Red Carpet Player includes no channels or playlists of its own, so matches only appear for sources you have added."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I organise categories and favourites?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Pin the channels you watch most, reorder your categories, and use search shortcuts to jump straight to a channel. Channels and categories are cached on your device, so browsing and switching stay quick even on a basic Fire TV Stick."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How does the 7-day free trial work, and which devices are supported?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Every install includes a 7-day full Pro trial automatically, with no card required. After that you can keep using the free player or buy a one-time Pro licence ($4.99 USD) for up to 5 personal devices. Red Carpet Player runs on Android TV, Fire TV, Google TV, Android phones and tablets, and Windows 10/11."
       }
     },
     {
@@ -70,7 +86,7 @@
       "name": "Is there a native Windows desktop M3U/Xtream player with hardware playback and EPG search?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Yes. The Windows build is a native desktop app with hardware-decoded video playback (Chromium's own decoder, with mpv bundled as a fallback for formats it can't handle, such as MKV or Dolby/DTS/TrueHD audio) and the same instant local search and Event Guide fixture matching as the TV app. It installs from a small .zip — no Microsoft Store listing or admin rights required."
+        "text": "Yes. The Windows build is a native desktop app with hardware-decoded video playback (Chromium's own decoder, with mpv bundled as a fallback for formats it can't handle, such as MKV or Dolby/DTS/TrueHD audio) and the same instant local search and Event Guide schedule matching as the TV app. It installs from a small .zip — no Microsoft Store listing or admin rights required."
       }
     },
     {
@@ -424,7 +440,7 @@
     <div class="wrap hero-inner">
       <span class="eyebrow">Next-Gen M3U &amp; Xtream Media Player</span>
       <h1>Your Playlist. Finally Given A <span class="gold-text">Cinema-Grade</span> Interface.</h1>
-      <p class="sub">Ditch clunky, spreadsheet-style TV apps. Download the free base player and get a complete, working 4K Live TV &amp; VOD experience with instant local caching — $0, forever. Upgrade to Pro ($4.99 one-time) whenever you want the automated Event Guide fixture matcher, Smart EPG auto-repair, and custom category controls.</p>
+      <p class="sub">Ditch clunky, spreadsheet-style TV apps. Download the free base player and get a complete, working 4K Live TV &amp; VOD experience with instant local caching — $0, forever. Upgrade to Pro ($4.99 one-time) whenever you want the automated Event Guide schedule matcher, Smart EPG auto-repair, and custom category controls.</p>
       <p class="free-badge">Includes 7-Day Full Pro Trial (No Credit Card Required) — Core Player Free Forever</p>
 
       <div class="cta-row" id="setup">
@@ -559,7 +575,7 @@
             <div class="tv-screen"><img src="assets/screenshot-eventguide.png" alt="Red Carpet Player Event Guide screen" loading="lazy"></div>
           </div>
           <div class="tv-stand"></div>
-          <p class="screen-cap"><b>Event Guide</b> — fixtures matched automatically against your own playlist, by category.</p>
+          <p class="screen-cap"><b>Event Guide</b> — events matched automatically against your own playlist, by category.</p>
         </div>
         <div>
           <div class="tv-frame">
@@ -651,7 +667,7 @@
           </div>
           <div>
             <h3>Dynamic Event Guide</h3>
-            <p>Cross-references public fixture schedules against your local XMLTV guide and playlist categories automatically.</p>
+            <p>Cross-references public event schedules against your local XMLTV guide and playlist categories automatically.</p>
           </div>
         </div>
         <div class="feat-item">
@@ -660,7 +676,7 @@
           </div>
           <div>
             <h3>Instant Local Engine</h3>
-            <p>Caches tens of thousands of channels on-device, so live TV, search, and guide switching open in milliseconds.</p>
+            <p>Caches your channel list on-device, so live TV, search, and guide switching open in milliseconds.</p>
           </div>
         </div>
         <div class="feat-item">
@@ -682,7 +698,7 @@
       <div class="section-head">
         <span class="eyebrow">Technical Spec &amp; Architecture Comparison</span>
         <h2>Red Carpet Player <span class="gold-text">vs.</span> The Field</h2>
-        <p>TiviMate, iMPlayer, and VU / Smarters, measured on the specifics that actually matter on a Fire TV Stick.</p>
+        <p>Typical alternatives, measured on the specifics that actually matter on a Fire TV Stick.</p>
       </div>
       <div class="compare-scroll">
         <table class="compare-table">
@@ -690,9 +706,9 @@
             <tr>
               <th></th>
               <th class="win">Red Carpet Player</th>
-              <th>TiviMate</th>
-              <th>iMPlayer</th>
-              <th>VU / Smarters</th>
+              <th>Legacy TV Players</th>
+              <th>Subscription Players</th>
+              <th>Basic M3U Players</th>
             </tr>
           </thead>
           <tbody>
@@ -719,7 +735,7 @@
             </tr>
             <tr>
               <td>Memory &amp; Indexing Engine</td>
-              <td class="win">Lightweight local indexed cache — 0ms search across 50,000+ channels on standard Fire TV Sticks</td>
+              <td class="win">Lightweight local indexed cache — instant search on standard Fire TV Sticks</td>
               <td>Standard app-level caching</td>
               <td>Heavier RAM footprint on budget Fire Sticks</td>
               <td>Slower linear list parsing on large playlists</td>
@@ -761,7 +777,7 @@
             <ul class="price-list">
               <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Full 4K Live TV &amp; VOD playback — bring your own M3U/M3U8 playlist or network tuner API</li>
               <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Local channel caching</li>
-              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Full Event Guide fixture browsing — filter by sport, see matched channels</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Full Event Guide browsing — filter by sport, see matched channels</li>
               <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>7-day full Pro trial included, automatically — no card required</li>
             </ul>
             <label class="ack-row">
@@ -777,8 +793,8 @@
             <p class="price-note">Standard price $9.99 after launch. No subscription and no recurring fees — nothing to cancel; one payment unlocks Pro forever. Every install also gets a 7-day full Pro trial, no card required.</p>
             <ul class="price-list">
               <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Everything in the Free tier</li>
-              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>One-click Event Guide stream launching — tune straight into a matched fixture</li>
-              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Manual “+ Link Channel” fixture binding when the auto-matcher misses one</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>One-click Event Guide stream launching — tune straight into a matched event</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Manual “+ Link Channel” event binding when the auto-matcher misses one</li>
               <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Smart EPG Channel Auto-Match &amp; Manual Guide Re-mapping</li>
               <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Pinned Channels, Custom Category Reordering &amp; Search Shortcuts</li>
               <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Multi-Source XMLTV &amp; Supplemental Schedule Merging</li>
@@ -821,8 +837,16 @@
       </div>
       <div class="faq-list">
         <details class="faq-item">
-          <summary>How do I load a huge 50,000+ channel M3U or Xtream playlist on Fire TV without memory crashes or EPG freezes?</summary>
-          <p>Red Carpet Player never loads your whole catalogue into memory at once. Live channels, movies and series are fetched and cached one provider category at a time into a lightweight on-device index, so even a playlist with tens of thousands of channels and titles opens instantly and stays responsive on a base Fire TV Stick. Search runs against that same lean index instead of a full grouped catalogue, so it can't balloon memory either. The TV guide (EPG) updates in the background and only patches the fixtures that actually changed, instead of rebuilding the whole guide and freezing the screen every time a match goes live.</p>
+          <summary>How does the Event Guide work with my own playlist?</summary>
+          <p>The Event Guide reads public event guides and broadcast schedules (including sports, news and documentaries) and matches them against the channels and categories in your own playlist and XMLTV guide. You can browse it free; with Pro you can tune straight into a matched channel. Red Carpet Player includes no channels or playlists of its own, so matches only appear for sources you have added.</p>
+        </details>
+        <details class="faq-item">
+          <summary>How do I organise categories and favourites?</summary>
+          <p>Pin the channels you watch most, reorder your categories, and use search shortcuts to jump straight to a channel. Channels and categories are cached on your device, so browsing and switching stay quick even on a basic Fire TV Stick.</p>
+        </details>
+        <details class="faq-item">
+          <summary>How does the 7-day free trial work, and which devices are supported?</summary>
+          <p>Every install includes a 7-day full Pro trial automatically, with no card required. After that you can keep using the free player or buy a one-time Pro licence ($4.99 USD) for up to 5 personal devices. Red Carpet Player runs on Android TV, Fire TV, Google TV, Android phones and tablets, and Windows 10/11.</p>
         </details>
         <details class="faq-item">
           <summary>How do I install Red Carpet Player on a Firestick or Google TV device?</summary>
@@ -830,7 +854,7 @@
         </details>
         <details class="faq-item">
           <summary>Is there a native Windows desktop M3U/Xtream player with hardware playback and EPG search?</summary>
-          <p>Yes. The Windows build is a native desktop app with hardware-decoded video playback (Chromium's own decoder, with mpv bundled as a fallback for formats it can't handle, such as MKV or Dolby/DTS/TrueHD audio) and the same instant local search and Event Guide fixture matching as the TV app. It installs from a small .zip — no Microsoft Store listing or admin rights required.</p>
+          <p>Yes. The Windows build is a native desktop app with hardware-decoded video playback (Chromium's own decoder, with mpv bundled as a fallback for formats it can't handle, such as MKV or Dolby/DTS/TrueHD audio) and the same instant local search and Event Guide schedule matching as the TV app. It installs from a small .zip — no Microsoft Store listing or admin rights required.</p>
         </details>
         <details class="faq-item">
           <summary>Does the same app support touch navigation as well as a TV remote?</summary>
@@ -869,7 +893,7 @@
     <h4>What the app contacts on your behalf</h4>
     <ul>
       <li>The player connects directly from your device to the playlist or network tuner endpoint you provide, and to any optional third-party XMLTV/EPG address you choose to add in Settings — never through a server we control.</li>
-      <li>Optional public fixture-schedule lookups (used only to label events in the guide) are read-only and contain no personal data.</li>
+      <li>Optional public event-schedule lookups (used only to label events in the guide) are read-only and contain no personal data.</li>
     </ul>
     <h4>Pro License Checkout &amp; Activation</h4>
     <ul>
